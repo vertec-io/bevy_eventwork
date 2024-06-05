@@ -205,8 +205,10 @@ impl Display for ConnectionId {
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire
 pub struct NetworkPacket {
-    kind: String,
-    data: Vec<u8>,
+    /// Typically the NetworkMessage::NAME
+    pub kind: String,
+    /// The serialized message from bincode
+    pub data: Vec<u8>,
 }
 
 impl Debug for NetworkPacket {
@@ -280,7 +282,7 @@ pub struct EventworkPlugin<NP: NetworkProvider, RT: Runtime = bevy::tasks::TaskP
 
 impl<NP: NetworkProvider + Default, RT: Runtime> Plugin for EventworkPlugin<NP, RT> {
     fn build(&self, app: &mut App) {
-        app.insert_resource(managers::Network::new(NP::default()));
+        app.insert_resource(Network::new(NP::default()));
         app.add_event::<NetworkEvent>();
         app.add_systems(
             PreUpdate,
