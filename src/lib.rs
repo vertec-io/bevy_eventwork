@@ -207,8 +207,8 @@ impl Display for ConnectionId {
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire
 pub struct NetworkPacket {
-    kind: String,
-    data: Vec<u8>,
+    pub kind: String,
+    pub data: Vec<u8>,
 }
 
 impl Debug for NetworkPacket {
@@ -235,8 +235,8 @@ pub enum NetworkEvent {
 ///
 /// Please check the root documentation how to up everything
 pub struct NetworkData<T> {
-    source: ConnectionId,
-    inner: T,
+    pub source: ConnectionId,
+    pub inner: T,
 }
 
 impl<T> Deref for NetworkData<T> {
