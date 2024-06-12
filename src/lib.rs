@@ -9,6 +9,8 @@
 )]
 #![allow(clippy::type_complexity)]
 
+// //
+
 /*!
 A simple networking plugin for Bevy designed to work with Bevy's event architecture.
 
