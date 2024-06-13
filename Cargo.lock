@@ -586,6 +586,7 @@ dependencies = [
  "bincode",
  "dashmap",
  "futures-lite 2.2.0",
+ "network_project",
  "serde",
 ]
 

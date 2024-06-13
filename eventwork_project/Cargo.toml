@@ -52,5 +52,7 @@ async-net = { version = "2.0.0", optional = true }
 # Used for Stream type and other ext
 futures-lite = "2.0.0"
 
+network_project = { path = "../network_project"}
+
 [dev-dependencies]
 bevy = { version = "0.13.0", features = ["default_font"] }

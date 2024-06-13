@@ -211,7 +211,8 @@ use bevy::{
 use dashmap::DashMap;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{error::NetworkError, ConnectionId, NetworkData, NetworkMessage, NetworkPacket};
+use crate::{error::NetworkError, ConnectionId, NetworkData};
+use network_project::{NetworkMessage, NetworkPacket};
 
 use super::{network::register_message, Network, NetworkProvider};
 

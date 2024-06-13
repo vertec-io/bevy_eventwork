@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "eventwork_project",
     "network_project"

@@ -10,11 +10,11 @@ use futures_lite::StreamExt;
 
 use crate::{
     error::NetworkError,
-    network_message::NetworkMessage,
+    // network_message::NetworkMessage,
     runtime::{run_async, EventworkRuntime},
-    AsyncChannel, Connection, ConnectionId, NetworkData, NetworkEvent, NetworkPacket, Runtime,
+    AsyncChannel, Connection, ConnectionId, NetworkData, NetworkEvent, Runtime,
 };
-
+use network_project::{NetworkMessage, NetworkPacket};
 use super::{Network, NetworkProvider};
 
 impl<NP: NetworkProvider> std::fmt::Debug for Network<NP> {

@@ -78,9 +78,12 @@ fn handle_connection_events(mut network_events: EventReader<NetworkEvent>,) {
 ```rust,no_run
 use bevy::prelude::*;
 use bevy_eventwork::{EventworkRuntime,
-    EventworkPlugin, NetworkData, NetworkMessage, Network, NetworkEvent, AppNetworkMessage,
+    EventworkPlugin, NetworkData, 
+    // NetworkMessage,
+    Network, NetworkEvent, AppNetworkMessage,
     tcp::TcpProvider,tcp::NetworkSettings
 };
+use network_project::NetworkMessage;
 use bevy::tasks::TaskPoolBuilder;
 use serde::{Serialize, Deserialize};
 
@@ -148,7 +151,7 @@ Currently, Bevy's [TaskPool](bevy::tasks::TaskPool) is the default runtime used 
 
 /// Contains error enum.
 pub mod error;
-mod network_message;
+// mod network_message;
 
 /// Contains all functionality for starting a server or client, sending, and recieving messages from clients.
 pub mod managers;
@@ -170,8 +173,9 @@ use async_channel::{unbounded, Receiver, Sender};
 pub use async_trait::async_trait;
 use bevy::prelude::*;
 use error::NetworkError;
-pub use network_message::NetworkMessage;
-use serde::{Deserialize, Serialize};
+pub use network_project::NetworkMessage;
+pub use network_project::NetworkPacket;
+// use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
 #[cfg(feature = "tcp")]
@@ -204,22 +208,22 @@ impl Display for ConnectionId {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-/// [`NetworkPacket`]s are untyped packets to be sent over the wire
-pub struct NetworkPacket {
-    /// Typically the NetworkMessage::NAME
-    pub kind: String,
-    /// The serialized message from bincode
-    pub data: Vec<u8>,
-}
+// #[derive(Serialize, Deserialize)]
+// /// [`NetworkPacket`]s are untyped packets to be sent over the wire
+// pub struct NetworkPacket {
+//     /// Typically the NetworkMessage::NAME
+//     pub kind: String,
+//     /// The serialized message from bincode
+//     pub data: Vec<u8>,
+// }
 
-impl Debug for NetworkPacket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NetworkPacket")
-            .field("kind", &self.kind)
-            .finish()
-    }
-}
+// impl Debug for NetworkPacket {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("NetworkPacket")
+//             .field("kind", &self.kind)
+//             .finish()
+//     }
+// }
 
 #[derive(Debug, Event)]
 /// A network event originating from another eventwork app
