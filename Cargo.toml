@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "eventwork_project",
-    "network_project"
+    "crates/eventwork_project",
+    "crates/network_project"
 ]
