@@ -9,12 +9,13 @@ use dashmap::DashMap;
 use futures_lite::StreamExt;
 
 use crate::{
-    error::NetworkError,
+    // error::NetworkError,
     // network_message::NetworkMessage,
     runtime::{run_async, EventworkRuntime},
-    AsyncChannel, Connection, ConnectionId, NetworkData, NetworkEvent, Runtime,
+    AsyncChannel, Connection, NetworkData, NetworkEvent, Runtime,
 };
-use eventwork_common::{NetworkMessage, NetworkPacket};
+use eventwork_common::{NetworkMessage, NetworkPacket, ConnectionId};
+use eventwork_common::error::NetworkError;
 use super::{Network, NetworkProvider};
 
 impl<NP: NetworkProvider> std::fmt::Debug for Network<NP> {

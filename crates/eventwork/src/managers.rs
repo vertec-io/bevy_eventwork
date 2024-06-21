@@ -7,8 +7,11 @@ use dashmap::DashMap;
 use futures_lite::Stream;
 
 use crate::{
-    error::NetworkError, runtime::JoinHandle, AsyncChannel, Connection, ConnectionId, NetworkPacket,
+    runtime::JoinHandle, AsyncChannel, Connection
 };
+
+use eventwork_common::error::NetworkError;
+use eventwork_common::{NetworkPacket, ConnectionId};
 
 /// Contains logic for using [`Network`]
 pub mod network;

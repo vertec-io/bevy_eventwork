@@ -21,8 +21,9 @@ mod native_websocket {
     use async_trait::async_trait;
     use async_tungstenite::tungstenite::protocol::WebSocketConfig;
     use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
-    use eventwork::{error::NetworkError, managers::NetworkProvider};
+    use eventwork::managers::NetworkProvider;
     use eventwork_common::NetworkPacket;
+    use eventwork_common::error::NetworkError;
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
     use ws_stream_tungstenite::WsStream;

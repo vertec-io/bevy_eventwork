@@ -3,10 +3,11 @@ use std::{net::SocketAddr, pin::Pin};
 use crate::{
     async_channel::{Receiver, Sender},
     async_trait,
-    error::NetworkError,
+    // error::NetworkError,
     managers::NetworkProvider,
     NetworkPacket,
 };
+use eventwork_common::error::NetworkError;
 use async_net::{TcpListener, TcpStream};
 use bevy::{
     log::{debug, error, info, trace},

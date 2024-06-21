@@ -150,7 +150,7 @@ Currently, Bevy's [TaskPool](bevy::tasks::TaskPool) is the default runtime used 
 */
 
 /// Contains error enum.
-pub mod error;
+// pub mod error;
 // mod network_message;
 
 /// Contains all functionality for starting a server or client, sending, and recieving messages from clients.
@@ -164,7 +164,7 @@ use runtime::JoinHandle;
 pub use runtime::Runtime;
 
 use std::{
-    fmt::{Debug, Display},
+    fmt::Debug,
     marker::PhantomData,
 };
 
@@ -172,10 +172,14 @@ pub use async_channel;
 use async_channel::{unbounded, Receiver, Sender};
 pub use async_trait::async_trait;
 use bevy::prelude::*;
-use error::NetworkError;
+
+pub use eventwork_common::error;
+use eventwork_common::error::NetworkError;
+pub use eventwork_common::ConnectionId;
+
 pub use eventwork_common::NetworkMessage;
 pub use eventwork_common::NetworkPacket;
-// use serde::{Deserialize, Serialize};
+
 use std::ops::Deref;
 
 #[cfg(feature = "tcp")]
@@ -194,21 +198,6 @@ impl<T> AsyncChannel<T> {
         Self { sender, receiver }
     }
 }
-
-#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
-/// A [`ConnectionId`] denotes a single connection
-pub struct ConnectionId {
-    /// The key of the connection.
-    pub id: u32,
-}
-
-impl Display for ConnectionId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Connection with ID={0}", self.id))
-    }
-}
-
-
 
 #[derive(Debug, Event)]
 /// A network event originating from another eventwork app

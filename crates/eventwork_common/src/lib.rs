@@ -1,26 +1,14 @@
-// pub fn add(left: usize, right: usize) -> usize {
-//     left + right
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn it_works() {
-//         let result = add(2, 2);
-//         assert_eq!(result, 4);
-//     }
-// }
-
 pub mod network_message_file;
 pub use network_message_file::*;
 pub mod request_shared;
 pub use request_shared::*;
 
+pub mod error;
+
 use serde::{Serialize, Deserialize};
 
 use std::fmt::Debug;
+use std::fmt::Display;
 
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire
@@ -39,12 +27,15 @@ impl Debug for NetworkPacket {
     }
 }
 
-// #[derive(Serialize, Deserialize)]
-// struct RequestInternal<T> {
-//     id: u64,
-//     request: T,
-// }
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+/// A [`ConnectionId`] denotes a single connection
+pub struct ConnectionId {
+    /// The key of the connection.
+    pub id: u32,
+}
 
-// impl<T: RequestMessage> NetworkMessage for RequestInternal<T> {
-//     const NAME: &'static str = T::REQUEST_NAME;
-// }
+impl Display for ConnectionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Connection with ID={0}", self.id))
+    }
+}
