@@ -15,6 +15,9 @@
 
 pub mod network_message_file;
 pub use network_message_file::*;
+pub mod request_shared;
+pub use request_shared::*;
+
 use serde::{Serialize, Deserialize};
 
 use std::fmt::Debug;
@@ -35,3 +38,13 @@ impl Debug for NetworkPacket {
             .finish()
     }
 }
+
+// #[derive(Serialize, Deserialize)]
+// struct RequestInternal<T> {
+//     id: u64,
+//     request: T,
+// }
+
+// impl<T: RequestMessage> NetworkMessage for RequestInternal<T> {
+//     const NAME: &'static str = T::REQUEST_NAME;
+// }

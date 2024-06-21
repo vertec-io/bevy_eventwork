@@ -212,7 +212,7 @@ use dashmap::DashMap;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{error::NetworkError, ConnectionId, NetworkData};
-use eventwork_common::{NetworkMessage, NetworkPacket};
+use eventwork_common::{NetworkMessage, NetworkPacket, request_shared::RequestMessage};
 
 use super::{network::register_message, Network, NetworkProvider};
 
@@ -289,22 +289,22 @@ impl<T: RequestMessage> ResponseMap<T> {
 }
 
 /// Marks a type as a request type.
-pub trait RequestMessage:
-    Clone + Serialize + DeserializeOwned + Send + Sync + Debug + 'static
-{
-    /// The response type for the request.
-    type ResponseMessage: NetworkMessage
-        + Clone
-        + Serialize
-        + DeserializeOwned
-        + Send
-        + Sync
-        + Debug
-        + 'static;
+// pub trait RequestMessage:
+//     Clone + Serialize + DeserializeOwned + Send + Sync + Debug + 'static
+// {
+//     /// The response type for the request.
+//     type ResponseMessage: NetworkMessage
+//         + Clone
+//         + Serialize
+//         + DeserializeOwned
+//         + Send
+//         + Sync
+//         + Debug
+//         + 'static;
 
-    /// The label used for the request type, same rules as [`NetworkMessage`] in terms of naming.
-    const REQUEST_NAME: &'static str;
-}
+//     /// The label used for the request type, same rules as [`NetworkMessage`] in terms of naming.
+//     const REQUEST_NAME: &'static str;
+// }
 
 #[derive(Serialize, Deserialize)]
 struct RequestInternal<T> {
