@@ -8,7 +8,8 @@ members = [
 
 exclude = [
     "crates/eventwork_websockets/examples",
-    "crates/eventwork_websockets/wasm_client_example"
+    "crates/eventwork_websockets/src/wasm_client_example",
+    "crates/eventwork/examples"
     ]
 
 [workspace.dependencies]
