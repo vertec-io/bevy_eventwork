@@ -209,10 +209,10 @@ use bevy::{
     prelude::{debug, App, Event, EventReader, EventWriter, PreUpdate, Res, ResMut, Resource},
 };
 use dashmap::DashMap;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::NetworkData;
-use eventwork_common::{NetworkMessage, NetworkPacket, ConnectionId, request_shared::RequestMessage};
+use eventwork_common::{NetworkMessage, NetworkPacket, ConnectionId, RequestMessage};
 use eventwork_common::error::NetworkError;
 
 use super::{network::register_message, Network, NetworkProvider};

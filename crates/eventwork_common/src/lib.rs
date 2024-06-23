@@ -1,7 +1,5 @@
-pub mod network_message_file;
-pub use network_message_file::*;
-pub mod request_shared;
-pub use request_shared::*;
+pub mod messages;
+pub use messages::*;
 
 pub mod error;
 
@@ -9,6 +7,7 @@ use serde::{Serialize, Deserialize};
 
 use std::fmt::Debug;
 use std::fmt::Display;
+
 
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire

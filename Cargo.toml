@@ -5,3 +5,13 @@ members = [
     "crates/eventwork_websockets",
     "crates/eventwork_common",
 ]
+
+exclude = [
+    "crates/eventwork_websockets/examples",
+    "crates/eventwork_websockets/wasm_client_example"
+    ]
+
+[workspace.dependencies]
+bevy = { version = "0.13", features = [], default-features = false }
+bevy_app = {version = "0.13"}
+bevy_ecs = {version = "0.13"}
