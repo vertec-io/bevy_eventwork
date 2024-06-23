@@ -4,5 +4,4 @@ members = [
     "crates/eventwork",
     "crates/eventwork_websockets",
     "crates/eventwork_common",
-    # "crates/websocket_bevy_split"
 ]
