@@ -26,7 +26,7 @@ impl Debug for NetworkPacket {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug)]
 /// A [`ConnectionId`] denotes a single connection
 pub struct ConnectionId {
     /// The key of the connection.
