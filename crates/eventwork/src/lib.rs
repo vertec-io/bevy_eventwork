@@ -227,6 +227,14 @@ impl<T> Deref for NetworkData<T> {
 }
 
 impl<T> NetworkData<T> {
+    /// Allows manual creation of networkdata for sending events within bevy
+    pub fn new(source: &ConnectionId, inner: T) -> NetworkData<T> {
+        Self{
+            source: *source,
+            inner
+        }
+    }
+
     /// The source of this network data
     pub fn source(&self) -> &ConnectionId {
         &self.source
