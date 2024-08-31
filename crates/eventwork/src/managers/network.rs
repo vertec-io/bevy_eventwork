@@ -322,3 +322,19 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
             .map(|inner| NetworkData { source, inner })
     }));
 }
+
+pub fn relay_outbound_notifications<T: NetworkMessage + Clone, NP: NetworkProvider>(
+    mut outbound_messages: EventReader<OutboundMessage<T>>,
+    net: Res<Network<NP>>,
+) {
+    for notification in outbound_messages.iter() {
+        match &notification.for_client {
+            Some(client) => {
+                let _ = net.send_message(client.clone(), notification.message.clone());
+            }
+            None => {
+                let _ = net.broadcast(notification.message.clone());
+            }
+        }
+    }
+}
