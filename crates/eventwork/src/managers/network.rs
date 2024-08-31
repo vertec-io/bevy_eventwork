@@ -322,3 +322,45 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
             .map(|inner| NetworkData { source, inner })
     }));
 }
+
+
+/// Relays outbound notifications to the appropriate clients.
+///
+/// This system reads outbound messages from the `OutboundMessage<T>` event and
+/// sends them either to a specific client or broadcasts them to all connected clients
+/// using the provided `Network<NP>` resource.
+///
+/// # Type Parameters
+///
+/// * `T` - The type of the network message that implements the `NetworkMessage` trait.
+/// * `NP` - The type of the network provider that implements the `NetworkProvider` trait.
+///
+/// # Parameters
+///
+/// * `outbound_messages` - An `EventReader` that reads `OutboundMessage<T>` events, 
+///   which contain the messages to be sent to clients.
+/// * `net` - A `Res<Network<NP>>` resource that provides access to the network
+///   for sending and broadcasting messages.
+///
+/// # Behavior
+///
+/// The function iterates over all outbound messages:
+/// - If the message is designated for a specific client (`for_client` is `Some(client)`), 
+///   it attempts to send the message to that client using `send_message`.
+/// - If the message is intended for all clients (`for_client` is `None`), it broadcasts 
+///   the message using `broadcast`.
+pub fn relay_outbound_notifications<T: NetworkMessage + Clone, NP: NetworkProvider>(
+    mut outbound_messages: EventReader<OutboundMessage<T>>,
+    net: Res<Network<NP>>,
+) {
+    for notification in outbound_messages.read() {
+        match &notification.for_client {
+            Some(client) => {
+                let _ = net.send_message(client.clone(), notification.message.clone());
+            }
+            None => {
+                let _ = net.broadcast(notification.message.clone());
+            }
+        }
+    }
+}
