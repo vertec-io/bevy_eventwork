@@ -285,10 +285,33 @@ pub trait AppNetworkMessage {
     /// - Register the type for transformation over the wire
     /// - Internal bookkeeping
     fn listen_for_message<T: NetworkMessage, NP: NetworkProvider>(&mut self) -> &mut Self;
+
+    /// Register a network Outgoing message type
+    ///
+    /// ## Details
+    /// This will:
+    /// - Add a new event type of [`OutboundMessage<T>`]
+    /// - Register the type for sending/broadcasting over the wire
+    fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self,system_set:S) -> &mut Self;
 }
 
 impl AppNetworkMessage for App {
     fn listen_for_message<T: NetworkMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
+        let server = self.world.get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
+
+        debug!("Registered a new NetworkMessage: {}", T::NAME);
+
+        assert!(
+            !server.recv_message_map.contains_key(T::NAME),
+            "Duplicate registration of NetworkMessage: {}",
+            T::NAME
+        );
+        server.recv_message_map.insert(T::NAME, Vec::new());
+        self.add_event::<NetworkData<T>>();
+        self.add_systems(PreUpdate, register_message::<T, NP>)
+    }
+
+    fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self, system_set:S) -> &mut Self {
         let server = self.world.get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
 
         debug!("Registered a new ServerMessage: {}", T::NAME);
@@ -299,9 +322,8 @@ impl AppNetworkMessage for App {
             T::NAME
         );
         server.recv_message_map.insert(T::NAME, Vec::new());
-        self.add_event::<NetworkData<T>>();
         self.add_event::<OutboundMessage<T>>();
-        self.add_systems(PreUpdate, register_message::<T, NP>)
+        self.add_systems(PreUpdate, relay_outbound_notifications::<T, NP>.in_set(system_set))
     }
 }
 
