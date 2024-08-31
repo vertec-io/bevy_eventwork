@@ -11,8 +11,7 @@ use futures_lite::StreamExt;
 use crate::{
     // error::NetworkError,
     // network_message::NetworkMessage,
-    runtime::{run_async, EventworkRuntime},
-    AsyncChannel, Connection, NetworkData, NetworkEvent, Runtime,
+    runtime::{run_async, EventworkRuntime}, AsyncChannel, Connection, NetworkData, NetworkEvent, OutboundMessage, Runtime
 };
 use eventwork_common::{NetworkMessage, NetworkPacket, ConnectionId};
 use eventwork_common::error::NetworkError;
@@ -301,6 +300,7 @@ impl AppNetworkMessage for App {
         );
         server.recv_message_map.insert(T::NAME, Vec::new());
         self.add_event::<NetworkData<T>>();
+        self.add_event::<OutboundMessage<T>>();
         self.add_systems(PreUpdate, register_message::<T, NP>)
     }
 }

@@ -277,3 +277,69 @@ impl<NP: NetworkProvider + Default, RT: Runtime> Plugin for EventworkPlugin<NP, 
         );
     }
 }
+
+/// Represents an outbound message to be sent to clients.
+/// 
+/// This struct encapsulates the message payload (`message`), 
+/// an optional target client (`for_client`), and a name (`name`) 
+/// associated with the message.
+#[derive(Event, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct OutboundMessage<T>
+where
+    T: NetworkMessage,
+{
+    /// The name associated with the outbound message.
+    pub name: String,
+    
+    /// The actual message payload to be sent.
+    pub message: T,
+    
+    /// Optional target client for the message.
+    /// If `None`, the message will be broadcasted.
+    pub for_client: Option<ConnectionId>,
+}
+
+impl<T> OutboundMessage<T>
+where
+    T: NetworkMessage, // Reapply the constraint for the implementation block
+{
+    /// Creates a new `OutboundMessage` instance with the given name and message payload.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - A `String` representing the name of the message.
+    /// * `message` - The message payload that implements `NetworkMessage`.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a new `OutboundMessage` instance.
+    pub fn new(name: String, message: T) -> Self {
+        Self {
+            name,
+            message,
+            for_client: None,
+        }
+    }
+
+    /// Sets a specific client connection ID to target the message to.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `id` - The `ConnectionId` of the client to send the message to.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns an updated `OutboundMessage` instance with the target client set.
+    pub fn for_client(mut self, id: ConnectionId) -> Self {
+        self.for_client = Some(id);
+        self
+    }
+}
+
+impl<T: NetworkMessage> Deref for OutboundMessage<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.message
+    }
+}
