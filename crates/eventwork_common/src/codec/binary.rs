@@ -3,9 +3,9 @@ use serde::{de::{DeserializeOwned, Error}, Serialize};
 use std::convert::TryInto;
 
 /// A custom codec that encodes data using bincode and adds a length prefix.
-pub struct LengthPrefixedBincodeCodec;
+pub struct EventworkBincodeCodec;
 
-impl<T: Serialize> Encoder<T> for LengthPrefixedBincodeCodec {
+impl<T: Serialize> Encoder<T> for EventworkBincodeCodec {
     type Error = bincode::Error;
     type Encoded = Vec<u8>;
 
@@ -25,7 +25,7 @@ impl<T: Serialize> Encoder<T> for LengthPrefixedBincodeCodec {
     }
 }
 
-impl<T: DeserializeOwned> Decoder<T> for LengthPrefixedBincodeCodec {
+impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
     type Error = bincode::Error;
     type Encoded = [u8];
 
@@ -65,11 +65,11 @@ mod tests {
         };
 
         // Test encoding
-        let enc = LengthPrefixedBincodeCodec::encode(&t).unwrap();
+        let enc = EventworkBincodeCodec::encode(&t).unwrap();
         assert!(enc.len() > 8); // Ensure there's enough data for a length prefix
 
         // Test decoding
-        let dec: Test = LengthPrefixedBincodeCodec::decode(&enc).unwrap();
+        let dec: Test = EventworkBincodeCodec::decode(&enc).unwrap();
         assert_eq!(dec, t);
     }
 }
