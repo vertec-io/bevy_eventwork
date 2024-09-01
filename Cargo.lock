@@ -1438,6 +1438,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "codee"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d3ad3122b0001c7f140cf4d605ef9a9e2c24d96ab0b4fb4347b76de2425f445"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1875,6 +1884,8 @@ dependencies = [
 name = "eventwork_common"
 version = "0.1.0"
 dependencies = [
+ "bincode",
+ "codee",
  "serde",
 ]
 
