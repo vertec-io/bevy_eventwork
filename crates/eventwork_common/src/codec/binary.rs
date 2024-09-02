@@ -1,6 +1,8 @@
 use codee::{Decoder, Encoder};
-use serde::{de::{DeserializeOwned, Error}, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::convert::TryInto;
+
+use crate::error::NetworkError;
 
 /// A custom codec that encodes data using bincode and adds a length prefix.
 pub struct EventworkBincodeCodec;
@@ -26,13 +28,14 @@ impl<T: Serialize> Encoder<T> for EventworkBincodeCodec {
 }
 
 impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
-    type Error = bincode::Error;
+    type Error = NetworkError;
     type Encoded = [u8];
 
     fn decode(val: &Self::Encoded) -> Result<T, Self::Error> {
         if val.len() < 8 {
             // Not enough data to read the length prefix
-            return Err(bincode::Error::custom("Data is too short to contain length prefix"));
+            // return Err(bincode::Error::custom("Data is too short to contain length prefix"));
+            return Err(NetworkError::Serialization);
         }
 
         // Read the length prefix (first 8 bytes)
@@ -40,11 +43,15 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
 
         // Check that the length of the remaining data matches the length prefix
         if val.len() < 8 + length_prefix as usize {
-            return Err(bincode::Error::custom("Data length does not match length prefix"));
+            // return Err(bincode::Error::custom("Data length does not match length prefix"));
+            return Err(NetworkError::Serialization);
         }
 
         // Deserialize the data using bincode
         bincode::deserialize(&val[8..8 + length_prefix as usize])
+                .map_err(|_err| {
+                    NetworkError::Serialization
+                })
     }
 }
 
