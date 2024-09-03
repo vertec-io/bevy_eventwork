@@ -314,14 +314,17 @@ impl AppNetworkMessage for App {
     fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self, system_set:S) -> &mut Self {
         let server = self.world.get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
 
-        debug!("Registered a new ServerMessage: {}", T::NAME);
+        debug!("Registered a new OutboundMessage: {}", T::NAME);
 
-        assert!(
-            !server.recv_message_map.contains_key(T::NAME),
-            "Duplicate registration of ServerMessage: {}",
-            T::NAME
-        );
-        server.recv_message_map.insert(T::NAME, Vec::new());
+        // assert!(
+        //     !server.recv_message_map.contains_key(T::NAME),
+        //     "Duplicate registration of OutboundMessage: {}",
+        //     T::NAME
+        // );
+        if !server.recv_message_map.contains_key(T::NAME){
+            server.recv_message_map.insert(T::NAME, Vec::new());
+        }
+        
         self.add_event::<OutboundMessage<T>>();
         self.add_systems(PreUpdate, relay_outbound_notifications::<T, NP>.in_set(system_set))
     }
