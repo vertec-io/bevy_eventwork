@@ -24,7 +24,7 @@ name = "server"
 [dependencies]
 # bevy_eventwork = { version = "0.8", default-features = false }
 eventwork_common = { path = "../eventwork_common"}
-eventwork = { path = "../eventwork"}
+eventwork = { path = "../eventwork", default-features = false}
 
 # This is a bevy plugin
 bevy.workspace = true
