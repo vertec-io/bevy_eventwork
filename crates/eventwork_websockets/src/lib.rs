@@ -309,7 +309,9 @@ mod wasm_websocket {
     use async_io_stream::IoStream;
     use async_trait::async_trait;
     use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
-    use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
+    use eventwork::managers::NetworkProvider;
+    use eventwork_common::NetworkPacket;
+    use eventwork_common::error::NetworkError;
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
     use ws_stream_wasm::{WsMeta, WsStream, WsStreamIo};
