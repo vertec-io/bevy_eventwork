@@ -1,6 +1,6 @@
 [package]
 name = "eventwork_websockets"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
@@ -24,7 +24,7 @@ name = "server"
 [dependencies]
 # bevy_eventwork = { version = "0.8", default-features = false }
 eventwork_common = { path = "../eventwork_common"}
-eventwork = { path = "../eventwork"}
+eventwork = { path = "../eventwork", default-features = false}
 
 # This is a bevy plugin
 bevy.workspace = true

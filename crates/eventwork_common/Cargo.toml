@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+codee = "0.2.0"
 serde = { version = "1.0.190", features = ["derive"] }
+bincode.workspace = true

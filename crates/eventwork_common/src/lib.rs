@@ -1,6 +1,8 @@
 pub mod messages;
 pub use messages::*;
 
+pub mod codec;
+
 pub mod error;
 
 use serde::{Serialize, Deserialize};
