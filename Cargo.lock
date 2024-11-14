@@ -1917,7 +1917,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-channel 2.3.1",
  "async-net",
@@ -1932,7 +1932,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_common"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bincode",
  "codee",
@@ -1941,7 +1941,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_websockets"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-channel 2.3.1",
  "async-std",

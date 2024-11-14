@@ -16,3 +16,4 @@ exclude = [
 bevy = { version = "0.14.0",  default-features = false }
 bevy_app = {version = "0.14.0"}
 bevy_ecs = {version = "0.14.0"}
+bincode = "1.3.3"
