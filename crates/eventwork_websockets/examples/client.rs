@@ -116,12 +116,12 @@ impl FromWorld for GlobalChatSettings {
         GlobalChatSettings {
             chat_style: TextStyle {
                 font_size: 20.,
-                color: Color::BLACK,
+                color: Color::BLACK.into(),
                 ..default()
             },
             author_style: TextStyle {
                 font_size: 20.,
-                color: Color::RED,
+                color: Color::srgb(1.0, 0.0, 0.0),
                 ..default()
             },
         }
@@ -355,7 +355,7 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                         height: Val::Percent(10.0),
                         ..Default::default()
                     },
-                    background_color: Color::GRAY.into(),
+                    background_color: BackgroundColor(Color::srgb(0.5, 0.5, 0.5)) ,
                     ..Default::default()
                 })
                 .with_children(|parent_button_bar| {
