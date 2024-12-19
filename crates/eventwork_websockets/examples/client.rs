@@ -314,7 +314,7 @@ fn handle_chat_area(
 }
 
 fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d::default());
 
     commands.spawn((GameChatMessages::new(),));
 
