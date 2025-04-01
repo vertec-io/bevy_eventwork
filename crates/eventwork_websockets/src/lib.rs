@@ -64,6 +64,12 @@ mod native_websocket {
             network_settings: Self::NetworkSettings,
         ) -> Result<Self::Socket, NetworkError> {
             info!("Beginning connection");
+            if connect_info.scheme() == "wss" {
+                return Err(NetworkError::Error(
+                    "WSS connections require the TlsWebSocketProvider. Enable the 'tls' feature and use TlsWebSocketProvider instead".to_string(),
+                ));
+            }
+            
             let (stream, _response) = async_tungstenite::async_std::connect_async_with_config(
                 connect_info,
                 Some(*network_settings),
