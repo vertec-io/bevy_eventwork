@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 /* 
@@ -47,4 +47,28 @@ pub trait RequestMessage:
 
     /// The label used for the request type, same rules as [`NetworkMessage`] in terms of naming.
     const REQUEST_NAME: &'static str;
+}
+
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(bound = "T: NetworkMessage")]
+pub struct TargetedMessage<T: NetworkMessage> {
+    pub target_id: String,
+    pub message: T,
+}
+
+impl<T: NetworkMessage> NetworkMessage for TargetedMessage<T> {
+    const NAME: &'static str = "eventwork::TargetedMessage";
+}
+
+impl<T: NetworkMessage> TargetedMessage<T> {
+    pub fn name() -> &'static str {
+        // Creates a unique name for each TargetedMessage<T> type
+        // 1. Memory is only leaked once per message type during registration
+        // 2. The string needs to live for the entire program lifetime
+        // 3. The leaked memory is automatically freed when the program exits
+        // 4. Provides zero-cost lookups compared to String alternatives
+        Box::leak(format!("Targeted({})", T::NAME).into_boxed_str())
+    }
 }

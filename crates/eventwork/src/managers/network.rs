@@ -13,7 +13,7 @@ use crate::{
     // network_message::NetworkMessage,
     runtime::{run_async, EventworkRuntime}, AsyncChannel, Connection, NetworkData, NetworkEvent, OutboundMessage, Runtime
 };
-use eventwork_common::{NetworkMessage, NetworkPacket, ConnectionId};
+use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, TargetedMessage};
 use eventwork_common::error::NetworkError;
 use super::{Network, NetworkProvider};
 
@@ -293,6 +293,14 @@ pub trait AppNetworkMessage {
     /// - Add a new event type of [`OutboundMessage<T>`]
     /// - Register the type for sending/broadcasting over the wire
     fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self,system_set:S) -> &mut Self;
+
+     /// Register a targeted network message type
+    ///
+    /// ## Details
+    /// This will:
+    /// - Add a new event type of [`NetworkData<TargetedMessage<T>>`]
+    /// - Register the type for transformation over the wire
+    fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(&mut self) -> &mut Self;
 }
 
 impl AppNetworkMessage for App {
@@ -328,6 +336,29 @@ impl AppNetworkMessage for App {
         self.add_event::<OutboundMessage<T>>();
         self.add_systems(PreUpdate, relay_outbound_notifications::<T, NP>.in_set(system_set))
     }
+
+    fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(&mut self) -> &mut Self {
+        let server = self.world_mut().get_resource::<Network<NP>>()
+            .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for targeted messages.");
+
+        let message_name = TargetedMessage::<T>::name();
+        debug!("TargetedMessage::<T>::name(): {}", message_name);
+
+        assert!(
+            !server.recv_message_map.contains_key(message_name),
+            "Duplicate registration of TargetedMessage: {}",
+            message_name
+        );
+
+
+        
+        server.recv_message_map.insert(message_name, Vec::new());
+        self.add_event::<NetworkData<TargetedMessage<T>>>();
+        self.add_systems(PreUpdate, register_targeted_message::<TargetedMessage<T>, NP>);
+        
+        self
+    }
+
 }
 
 pub(crate) fn register_message<T, NP: NetworkProvider>(
@@ -388,4 +419,23 @@ pub fn relay_outbound_notifications<T: NetworkMessage + Clone, NP: NetworkProvid
             }
         }
     }
+}
+
+/// Registers a targeted message type for the network.
+pub fn register_targeted_message<T, NP: NetworkProvider>(
+    net_res: ResMut<Network<NP>>,
+    mut events: EventWriter<NetworkData<TargetedMessage<T>>>,
+) where
+    T: NetworkMessage,
+{
+    let mut messages = match net_res.recv_message_map.get_mut(TargetedMessage::<T>::name()) {
+        Some(messages) => messages,
+        None => return,
+    };
+
+    events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+        bincode::deserialize::<TargetedMessage<T>>(&msg)
+            .ok()
+            .map(|inner| NetworkData { source, inner })
+    }));
 }
