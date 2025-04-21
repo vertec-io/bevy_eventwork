@@ -341,24 +341,29 @@ impl AppNetworkMessage for App {
         let server = self.world_mut().get_resource::<Network<NP>>()
             .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for targeted messages.");
 
-        let message_name = TargetedMessage::<T>::name();
-        debug!("TargetedMessage::<T>::name(): {}", message_name);
+        // Register the base message type for serialization
+        // let base_message_name = T::NAME;
+        // if !server.recv_message_map.contains_key(base_message_name) {
+        //     server.recv_message_map.insert(base_message_name, Vec::new());
+        // }
 
+        // Register the wrapped targeted message
+        let targeted_message_name = TargetedMessage::<T>::name();
         assert!(
-            !server.recv_message_map.contains_key(message_name),
+            !server.recv_message_map.contains_key(targeted_message_name),
             "Duplicate registration of TargetedMessage: {}",
-            message_name
+            targeted_message_name
         );
-
-
         
-        server.recv_message_map.insert(message_name, Vec::new());
+        server.recv_message_map.insert(targeted_message_name, Vec::new());
+        
+        // Add events for both types
+        // self.add_event::<NetworkData<T>>();
         self.add_event::<NetworkData<TargetedMessage<T>>>();
-        self.add_systems(PreUpdate, register_targeted_message::<TargetedMessage<T>, NP>);
+        self.add_systems(PreUpdate, register_targeted_message::<T, NP>);
         
         self
     }
-
 }
 
 pub(crate) fn register_message<T, NP: NetworkProvider>(

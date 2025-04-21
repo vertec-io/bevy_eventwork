@@ -174,10 +174,8 @@ use bevy::prelude::*;
 
 pub use eventwork_common::error;
 use eventwork_common::error::NetworkError;
-pub use eventwork_common::ConnectionId;
 
-pub use eventwork_common::NetworkMessage;
-pub use eventwork_common::NetworkPacket;
+pub use eventwork_common::*;
 
 use std::ops::Deref;
 
