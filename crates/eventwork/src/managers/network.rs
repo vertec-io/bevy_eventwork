@@ -38,7 +38,7 @@ impl<NP: NetworkProvider> Network<NP> {
             server_handle: None,
             connection_tasks: Arc::new(DashMap::new()),
             connection_task_counts: AtomicU32::new(0),
-            connection_count: 0,
+            connection_count: 1, // SERVER reserved ID 0
         }
     }
 

@@ -35,6 +35,16 @@ pub struct ConnectionId {
     pub id: u32,
 }
 
+impl ConnectionId {
+    /// Represents the server's connection ID
+    pub const SERVER: Self = ConnectionId { id: 0 };
+
+    /// Returns true if this ConnectionId represents the server
+    pub fn is_server(&self) -> bool {
+        self.id == Self::SERVER.id
+    }
+}
+
 impl Display for ConnectionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("Connection with ID={0}", self.id))
