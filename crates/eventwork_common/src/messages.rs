@@ -72,3 +72,81 @@ impl<T: NetworkMessage> TargetedMessage<T> {
         Box::leak(format!("Targeted({})", T::NAME).into_boxed_str())
     }
 }
+
+/// Marks a type as a subscription message that can be used in a pub/sub pattern.
+///
+/// # Type Parameters
+/// * `Request` - The message type used to initiate a subscription
+/// * `Unsubscribe` - The message type used to terminate a subscription
+/// * `SubscriptionParams` - Parameters needed to create a subscription request
+///
+/// # Examples
+/// ```rust
+/// use eventwork::{NetworkMessage, SubscriptionMessage};
+/// use serde::{Serialize, Deserialize};
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct GameUpdate {
+///     game_id: String,
+///     state: Vec<u8>,
+/// }
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct SubscribeToGame {
+///     game_id: String,
+/// }
+///
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct UnsubscribeFromGame {
+///     game_id: String,
+/// }
+///
+/// impl NetworkMessage for GameUpdate {
+///     const NAME: &'static str = "game:GameUpdate";
+/// }
+///
+/// impl NetworkMessage for SubscribeToGame {
+///     const NAME: &'static str = "game:Subscribe";
+/// }
+///
+/// impl NetworkMessage for UnsubscribeFromGame {
+///     const NAME: &'static str = "game:Unsubscribe";
+/// }
+///
+/// impl SubscriptionMessage for GameUpdate {
+///     type Request = SubscribeToGame;
+///     type Unsubscribe = UnsubscribeFromGame;
+///     type SubscriptionParams = String;
+///
+///     fn get_id(&self) -> impl Into<String> {
+///         self.game_id.clone()
+///     }
+///
+///     fn create_subscription_request(params: Self::SubscriptionParams) -> Self::Request {
+///         SubscribeToGame { game_id: params }
+///     }
+///
+///     fn create_unsubscribe_request(params: Self::SubscriptionParams) -> Self::Unsubscribe {
+///         UnsubscribeFromGame { game_id: params }
+///     }
+/// }
+/// ```
+pub trait SubscriptionMessage: NetworkMessage {
+    /// The message type used to request a subscription
+    type Request: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
+    
+    /// The message type used to terminate a subscription
+    type Unsubscribe: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
+    
+    /// Parameters needed to create subscription/unsubscribe requests
+    type SubscriptionParams: Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
+    
+    /// Returns a unique identifier for this subscription
+    fn get_id(&self) -> impl Into<String>;
+
+    /// Creates a subscription request from the given parameters
+    fn create_subscription_request(subscription_params: Self::SubscriptionParams) -> Self::Request;
+
+    /// Creates an unsubscribe request from the given parameters
+    fn create_unsubscribe_request(subscription_params: Self::SubscriptionParams) -> Self::Unsubscribe;
+}

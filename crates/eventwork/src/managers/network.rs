@@ -13,7 +13,7 @@ use crate::{
     // network_message::NetworkMessage,
     runtime::{run_async, EventworkRuntime}, AsyncChannel, Connection, NetworkData, NetworkEvent, OutboundMessage, Runtime
 };
-use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, TargetedMessage};
+use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, SubscriptionMessage, TargetedMessage};
 use eventwork_common::error::NetworkError;
 use super::{Network, NetworkProvider};
 
@@ -301,6 +301,14 @@ pub trait AppNetworkMessage {
     /// - Add a new event type of [`NetworkData<TargetedMessage<T>>`]
     /// - Register the type for transformation over the wire
     fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(&mut self) -> &mut Self;
+
+    /// Register a subscription message type
+    ///
+    /// ## Details
+    /// This will:
+    /// - Register the subscription request, unsubscribe message, and subscription updates
+    /// - Add the appropriate event types and system registrations
+    fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self;
 }
 
 impl AppNetworkMessage for App {
@@ -341,12 +349,6 @@ impl AppNetworkMessage for App {
         let server = self.world_mut().get_resource::<Network<NP>>()
             .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for targeted messages.");
 
-        // Register the base message type for serialization
-        // let base_message_name = T::NAME;
-        // if !server.recv_message_map.contains_key(base_message_name) {
-        //     server.recv_message_map.insert(base_message_name, Vec::new());
-        // }
-
         // Register the wrapped targeted message
         let targeted_message_name = TargetedMessage::<T>::name();
         assert!(
@@ -361,6 +363,19 @@ impl AppNetworkMessage for App {
         // self.add_event::<NetworkData<T>>();
         self.add_event::<NetworkData<TargetedMessage<T>>>();
         self.add_systems(PreUpdate, register_targeted_message::<T, NP>);
+        
+        self
+    }
+
+    fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
+        // Register the subscription request
+        self.listen_for_message::<T::Request, NP>();
+        
+        // Register the unsubscribe message
+        self.listen_for_message::<T::Unsubscribe, NP>();
+        
+        // Register the subscription updates
+        self.listen_for_message::<T, NP>();
         
         self
     }
