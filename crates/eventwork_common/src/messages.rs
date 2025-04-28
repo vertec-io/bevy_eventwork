@@ -139,7 +139,7 @@ pub trait SubscriptionMessage: NetworkMessage {
     type UnsubscribeRequest: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
     
     /// Parameters needed to create subscription/unsubscribe requests
-    type SubscriptionParams: Serialize + DeserializeOwned + Send + Sync + Debug + PartialEq + 'static;
+    type SubscriptionParams: Serialize + DeserializeOwned + Send + Sync + Debug + PartialEq + Clone + 'static;
     
     /// Returns the subscription parameters associated with this message
     /// This allows clients to match incoming messages with their original subscription parameters
