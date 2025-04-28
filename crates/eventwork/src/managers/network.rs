@@ -332,11 +332,6 @@ impl AppNetworkMessage for App {
 
         debug!("Registered a new OutboundMessage: {}", T::NAME);
 
-        // assert!(
-        //     !server.recv_message_map.contains_key(T::NAME),
-        //     "Duplicate registration of OutboundMessage: {}",
-        //     T::NAME
-        // );
         if !server.recv_message_map.contains_key(T::NAME){
             server.recv_message_map.insert(T::NAME, Vec::new());
         }
@@ -349,7 +344,6 @@ impl AppNetworkMessage for App {
         let server = self.world_mut().get_resource::<Network<NP>>()
             .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for targeted messages.");
 
-        // Register the wrapped targeted message
         let targeted_message_name = TargetedMessage::<T>::name();
         assert!(
             !server.recv_message_map.contains_key(targeted_message_name),
@@ -359,8 +353,6 @@ impl AppNetworkMessage for App {
         
         server.recv_message_map.insert(targeted_message_name, Vec::new());
         
-        // Add events for both types
-        // self.add_event::<NetworkData<T>>();
         self.add_event::<NetworkData<TargetedMessage<T>>>();
         self.add_systems(PreUpdate, register_targeted_message::<T, NP>);
         
@@ -368,15 +360,37 @@ impl AppNetworkMessage for App {
     }
 
     fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
-        // Register the subscription request
-        self.listen_for_message::<T::Request, NP>();
+        // Check if any of these message types have already been registered
+        let need_request = {
+            let server = self.world_mut().get_resource::<Network<NP>>()
+                .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
+            !server.recv_message_map.contains_key(T::Request::NAME)
+        };
+
+        let need_unsubscribe = {
+            let server = self.world_mut().get_resource::<Network<NP>>()
+                .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
+            !server.recv_message_map.contains_key(T::Unsubscribe::NAME)
+        };
+
+        let need_subscription = {
+            let server = self.world_mut().get_resource::<Network<NP>>()
+                .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
+            !server.recv_message_map.contains_key(T::NAME)
+        };
+
+        if need_request {
+            self.listen_for_message::<T::Request, NP>();
+        }
         
-        // Register the unsubscribe message
-        self.listen_for_message::<T::Unsubscribe, NP>();
+        if need_unsubscribe {
+            self.listen_for_message::<T::Unsubscribe, NP>();
+        }
         
-        // Register the subscription updates
-        self.listen_for_message::<T, NP>();
-        
+        if need_subscription {
+            self.listen_for_message::<T, NP>();
+        }
+
         self
     }
 }
