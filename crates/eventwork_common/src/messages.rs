@@ -114,39 +114,40 @@ impl<T: NetworkMessage> TargetedMessage<T> {
 /// }
 ///
 /// impl SubscriptionMessage for GameUpdate {
-///     type Request = SubscribeToGame;
-///     type Unsubscribe = UnsubscribeFromGame;
+///     type SubscribeRequest = SubscribeToGame;
+///     type UnsubscribeRequest = UnsubscribeFromGame;
 ///     type SubscriptionParams = String;
 ///
-///     fn get_id(&self) -> impl Into<String> {
+///     fn get_subscription_params(&self) -> Self::SubscriptionParams {
 ///         self.game_id.clone()
 ///     }
 ///
-///     fn create_subscription_request(params: Self::SubscriptionParams) -> Self::Request {
+///     fn create_subscription_request(params: Self::SubscriptionParams) -> Self::SubscribeRequest {
 ///         SubscribeToGame { game_id: params }
 ///     }
 ///
-///     fn create_unsubscribe_request(params: Self::SubscriptionParams) -> Self::Unsubscribe {
+///     fn create_unsubscribe_request(params: Self::SubscriptionParams) -> Self::UnsubscribeRequest {
 ///         UnsubscribeFromGame { game_id: params }
 ///     }
 /// }
 /// ```
 pub trait SubscriptionMessage: NetworkMessage {
     /// The message type used to request a subscription
-    type Request: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
+    type SubscribeRequest: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
     
     /// The message type used to terminate a subscription
-    type Unsubscribe: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
+    type UnsubscribeRequest: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
     
     /// Parameters needed to create subscription/unsubscribe requests
     type SubscriptionParams: Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
     
-    /// Returns a unique identifier for this subscription
-    fn get_id(&self) -> impl Into<String>;
+    /// Returns the subscription parameters associated with this message
+    /// This allows clients to match incoming messages with their original subscription parameters
+    fn get_subscription_params(&self) -> Self::SubscriptionParams;
 
     /// Creates a subscription request from the given parameters
-    fn create_subscription_request(subscription_params: Self::SubscriptionParams) -> Self::Request;
+    fn create_subscription_request(subscription_params: Self::SubscriptionParams) -> Self::SubscribeRequest;
 
     /// Creates an unsubscribe request from the given parameters
-    fn create_unsubscribe_request(subscription_params: Self::SubscriptionParams) -> Self::Unsubscribe;
+    fn create_unsubscribe_request(subscription_params: Self::SubscriptionParams) -> Self::UnsubscribeRequest;
 }

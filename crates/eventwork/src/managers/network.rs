@@ -364,13 +364,13 @@ impl AppNetworkMessage for App {
         let need_request = {
             let server = self.world_mut().get_resource::<Network<NP>>()
                 .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
-            !server.recv_message_map.contains_key(T::Request::NAME)
+            !server.recv_message_map.contains_key(T::SubscribeRequest::NAME)
         };
 
         let need_unsubscribe = {
             let server = self.world_mut().get_resource::<Network<NP>>()
                 .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
-            !server.recv_message_map.contains_key(T::Unsubscribe::NAME)
+            !server.recv_message_map.contains_key(T::UnsubscribeRequest::NAME)
         };
 
         let need_subscription = {
@@ -380,11 +380,11 @@ impl AppNetworkMessage for App {
         };
 
         if need_request {
-            self.listen_for_message::<T::Request, NP>();
+            self.listen_for_message::<T::SubscribeRequest, NP>();
         }
         
         if need_unsubscribe {
-            self.listen_for_message::<T::Unsubscribe, NP>();
+            self.listen_for_message::<T::UnsubscribeRequest, NP>();
         }
         
         if need_subscription {
