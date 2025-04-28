@@ -131,6 +131,7 @@ impl<T: NetworkMessage> TargetedMessage<T> {
 ///     }
 /// }
 /// ```
+/// 
 pub trait SubscriptionMessage: NetworkMessage {
     /// The message type used to request a subscription
     type SubscribeRequest: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;

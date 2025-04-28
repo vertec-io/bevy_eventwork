@@ -5,11 +5,13 @@ pub mod codec;
 
 pub mod error;
 
+
 use serde::{Serialize, Deserialize};
 
 use std::fmt::Debug;
 use std::fmt::Display;
 
+pub use eventwork_macros::SubscribeById;
 
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire
@@ -44,6 +46,7 @@ impl ConnectionId {
         self.id == Self::SERVER.id
     }
 }
+
 
 impl Display for ConnectionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

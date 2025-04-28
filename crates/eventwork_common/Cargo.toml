@@ -1,9 +1,10 @@
 [package]
 name = "eventwork_common"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 
 [dependencies]
 codee = "0.2.0"
+eventwork_macros = { path = "../eventwork_macros" }
 serde = { version = "1.0.190", features = ["derive"] }
 bincode.workspace = true

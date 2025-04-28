@@ -2115,11 +2115,21 @@ dependencies = [
 
 [[package]]
 name = "eventwork_common"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bincode",
  "codee",
+ "eventwork_macros",
  "serde",
+]
+
+[[package]]
+name = "eventwork_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
