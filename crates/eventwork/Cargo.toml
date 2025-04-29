@@ -1,6 +1,6 @@
 [package]
 name = "eventwork"
-version = "0.9.5"
+version = "0.9.6"
 authors = [
     "James <jamescarterbell@gmail.com>",
     "Neikos <neikos@neikos.email>",

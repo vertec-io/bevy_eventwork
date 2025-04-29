@@ -253,6 +253,7 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
                             match recv_message_map.get_mut(&packet.kind[..]) {
                                 Some(mut packets) => packets.push((conn_id, packet.data)),
                                 None => {
+                                    println!("Eventwork could not find a registration for message type: {:?}", packet.kind);
                                     error!("Could not find existing entries for message kinds: {:?}", packet);
                                 }
                             }
@@ -511,6 +512,7 @@ fn handle_previous_message_requests<T: NetworkMessage + Clone, NP: NetworkProvid
 
             if let Some(connection) = server.established_connections.get(&request.source) {
                 let _ = connection.send_message.try_send(packet);
+                println!("Sent last message of type {} to client {}", T::NAME, request.source);
             }
         }
     }
@@ -563,6 +565,10 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
         Some(messages) => messages,
         None => return,
     };
+
+    if !messages.is_empty() {
+        println!("Received a request for PreviousMessage of type : {}", T::NAME);
+    }
 
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<PreviousMessage<T>>(&msg)
