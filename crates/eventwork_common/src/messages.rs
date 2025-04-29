@@ -76,14 +76,18 @@ impl<T: NetworkMessage> TargetedMessage<T> {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "T: NetworkMessage")]
 pub struct PreviousMessage<T: NetworkMessage> {
-    pub message: T,
-}
-
-impl<T: NetworkMessage> NetworkMessage for PreviousMessage<T> {
-    const NAME: &'static str = "eventwork::TargetedMessage";
+    // Empty struct - only used for type information
+    #[serde(skip)]
+    _phantom: std::marker::PhantomData<T>,
 }
 
 impl<T: NetworkMessage> PreviousMessage<T> {
+    pub fn new() -> Self {
+        Self {
+            _phantom: std::marker::PhantomData
+        }
+    }
+
     pub fn name() -> &'static str {
         // Creates a unique name for each TargetedMessage<T> type
         // 1. Memory is only leaked once per message type during registration
@@ -92,6 +96,10 @@ impl<T: NetworkMessage> PreviousMessage<T> {
         // 4. Provides zero-cost lookups compared to String alternatives
         Box::leak(format!("ObservedSubscription({})", T::NAME).into_boxed_str())
     }
+}
+
+impl<T: NetworkMessage> NetworkMessage for PreviousMessage<T> {
+    const NAME: &'static str = "eventwork::PreviousMessage";
 }
 
 /// Marks a type as a subscription message that can be used in a pub/sub pattern.
