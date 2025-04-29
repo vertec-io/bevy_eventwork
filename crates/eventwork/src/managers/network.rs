@@ -349,7 +349,7 @@ impl AppNetworkMessage for App {
             }
             self.add_event::<NetworkData<PreviousMessage<T>>>();
             self.add_systems(PreUpdate, register_previous_message::<T, NP>);
-            self.add_systems(PostUpdate, handle_previous_message_requests::<T, NP>);
+            self.add_systems(PreUpdate, handle_previous_message_requests::<T, NP>);
         }
 
         self.add_event::<OutboundMessage<T>>();

@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
+
 /* 
 /// Any type that should be sent over the wire has to implement [`NetworkMessage`].
 ///
@@ -79,12 +80,16 @@ pub struct PreviousMessage<T: NetworkMessage> {
     // Empty struct - only used for type information
     #[serde(skip)]
     _phantom: std::marker::PhantomData<T>,
+    // Add a marker field that will actually be serialized
+    #[serde(default)]
+    _marker: bool,
 }
 
 impl<T: NetworkMessage> PreviousMessage<T> {
     pub fn new() -> Self {
         Self {
-            _phantom: std::marker::PhantomData
+            _phantom: std::marker::PhantomData,
+            _marker: false
         }
     }
 
