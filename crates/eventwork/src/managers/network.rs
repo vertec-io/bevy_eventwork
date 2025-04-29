@@ -342,22 +342,19 @@ impl AppNetworkMessage for App {
         
         // Register to listen for PreviousMessage requests
         #[cfg(feature = "cache_messages")]
-        if !server.recv_message_map.contains_key(PreviousMessage::<T>::name()) {
-            server.recv_message_map.insert(PreviousMessage::<T>::name(), Vec::new());
+        {
+            let previous_message_name = PreviousMessage::<T>::name();
+            if !server.recv_message_map.contains_key(previous_message_name) {
+                server.recv_message_map.insert(previous_message_name, Vec::new());
+            }
+            self.add_event::<NetworkData<PreviousMessage<T>>>();
+            self.add_systems(PostUpdate, handle_previous_message_requests::<T, NP>);
         }
-        
-        self.add_event::<OutboundMessage<T>>()
-            .add_event::<NetworkData<PreviousMessage<T>>>();
 
-        #[cfg(not(feature = "cache_messages"))]
-        self.add_systems(PreUpdate, relay_outbound_notifications::<T, NP>.in_set(system_set));
+        self.add_event::<OutboundMessage<T>>();
 
-        #[cfg(feature = "cache_messages")]
-        self.add_systems(PreUpdate, (
-                relay_outbound_notifications::<T, NP>,
-                handle_previous_message_requests::<T, NP>).chain().in_set(system_set)
-            );
-        
+        self.add_systems(Update, relay_outbound_notifications::<T, NP>.in_set(system_set));
+
         self
     }
 

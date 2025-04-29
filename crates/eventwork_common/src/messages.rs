@@ -94,7 +94,7 @@ impl<T: NetworkMessage> PreviousMessage<T> {
         // 2. The string needs to live for the entire program lifetime
         // 3. The leaked memory is automatically freed when the program exits
         // 4. Provides zero-cost lookups compared to String alternatives
-        Box::leak(format!("ObservedSubscription({})", T::NAME).into_boxed_str())
+        Box::leak(format!("PreviousMessage({})", T::NAME).into_boxed_str())
     }
 }
 
