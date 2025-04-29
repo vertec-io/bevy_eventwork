@@ -535,7 +535,25 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     }));
 }
 
-pub fn register_previous_message<T, NP: NetworkProvider>(
+/// System that registers and processes incoming `PreviousMessage<T>` network messages.
+///
+/// This system is responsible for:
+/// 1. Reading `PreviousMessage<T>` messages from the network message map
+/// 2. Deserializing them into proper `NetworkData<PreviousMessage<T>>` events
+/// 3. Sending these events through Bevy's event system
+///
+/// It works in conjunction with `handle_previous_message_requests` to implement the
+/// previous message request/response functionality.
+///
+/// # Type Parameters
+/// * `T` - The type of the network message being wrapped in `PreviousMessage`
+/// * `NP` - The network provider type
+///
+/// # Arguments
+/// * `net_res` - The network resource containing message queues and connection information
+/// * `events` - Event writer for sending `NetworkData<PreviousMessage<T>>` events
+#[cfg(feature = "cache_messages")]
+pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
     net_res: ResMut<Network<NP>>,
     mut events: EventWriter<NetworkData<PreviousMessage<T>>>,
 ) where
