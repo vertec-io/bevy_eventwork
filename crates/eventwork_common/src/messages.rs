@@ -73,6 +73,27 @@ impl<T: NetworkMessage> TargetedMessage<T> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(bound = "T: NetworkMessage")]
+pub struct PreviousMessage<T: NetworkMessage> {
+    pub message: T,
+}
+
+impl<T: NetworkMessage> NetworkMessage for PreviousMessage<T> {
+    const NAME: &'static str = "eventwork::TargetedMessage";
+}
+
+impl<T: NetworkMessage> PreviousMessage<T> {
+    pub fn name() -> &'static str {
+        // Creates a unique name for each TargetedMessage<T> type
+        // 1. Memory is only leaked once per message type during registration
+        // 2. The string needs to live for the entire program lifetime
+        // 3. The leaked memory is automatically freed when the program exits
+        // 4. Provides zero-cost lookups compared to String alternatives
+        Box::leak(format!("ObservedSubscription({})", T::NAME).into_boxed_str())
+    }
+}
+
 /// Marks a type as a subscription message that can be used in a pub/sub pattern.
 ///
 /// # Type Parameters

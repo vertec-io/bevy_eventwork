@@ -2100,7 +2100,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork"
-version = "0.9.2"
+version = "0.9.3"
 dependencies = [
  "async-channel 2.3.1",
  "async-net",
@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_common"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "bincode",
  "codee",

@@ -29,6 +29,8 @@ pub mod network_request;
 #[derive(Resource)]
 pub struct Network<NP: NetworkProvider> {
     recv_message_map: Arc<DashMap<&'static str, Vec<(ConnectionId, Vec<u8>)>>>,
+    #[cfg(feature = "cache_messages")]
+    last_messages: Arc<DashMap<&'static str, Vec<u8>>>,
     established_connections: Arc<DashMap<ConnectionId, Connection>>,
     new_connections: AsyncChannel<NP::Socket>,
     disconnected_connections: AsyncChannel<ConnectionId>,

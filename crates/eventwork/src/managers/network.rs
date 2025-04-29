@@ -14,6 +14,7 @@ use crate::{
     runtime::{run_async, EventworkRuntime}, AsyncChannel, Connection, NetworkData, NetworkEvent, OutboundMessage, Runtime
 };
 use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, SubscriptionMessage, TargetedMessage};
+use eventwork_common::PreviousMessage;
 use eventwork_common::error::NetworkError;
 use super::{Network, NetworkProvider};
 
@@ -31,6 +32,7 @@ impl<NP: NetworkProvider> Network<NP> {
     pub(crate) fn new(_provider: NP) -> Self {
         Self {
             recv_message_map: Arc::new(DashMap::new()),
+            last_messages: Arc::new(DashMap::new()),
             established_connections: Arc::new(DashMap::new()),
             new_connections: AsyncChannel::new(),
             disconnected_connections: AsyncChannel::new(),
@@ -192,6 +194,7 @@ impl<NP: NetworkProvider> Network<NP> {
             }
             self.established_connections.clear();
             self.recv_message_map.clear();
+            self.last_messages.clear();
 
             while self.new_connections.receiver.try_recv().is_ok() {}
         }
@@ -328,16 +331,34 @@ impl AppNetworkMessage for App {
     }
 
     fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self, system_set:S) -> &mut Self {
-        let server = self.world_mut().get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
+        let server = self.world_mut().get_resource::<Network<NP>>()
+            .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
 
         debug!("Registered a new OutboundMessage: {}", T::NAME);
 
-        if !server.recv_message_map.contains_key(T::NAME){
+        if !server.recv_message_map.contains_key(T::NAME) {
             server.recv_message_map.insert(T::NAME, Vec::new());
         }
         
-        self.add_event::<OutboundMessage<T>>();
-        self.add_systems(PreUpdate, relay_outbound_notifications::<T, NP>.in_set(system_set))
+        // Register to listen for PreviousMessage requests
+        #[cfg(feature = "cache_messages")]
+        if !server.recv_message_map.contains_key(PreviousMessage::<T>::name()) {
+            server.recv_message_map.insert(PreviousMessage::<T>::name(), Vec::new());
+        }
+        
+        self.add_event::<OutboundMessage<T>>()
+            .add_event::<NetworkData<PreviousMessage<T>>>();
+
+        #[cfg(not(feature = "cache_messages"))]
+        self.add_systems(PreUpdate, relay_outbound_notifications::<T, NP>.in_set(system_set));
+
+        #[cfg(feature = "cache_messages")]
+        self.add_systems(PreUpdate, (
+                relay_outbound_notifications::<T, NP>,
+                handle_previous_message_requests::<T, NP>).chain().in_set(system_set)
+            );
+        
+        self
     }
 
     fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(&mut self) -> &mut Self {
@@ -406,6 +427,11 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
         None => return,
     };
 
+    #[cfg(feature = "cache_messages")]
+    if let Some((_, newest_message)) = messages.last() {
+        net_res.last_messages.insert(T::NAME, newest_message.clone());
+    }
+
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<T>(&msg)
             .ok()
@@ -450,6 +476,43 @@ pub fn relay_outbound_notifications<T: NetworkMessage + Clone, NP: NetworkProvid
             }
             None => {
                 let _ = net.broadcast(notification.message.clone());
+            }
+        }
+    }
+}
+
+/// System that handles requests from clients for the most recent message of a specific type.
+///
+/// When a client sends a `PreviousMessage<T>`, this system will:
+/// 1. Look up the most recent serialized message of type `T` in the `recv_message_map`
+/// 2. If found, create a `NetworkPacket` using the existing serialized data
+/// 3. Send the packet directly to the requesting client through their connection channel
+///
+/// This allows clients to request the latest state of any message type they're interested in,
+/// without requiring the server to deserialize and re-serialize the data.
+///
+/// # Type Parameters
+/// * `T` - The type of the network message being requested
+/// * `NP` - The network provider type
+///
+/// # Arguments
+/// * `previous_message_requests` - Event reader for incoming `PreviousMessage<T>` requests
+/// * `server` - The network resource containing connection and message information
+#[cfg(feature = "cache_messages")]
+fn handle_previous_message_requests<T: NetworkMessage + Clone, NP: NetworkProvider>(
+    mut previous_message_requests: EventReader<NetworkData<PreviousMessage<T>>>,
+    server: Res<Network<NP>>,
+) {
+    for request in previous_message_requests.read() {
+        // Get the last message from the cache
+        if let Some(last_message) = server.last_messages.get(T::NAME) {
+            let packet = NetworkPacket {
+                kind: String::from(T::NAME),
+                data: last_message.clone(),
+            };
+
+            if let Some(connection) = server.established_connections.get(&request.source) {
+                let _ = connection.send_message.try_send(packet);
             }
         }
     }
