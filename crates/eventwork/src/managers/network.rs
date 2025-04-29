@@ -348,6 +348,7 @@ impl AppNetworkMessage for App {
                 server.recv_message_map.insert(previous_message_name, Vec::new());
             }
             self.add_event::<NetworkData<PreviousMessage<T>>>();
+            self.add_systems(PreUpdate, register_previous_message::<T, NP>);
             self.add_systems(PostUpdate, handle_previous_message_requests::<T, NP>);
         }
 
@@ -529,6 +530,24 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
 
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<TargetedMessage<T>>(&msg)
+            .ok()
+            .map(|inner| NetworkData { source, inner })
+    }));
+}
+
+pub fn register_previous_message<T, NP: NetworkProvider>(
+    net_res: ResMut<Network<NP>>,
+    mut events: EventWriter<NetworkData<PreviousMessage<T>>>,
+) where
+    T: NetworkMessage,
+{
+    let mut messages = match net_res.recv_message_map.get_mut(PreviousMessage::<T>::name()) {
+        Some(messages) => messages,
+        None => return,
+    };
+
+    events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+        bincode::deserialize::<PreviousMessage<T>>(&msg)
             .ok()
             .map(|inner| NetworkData { source, inner })
     }));
