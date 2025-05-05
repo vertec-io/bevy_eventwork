@@ -2,6 +2,58 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields};
 
+#[proc_macro]
+pub fn notify_component_subscribers(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as syn::ExprTuple);
+    
+    // Extract the component type and type name from the tuple
+    if input.elems.len() != 2 {
+        return syn::Error::new_spanned(
+            input,
+            "Expected exactly two arguments: component type and type name string",
+        )
+        .to_compile_error()
+        .into();
+    }
+    
+    let component_type = &input.elems[0];
+    let type_name = &input.elems[1];
+    
+    let expanded = quote! {
+        pub fn notify_component_subscribers(
+            changed_components: Query<(Entity, &#component_type), Changed<#component_type>>,
+            subscriptions: Res<ComponentSubscriptions>,
+            mut outbound: EventWriter<OutboundMessage<ReflectedEntityData>>,
+        ) {
+            for (entity, component) in changed_components.iter() {
+                let entity_id = entity.to_bits();
+                
+                // Get subscribers for this entity and component type
+                let subscribers = subscriptions.get_subscribers(entity_id, #type_name);
+                
+                if !subscribers.is_empty() {
+                    // Serialize the component
+                    if let Ok(component_data) = bincode::serialize(component) {
+                        let reflected_data = ReflectedEntityData {
+                            entity_id,
+                            component_type: #type_name.to_string(),
+                            data: component_data,
+                        };
+                        
+                        // Send to all subscribers
+                        for (client_id, _field_path) in subscribers {
+                            // TODO: Filter by field path if specified
+                            outbound.send(OutboundMessage::new(ReflectedEntityData::NAME.to_string(), reflected_data.clone()).for_client(client_id));
+                        }
+                    }
+                }
+            }
+        }
+    };
+    
+    expanded.into()
+}
+
 #[proc_macro_derive(SubscribeById, attributes(subscribe_id))]
 pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -117,3 +169,4 @@ fn find_subscribe_id_field(data: &Data) -> Option<(syn::Ident, syn::Type)> {
         _ => None,
     }
 }
+

@@ -2109,6 +2109,7 @@ dependencies = [
  "bincode",
  "dashmap",
  "eventwork_common",
+ "eventwork_macros",
  "futures-lite",
  "serde",
 ]

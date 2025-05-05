@@ -161,6 +161,8 @@ use managers::NetworkProvider;
 pub use runtime::EventworkRuntime;
 use runtime::JoinHandle;
 pub use runtime::Runtime;
+mod plugins;
+pub use plugins::*;
 
 use std::{
     fmt::Debug,
@@ -178,6 +180,9 @@ use eventwork_common::error::NetworkError;
 pub use eventwork_common::*;
 
 use std::ops::Deref;
+
+/// Module containing reflection utilities for network message types.
+pub mod reflection;
 
 #[cfg(feature = "tcp")]
 /// A default tcp provider to help get you started.

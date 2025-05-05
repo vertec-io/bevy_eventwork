@@ -44,6 +44,7 @@ dashmap = "5.5.3"
 async-channel = "2.0.0"
 # Used for providers, which are async in nature
 async-trait = "0.1.74"
+eventwork_macros = { path = "../eventwork_macros" }
 
 # Used for TCP provider
 async-net = { version = "2.0.0", optional = true }

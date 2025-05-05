@@ -3,6 +3,8 @@ pub use messages::*;
 
 pub mod codec;
 
+pub mod reflection;
+
 pub mod error;
 
 
