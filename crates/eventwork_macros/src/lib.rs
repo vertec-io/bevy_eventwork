@@ -57,11 +57,11 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
                 }
 
                 fn create_subscription_request(params: Self::SubscriptionParams) -> Self::SubscribeRequest {
-                    Self::SubscribeRequest { #field_name: params }
+                    #subscribe_struct_name { #field_name: params }
                 }
 
                 fn create_unsubscribe_request(params: Self::SubscriptionParams) -> Self::UnsubscribeRequest {
-                    Self::UnsubscribeRequest { #field_name: params }
+                    #unsubscribe_struct_name { #field_name: params }
                 }
             }
         },
@@ -76,11 +76,11 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
                 }
 
                 fn create_subscription_request(_params: Self::SubscriptionParams) -> Self::SubscribeRequest {
-                    Self::SubscribeRequest
+                    #subscribe_struct_name
                 }
 
                 fn create_unsubscribe_request(_params: Self::SubscriptionParams) -> Self::UnsubscribeRequest {
-                    Self::UnsubscribeRequest
+                    #unsubscribe_struct_name
                 }
             }
         }
