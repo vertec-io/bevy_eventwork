@@ -2,17 +2,81 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields};
 
-#[proc_macro_derive(SubscribeById, attributes(subscribe_id))]
-pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
-    let name = &ast.ident;
+#[proc_macro_attribute]
+pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // Parse the input struct
+    let input = parse_macro_input!(item as DeriveInput);
+    let name = &input.ident;
     
-    // Generate the struct names
+    // Check if there are any attributes passed to the macro
+    let _attr_args = parse_macro_input!(attr as syn::AttributeArgs);
+    
+    // Generate the struct names for subscription messages
     let subscribe_struct_name = quote::format_ident!("SubscribeTo{}", name);
     let unsubscribe_struct_name = quote::format_ident!("UnsubscribeFrom{}", name);
     
-    // Get the subscribe_id field and its type, if any
-    let subscribe_id_field = find_subscribe_id_field(&ast.data);
+    // Find if there's an explicit subscribe_id field
+    let subscribe_id_field = find_subscribe_id_field(&input.data);
+    
+    // Create a modified struct with an added field if needed
+    let modified_struct = if subscribe_id_field.is_none() {
+        // We need to add a field for the subscription ID
+        match &input.data {
+            Data::Struct(data_struct) => {
+                let mut modified_data_struct = data_struct.clone();
+                
+                // Add the _subscription_id field
+                match &mut modified_data_struct.fields {
+                    Fields::Named(fields) => {
+                        fields.named.push(
+                            syn::Field::parse_named
+                                .parse2(quote! {
+                                    #[doc(hidden)]
+                                    #[serde(skip)]
+                                    #[serde(default)]
+                                    pub _subscription_id: Option<String>
+                                })
+                                .unwrap()
+                        );
+                    }
+                    _ => {
+                        // For tuple structs or unit structs, we can't easily add fields
+                        // Return an error
+                        return syn::Error::new_spanned(
+                            input,
+                            "subscribe_by_id can only be used with structs that have named fields",
+                        )
+                        .to_compile_error()
+                        .into();
+                    }
+                }
+                
+                // Create a new struct with the modified fields
+                let vis = &input.vis;
+                let attrs = &input.attrs;
+                let generics = &input.generics;
+                
+                quote! {
+                    #(#attrs)*
+                    #vis struct #name #generics {
+                        #modified_data_struct
+                    }
+                }
+            }
+            _ => {
+                // Return an error for non-struct types
+                return syn::Error::new_spanned(
+                    input,
+                    "subscribe_by_id can only be used with structs",
+                )
+                .to_compile_error()
+                .into();
+            }
+        }
+    } else {
+        // No need to modify the struct, just pass it through
+        quote! { #input }
+    };
     
     // Generate the Subscribe and Unsubscribe message structs
     let subscribe_struct = match &subscribe_id_field {
@@ -49,21 +113,7 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
     let subscribe_name = format!("{}:Subscribe", name);
     let unsubscribe_name = format!("{}:Unsubscribe", name);
 
-    // Add the custom subscription ID field to the struct
-    let custom_field = if subscribe_id_field.is_none() {
-        quote! {
-            // Add a field to the struct to store custom subscription ID
-            impl #name {
-                #[doc(hidden)]
-                #[serde(skip)]
-                #[serde(default)]
-                _subscription_id: Option<String>,
-            }
-        }
-    } else {
-        quote! {}
-    };
-
+    // Implement SubscriptionMessage
     let subscription_impl = match &subscribe_id_field {
         Some((field_name, _field_type)) => quote! {
             impl SubscriptionMessage for #name {
@@ -125,8 +175,9 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
         }
     };
 
+    // Combine everything
     quote! {
-        #custom_field
+        #modified_struct
         
         #subscribe_struct
         #unsubscribe_struct
