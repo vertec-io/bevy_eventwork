@@ -185,4 +185,10 @@ pub trait SubscriptionMessage: NetworkMessage {
 
     /// Creates an unsubscribe request from the given parameters
     fn create_unsubscribe_request(subscription_params: Self::SubscriptionParams) -> Self::UnsubscribeRequest;
+    
+    /// Sets a custom subscription ID for this message
+    /// Default implementation returns self unchanged - derived implementations will override this
+    fn with_subscription_id(self, _id: impl Into<String>) -> Self where Self: Sized {
+        self
+    }
 }

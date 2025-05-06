@@ -2110,7 +2110,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork"
-version = "0.9.7"
+version = "0.9.8"
 dependencies = [
  "async-channel 2.3.1",
  "async-net",
