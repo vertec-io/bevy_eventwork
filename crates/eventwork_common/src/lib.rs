@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 use std::fmt::Debug;
 use std::fmt::Display;
 
-pub use eventwork_macros::SubscribeById;
+pub use eventwork_macros::*;
 
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire

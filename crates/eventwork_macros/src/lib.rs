@@ -8,8 +8,8 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let name = &input.ident;
     
-    // Check if there are any attributes passed to the macro
-    let _attr_args = parse_macro_input!(attr as syn::AttributeArgs);
+    // Parse attribute arguments if needed (not used in this case)
+    let _attr = parse_macro_input!(attr as syn::parse::Nothing);
     
     // Generate the struct names for subscription messages
     let subscribe_struct_name = quote::format_ident!("SubscribeTo{}", name);
@@ -23,22 +23,29 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
         // We need to add a field for the subscription ID
         match &input.data {
             Data::Struct(data_struct) => {
-                let mut modified_data_struct = data_struct.clone();
-                
-                // Add the _subscription_id field
-                match &mut modified_data_struct.fields {
+                match &data_struct.fields {
                     Fields::Named(fields) => {
-                        fields.named.push(
-                            syn::Field::parse_named
-                                .parse2(quote! {
-                                    #[doc(hidden)]
-                                    #[serde(skip)]
-                                    #[serde(default)]
-                                    pub _subscription_id: Option<String>
-                                })
-                                .unwrap()
-                        );
-                    }
+                        // Instead of modifying the struct directly, we'll generate code that includes
+                        // all the original fields plus our new field
+                        let original_fields = &fields.named;
+                        
+                        // Create a new struct with all original fields plus our new field
+                        let vis = &input.vis;
+                        let attrs = &input.attrs;
+                        let generics = &input.generics;
+                        
+                        quote! {
+                            #(#attrs)*
+                            #vis struct #name #generics {
+                                #original_fields,
+                                
+                                #[doc(hidden)]
+                                #[serde(skip)]
+                                #[serde(default)]
+                                pub _subscription_id: Option<String>
+                            }
+                        }
+                    },
                     _ => {
                         // For tuple structs or unit structs, we can't easily add fields
                         // Return an error
@@ -48,18 +55,6 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
                         )
                         .to_compile_error()
                         .into();
-                    }
-                }
-                
-                // Create a new struct with the modified fields
-                let vis = &input.vis;
-                let attrs = &input.attrs;
-                let generics = &input.generics;
-                
-                quote! {
-                    #(#attrs)*
-                    #vis struct #name #generics {
-                        #modified_data_struct
                     }
                 }
             }
@@ -80,10 +75,10 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
     
     // Generate the Subscribe and Unsubscribe message structs
     let subscribe_struct = match &subscribe_id_field {
-        Some((field_name, _field_type)) => quote! {
+        Some((field_name, field_type)) => quote! {
             #[derive(Serialize, Deserialize, Debug)]
             pub struct #subscribe_struct_name {
-                pub #field_name: String,
+                pub #field_name: #field_type,
             }
         },
         None => quote! {
@@ -95,10 +90,10 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let unsubscribe_struct = match &subscribe_id_field {
-        Some((field_name, _field_type)) => quote! {
+        Some((field_name, field_type)) => quote! {
             #[derive(Serialize, Deserialize, Debug)]
             pub struct #unsubscribe_struct_name {
-                pub #field_name: String,
+                pub #field_name: #field_type,
             }
         },
         None => quote! {
@@ -113,16 +108,22 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
     let subscribe_name = format!("{}:Subscribe", name);
     let unsubscribe_name = format!("{}:Unsubscribe", name);
 
+    // Determine the subscription params type
+    let subscription_params_type = match &subscribe_id_field {
+        Some((_field_name, field_type)) => field_type.clone(),
+        None => syn::parse_str::<syn::Type>("String").unwrap(),
+    };
+
     // Implement SubscriptionMessage
     let subscription_impl = match &subscribe_id_field {
         Some((field_name, _field_type)) => quote! {
             impl SubscriptionMessage for #name {
                 type SubscribeRequest = #subscribe_struct_name;
                 type UnsubscribeRequest = #unsubscribe_struct_name;
-                type SubscriptionParams = String;
+                type SubscriptionParams = #subscription_params_type;
 
                 fn get_subscription_params(&self) -> Self::SubscriptionParams {
-                    self.#field_name.to_string()
+                    self.#field_name.clone()
                 }
 
                 fn create_subscription_request(params: Self::SubscriptionParams) -> Self::SubscribeRequest {
