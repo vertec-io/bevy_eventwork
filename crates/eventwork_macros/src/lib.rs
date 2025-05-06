@@ -2,6 +2,52 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields};
 
+/// Marks a field as the subscription identifier for a message type.
+/// 
+/// Use this attribute on a field within a struct that has the `#[subscribe_by_id]` attribute.
+/// The marked field will be used as the subscription identifier instead of generating a new field.
+/// 
+/// # Example
+/// ```
+/// use eventwork_macros::subscribe_by_id;
+/// use serde::{Serialize, Deserialize};
+/// 
+/// #[subscribe_by_id]
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct GameState {
+///     #[subscribe_id]
+///     game_id: String,
+///     players: Vec<String>,
+///     score: u32,
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn subscribe_id(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // This is just a marker attribute, so we return the item unchanged
+    item
+}
+
+/// Implements the `SubscriptionMessage` trait for a struct.
+/// 
+/// This attribute generates the necessary subscription and unsubscription message types
+/// and implements the `SubscriptionMessage` trait for the struct.
+/// 
+/// If a field is marked with `#[subscribe_id]`, that field will be used as the subscription
+/// identifier. Otherwise, a new field `_subscription_id` will be added to the struct.
+/// 
+/// # Example
+/// ```
+/// use eventwork_macros::subscribe_by_id;
+/// use serde::{Serialize, Deserialize};
+/// 
+/// #[subscribe_by_id]
+/// #[derive(Serialize, Deserialize, Debug)]
+/// struct GameState {
+///     game_id: String,
+///     players: Vec<String>,
+///     score: u32,
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Parse the input struct
