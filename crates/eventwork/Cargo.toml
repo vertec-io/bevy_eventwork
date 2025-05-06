@@ -22,6 +22,7 @@ maintenance = { status = "actively-developed" }
 default = ["tcp", "cache_messages"]
 tcp = ["async-net"]
 cache_messages = []
+dynamic_linking = ["bevy/dynamic_linking"]
 
 [[example]]
 name = "client"
@@ -55,6 +56,3 @@ eventwork_common = { path = "../eventwork_common"}
 
 #[dev-dependencies]
 #bevy = {workspace=true, features = ["default_font", "dynamic_linking"] }
-
-[dev-dependencies]
-bevy = { workspace = true }
