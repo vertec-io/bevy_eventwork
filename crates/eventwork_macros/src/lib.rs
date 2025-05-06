@@ -119,36 +119,9 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { #input }
     };
     
-    // Generate the Subscribe and Unsubscribe message structs
-    let subscribe_struct = match &subscribe_id_field {
-        Some((field_name, field_type)) => quote! {
-            #[derive(Serialize, Deserialize, Debug)]
-            pub struct #subscribe_struct_name {
-                pub #field_name: #field_type,
-            }
-        },
-        None => quote! {
-            #[derive(Serialize, Deserialize, Debug)]
-            pub struct #subscribe_struct_name {
-                pub subscription_id: String,
-            }
-        }
-    };
-
-    let unsubscribe_struct = match &subscribe_id_field {
-        Some((field_name, field_type)) => quote! {
-            #[derive(Serialize, Deserialize, Debug)]
-            pub struct #unsubscribe_struct_name {
-                pub #field_name: #field_type,
-            }
-        },
-        None => quote! {
-            #[derive(Serialize, Deserialize, Debug)]
-            pub struct #unsubscribe_struct_name {
-                pub subscription_id: String,
-            }
-        }
-    };
+    // Generate the Subscribe and Unsubscribe message structs with appropriate derives
+    let (subscribe_struct, unsubscribe_struct) = 
+        generate_subscription_structs(&input, &subscribe_struct_name, &unsubscribe_struct_name, &subscribe_id_field);
 
     // Implement NetworkMessage for both structs
     let subscribe_name = format!("{}:Subscribe", name);
@@ -222,8 +195,19 @@ pub fn subscribe_by_id(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    // Check if we need to add imports
+    let imports = if !has_required_imports(&input) {
+        quote! {
+            use serde::{Serialize, Deserialize};
+        }
+    } else {
+        quote! {}
+    };
+
     // Combine everything
     quote! {
+        #imports
+        
         #modified_struct
         
         #subscribe_struct
@@ -255,4 +239,79 @@ fn find_subscribe_id_field(data: &Data) -> Option<(syn::Ident, syn::Type)> {
         }
         _ => None,
     }
+}
+
+// Add this function to check if the struct already has the necessary imports
+fn has_required_imports(input: &DeriveInput) -> bool {
+    // Check if the struct already has Serialize and Deserialize derives
+    input.attrs.iter().any(|attr| {
+        if let Some(path) = attr.path().get_ident() {
+            if path == "derive" {
+                let meta = attr.meta.clone();
+                if let Ok(list) = meta.require_list() {
+                    let tokens = list.tokens.clone();
+                    let token_str = tokens.to_string();
+                    return token_str.contains("Serialize") && token_str.contains("Deserialize");
+                }
+            }
+        }
+        false
+    })
+}
+
+// Generate the Subscribe and Unsubscribe message structs with appropriate derives
+fn generate_subscription_structs(
+    input: &DeriveInput,
+    subscribe_struct_name: &syn::Ident,
+    unsubscribe_struct_name: &syn::Ident,
+    subscribe_id_field: &Option<(syn::Ident, syn::Type)>,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+    // Extract derive attributes from the original struct
+    let mut derive_attrs = Vec::new();
+    for attr in &input.attrs {
+        if let Some(path) = attr.path().get_ident() {
+            if path == "derive" {
+                derive_attrs.push(attr.clone());
+            }
+        }
+    }
+    
+    // If no derive attributes found, add the minimum required ones
+    let derive_attrs = if derive_attrs.is_empty() {
+        quote! { #[derive(Serialize, Deserialize, Debug, Clone)] }
+    } else {
+        quote! { #(#derive_attrs)* }
+    };
+    
+    let subscribe_struct = match subscribe_id_field {
+        Some((field_name, field_type)) => quote! {
+            #derive_attrs
+            pub struct #subscribe_struct_name {
+                pub #field_name: #field_type,
+            }
+        },
+        None => quote! {
+            #derive_attrs
+            pub struct #subscribe_struct_name {
+                pub subscription_id: String,
+            }
+        }
+    };
+
+    let unsubscribe_struct = match subscribe_id_field {
+        Some((field_name, field_type)) => quote! {
+            #derive_attrs
+            pub struct #unsubscribe_struct_name {
+                pub #field_name: #field_type,
+            }
+        },
+        None => quote! {
+            #derive_attrs
+            pub struct #unsubscribe_struct_name {
+                pub subscription_id: String,
+            }
+        }
+    };
+    
+    (subscribe_struct, unsubscribe_struct)
 }
