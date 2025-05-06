@@ -32,6 +32,7 @@ impl<NP: NetworkProvider> Network<NP> {
     pub(crate) fn new(_provider: NP) -> Self {
         Self {
             recv_message_map: Arc::new(DashMap::new()),
+            #[cfg(feature = "cache_messages")]
             last_messages: Arc::new(DashMap::new()),
             established_connections: Arc::new(DashMap::new()),
             new_connections: AsyncChannel::new(),
