@@ -57,7 +57,7 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
                 #[doc(hidden)]
                 #[serde(skip)]
                 #[serde(default)]
-                pub _subscription_id: Option<String>,
+                _subscription_id: Option<String>,
             }
         }
     } else {
@@ -76,11 +76,11 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
                 }
 
                 fn create_subscription_request(params: Self::SubscriptionParams) -> Self::SubscribeRequest {
-                    #subscribe_struct_name { subscription_id: params }
+                    #subscribe_struct_name { #field_name: params }
                 }
 
                 fn create_unsubscribe_request(params: Self::SubscriptionParams) -> Self::UnsubscribeRequest {
-                    #unsubscribe_struct_name { subscription_id: params }
+                    #unsubscribe_struct_name { #field_name: params }
                 }
                 
                 // Override the with_subscription_id method - for structs with a subscribe_id field,
