@@ -563,10 +563,22 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
 ) where
     T: NetworkMessage,
 {
-    let mut messages = match net_res.recv_message_map.get_mut(PreviousMessage::<T>::name()) {
-        Some(messages) => messages,
-        None => return,
-    };
+    let name = PreviousMessage::<T>::name();
+    
+    // Try to find messages by name
+    let mut messages = Vec::new();
+    
+    // First check by exact key match
+    for entry in net_res.recv_message_map.iter() {
+        if *entry.key() == name {
+            messages = entry.value().clone();
+            break;
+        }
+    }
+    
+    if messages.is_empty() {
+        return;
+    }
 
     if !messages.is_empty() {
         println!("Received a request for PreviousMessage of type : {}", T::NAME);

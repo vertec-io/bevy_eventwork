@@ -30,6 +30,7 @@ pub fn setup_memory_monitor(mut commands: Commands) {
 pub fn monitor_system_memory(
     _time: Res<Time>,
     mut monitor: ResMut<MemoryMonitor>,
+    network: Option<Res<eventwork::Network<eventwork_websockets::WebSocketProvider>>>,
 ) {
     if monitor.last_check.elapsed() < monitor.check_interval {
         return;
@@ -42,8 +43,18 @@ pub fn monitor_system_memory(
     let memory_usage = get_current_memory_usage();
     monitor.memory_samples.push((elapsed, memory_usage));
 
-    // Print memory stats
+    // Print memory stats with more details
     println!("Time elapsed: {:.2}s, Memory usage: {} bytes", elapsed, memory_usage);
+    
+    // Print network details if available
+    if let Some(net) = network {
+        // println!("  - Connection tasks: {}", net.connection_tasks.len());
+        println!("  - Established connections: {}", net.has_connections());
+        // println!("  - Message map entries: {}", net.recv_message_map.len());
+        
+        #[cfg(feature = "cache_messages")]
+        println!("  - Cached message types: {}", net.last_messages.len());
+    }
 
     // Check for memory leaks
     if monitor.memory_samples.len() >= 10 {
@@ -123,3 +134,5 @@ pub fn register_memory_monitor_plugin(app: &mut App) {
     app.add_systems(Startup, setup_memory_monitor)
        .add_systems(Update, monitor_system_memory);
 }
+
+

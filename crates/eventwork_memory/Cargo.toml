@@ -5,6 +5,23 @@ edition = "2021"
 description = "Memory leak detection and prevention tools for eventwork"
 license = "MIT OR Apache-2.0"
 
+[[bin]]
+name = "outbound_test"
+path = "src/bin/outbound_test.rs"
+required-features = ["bin-deps"]
+
+[[bin]]
+name = "minimal_server"
+path = "src/bin/minimal_server.rs"
+required-features = ["bin-deps"]
+
+[features]
+default = ["websockets"]
+detailed_diagnostics = []
+websockets = []
+tcp = []
+bin-deps = ["dep:serde"]
+
 [dependencies]
 # Bevy dependencies
 bevy = { workspace = true }
@@ -19,11 +36,11 @@ dashmap = "5.5.3"
 async-channel = "2.0.0"
 futures-lite = "2.0.0"
 
+# Optional dependencies for binaries
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[dev-dependencies]
+sysinfo = "0.29.10"
+
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["psapi", "processthreadsapi"] }
-
-[features]
-default = ["websockets"]
-detailed_diagnostics = []
-websockets = []
-tcp = []

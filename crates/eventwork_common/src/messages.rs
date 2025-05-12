@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /* 
 /// Any type that should be sent over the wire has to implement [`NetworkMessage`].
@@ -65,12 +66,36 @@ impl<T: NetworkMessage> NetworkMessage for TargetedMessage<T> {
 
 impl<T: NetworkMessage> TargetedMessage<T> {
     pub fn name() -> &'static str {
-        // Creates a unique name for each TargetedMessage<T> type
-        // 1. Memory is only leaked once per message type during registration
-        // 2. The string needs to live for the entire program lifetime
-        // 3. The leaked memory is automatically freed when the program exits
-        // 4. Provides zero-cost lookups compared to String alternatives
-        Box::leak(format!("Targeted({})", T::NAME).into_boxed_str())
+        // Use a global cache with lazy initialization
+        use std::sync::OnceLock;
+        use std::collections::HashMap;
+        use std::sync::Mutex;
+        use std::any::TypeId;
+        
+        static CACHE: OnceLock<Mutex<HashMap<TypeId, &'static str>>> = OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        
+        let type_id = TypeId::of::<T>();
+        
+        // Try to get from cache first
+        {
+            let cache_guard = cache.lock().unwrap();
+            if let Some(&name) = cache_guard.get(&type_id) {
+                return name;
+            }
+        }
+        
+        // Not in cache, create it once and leak it (only once per type)
+        let formatted_name = format!("Targeted({})", T::NAME);
+        let static_name = Box::leak(formatted_name.into_boxed_str());
+        
+        // Store in cache for future use
+        {
+            let mut cache_guard = cache.lock().unwrap();
+            cache_guard.insert(type_id, static_name);
+        }
+        
+        static_name
     }
 }
 
@@ -94,12 +119,36 @@ impl<T: NetworkMessage> PreviousMessage<T> {
     }
 
     pub fn name() -> &'static str {
-        // Creates a unique name for each TargetedMessage<T> type
-        // 1. Memory is only leaked once per message type during registration
-        // 2. The string needs to live for the entire program lifetime
-        // 3. The leaked memory is automatically freed when the program exits
-        // 4. Provides zero-cost lookups compared to String alternatives
-        Box::leak(format!("PreviousMessage({})", T::NAME).into_boxed_str())
+        // Use a global cache with lazy initialization
+        use std::sync::OnceLock;
+        use std::collections::HashMap;
+        use std::sync::Mutex;
+        use std::any::TypeId;
+        
+        static CACHE: OnceLock<Mutex<HashMap<TypeId, &'static str>>> = OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        
+        let type_id = TypeId::of::<T>();
+        
+        // Try to get from cache first
+        {
+            let cache_guard = cache.lock().unwrap();
+            if let Some(&name) = cache_guard.get(&type_id) {
+                return name;
+            }
+        }
+        
+        // Not in cache, create it once and leak it (only once per type)
+        let formatted_name = format!("PreviousMessage({})", T::NAME);
+        let static_name = Box::leak(formatted_name.into_boxed_str());
+        
+        // Store in cache for future use
+        {
+            let mut cache_guard = cache.lock().unwrap();
+            cache_guard.insert(type_id, static_name);
+        }
+        
+        static_name
     }
 }
 
