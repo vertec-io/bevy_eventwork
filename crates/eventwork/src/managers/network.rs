@@ -539,10 +539,24 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     };
 
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
-        bincode::deserialize::<TargetedMessage<T>>(&msg)
-            .ok()
-            .map(|inner| NetworkData { source, inner })
+        match bincode::deserialize::<TargetedMessage<T>>(&msg) {
+            Ok(inner) => {
+                println!("Successfully deserialized message for target: {}", inner.target_id);
+                Some(NetworkData { source, inner })
+            },
+            Err(e) => {
+                #[cfg(feature = "debug_messages")]
+                println!("Failed to deserialize message: {:?}", e);
+                None
+            }
+        }
     }));
+
+    // events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+    //     bincode::deserialize::<TargetedMessage<T>>(&msg)
+    //         .ok()
+    //         .map(|inner| NetworkData { source, inner })
+    // }));
 }
 
 /// System that registers and processes incoming `PreviousMessage<T>` network messages.
