@@ -51,9 +51,7 @@ pub fn monitor_system_memory(
         // println!("  - Connection tasks: {}", net.connection_tasks.len());
         println!("  - Established connections: {}", net.has_connections());
         // println!("  - Message map entries: {}", net.recv_message_map.len());
-        
-        #[cfg(feature = "cache_messages")]
-        println!("  - Cached message types: {}", net.last_messages.len());
+
     }
 
     // Check for memory leaks
