@@ -1,6 +1,6 @@
 [package]
 name = "eventwork"
-version = "0.9.6"
+version = "0.9.11"
 authors = [
     "James <jamescarterbell@gmail.com>",
     "Neikos <neikos@neikos.email>",
@@ -22,6 +22,8 @@ maintenance = { status = "actively-developed" }
 default = ["tcp", "cache_messages"]
 tcp = ["async-net"]
 cache_messages = []
+dynamic_linking = ["bevy/dynamic_linking"]
+debug_messages = []
 
 [[example]]
 name = "client"
@@ -56,6 +58,3 @@ eventwork_common = { path = "../eventwork_common"}
 
 #[dev-dependencies]
 #bevy = {workspace=true, features = ["default_font", "dynamic_linking"] }
-
-[dev-dependencies]
-bevy = { workspace = true }

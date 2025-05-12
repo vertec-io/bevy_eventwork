@@ -32,6 +32,7 @@ impl<NP: NetworkProvider> Network<NP> {
     pub(crate) fn new(_provider: NP) -> Self {
         Self {
             recv_message_map: Arc::new(DashMap::new()),
+            #[cfg(feature = "cache_messages")]
             last_messages: Arc::new(DashMap::new()),
             established_connections: Arc::new(DashMap::new()),
             new_connections: AsyncChannel::new(),
@@ -194,6 +195,7 @@ impl<NP: NetworkProvider> Network<NP> {
             }
             self.established_connections.clear();
             self.recv_message_map.clear();
+            #[cfg(feature = "cache_messages")]
             self.last_messages.clear();
 
             while self.new_connections.receiver.try_recv().is_ok() {}
@@ -251,7 +253,13 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
                     map_receive_task: Box::new(run_async(async move{
                         while let Ok(packet) = incoming_rx.recv().await{
                             match recv_message_map.get_mut(&packet.kind[..]) {
-                                Some(mut packets) => packets.push((conn_id, packet.data)),
+                                Some(mut packets) => {
+                                    #[cfg(feature = "debug_messages")]
+                                    {
+                                        println!("Received a message of type: {:?}", packet.kind);
+                                    }
+                                    packets.push((conn_id, packet.data))
+                                },
                                 None => {
                                     println!("Eventwork could not find a registration for message type: {:?}", packet.kind);
                                     error!("Could not find existing entries for message kinds: {:?}", packet);
@@ -531,10 +539,24 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     };
 
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
-        bincode::deserialize::<TargetedMessage<T>>(&msg)
-            .ok()
-            .map(|inner| NetworkData { source, inner })
+        match bincode::deserialize::<TargetedMessage<T>>(&msg) {
+            Ok(inner) => {
+                println!("Successfully deserialized message for target: {}", inner.target_id);
+                Some(NetworkData { source, inner })
+            },
+            Err(e) => {
+                #[cfg(feature = "debug_messages")]
+                println!("Failed to deserialize message: {:?}", e);
+                None
+            }
+        }
     }));
+
+    // events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+    //     bincode::deserialize::<TargetedMessage<T>>(&msg)
+    //         .ok()
+    //         .map(|inner| NetworkData { source, inner })
+    // }));
 }
 
 /// System that registers and processes incoming `PreviousMessage<T>` network messages.
@@ -561,15 +583,21 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
 ) where
     T: NetworkMessage,
 {
-    let mut messages = match net_res.recv_message_map.get_mut(PreviousMessage::<T>::name()) {
+    let name = PreviousMessage::<T>::name();
+    
+    // Get a mutable reference to the messages
+    let mut messages = match net_res.recv_message_map.get_mut(name) {
         Some(messages) => messages,
         None => return,
     };
-
-    if !messages.is_empty() {
-        println!("Received a request for PreviousMessage of type : {}", T::NAME);
+    
+    if messages.is_empty() {
+        return;
     }
 
+    println!("Received a request for PreviousMessage of type : {}", T::NAME);
+
+    // Drain the message buffer and send events 
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<PreviousMessage<T>>(&msg)
             .ok()
