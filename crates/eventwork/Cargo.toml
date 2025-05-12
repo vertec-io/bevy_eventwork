@@ -23,6 +23,7 @@ default = ["tcp", "cache_messages"]
 tcp = ["async-net"]
 cache_messages = []
 dynamic_linking = ["bevy/dynamic_linking"]
+debug_messages = []
 
 [[example]]
 name = "client"

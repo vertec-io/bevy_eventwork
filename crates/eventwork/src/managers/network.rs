@@ -253,7 +253,13 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
                     map_receive_task: Box::new(run_async(async move{
                         while let Ok(packet) = incoming_rx.recv().await{
                             match recv_message_map.get_mut(&packet.kind[..]) {
-                                Some(mut packets) => packets.push((conn_id, packet.data)),
+                                Some(mut packets) => {
+                                    #[cfg(feature = "debug_messages")]
+                                    {
+                                        println!("Received a message of type: {:?}", packet.kind);
+                                    }
+                                    packets.push((conn_id, packet.data))
+                                },
                                 None => {
                                     println!("Eventwork could not find a registration for message type: {:?}", packet.kind);
                                     error!("Could not find existing entries for message kinds: {:?}", packet);
