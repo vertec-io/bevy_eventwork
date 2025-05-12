@@ -1,0 +1,29 @@
+[package]
+name = "eventwork_memory"
+version = "0.1.0"
+edition = "2021"
+description = "Memory leak detection and prevention tools for eventwork"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Bevy dependencies
+bevy = { workspace = true }
+
+# Eventwork dependencies
+eventwork = { path = "../eventwork" }
+eventwork_common = { path = "../eventwork_common" }
+eventwork_websockets = { path = "../eventwork_websockets" }
+
+# Other dependencies
+dashmap = "5.5.3"
+async-channel = "2.0.0"
+futures-lite = "2.0.0"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["psapi", "processthreadsapi"] }
+
+[features]
+default = ["websockets"]
+detailed_diagnostics = []
+websockets = []
+tcp = []

@@ -4,6 +4,7 @@ members = [
     "crates/eventwork",
     "crates/eventwork_websockets",
     "crates/eventwork_common",
+    "crates/eventwork_memory",
 ]
 
 exclude = [

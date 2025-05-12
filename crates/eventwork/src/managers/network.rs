@@ -195,6 +195,7 @@ impl<NP: NetworkProvider> Network<NP> {
             }
             self.established_connections.clear();
             self.recv_message_map.clear();
+            #[cfg(feature = "cache_messages")]
             self.last_messages.clear();
 
             while self.new_connections.receiver.try_recv().is_ok() {}
