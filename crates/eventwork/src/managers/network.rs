@@ -8,15 +8,23 @@ use bevy::prelude::*;
 use dashmap::DashMap;
 use futures_lite::StreamExt;
 
+use super::{Network, NetworkProvider};
 use crate::{
     // error::NetworkError,
     // network_message::NetworkMessage,
-    runtime::{run_async, EventworkRuntime}, AsyncChannel, Connection, NetworkData, NetworkEvent, OutboundMessage, Runtime
+    runtime::{run_async, EventworkRuntime},
+    AsyncChannel,
+    Connection,
+    NetworkData,
+    NetworkEvent,
+    OutboundMessage,
+    Runtime,
 };
-use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, SubscriptionMessage, TargetedMessage};
-use eventwork_common::PreviousMessage;
 use eventwork_common::error::NetworkError;
-use super::{Network, NetworkProvider};
+use eventwork_common::PreviousMessage;
+use eventwork_common::{
+    ConnectionId, NetworkMessage, NetworkPacket, SubscriptionMessage, TargetedMessage,
+};
 
 impl<NP: NetworkProvider> std::fmt::Debug for Network<NP> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -304,15 +312,20 @@ pub trait AppNetworkMessage {
     /// This will:
     /// - Add a new event type of [`OutboundMessage<T>`]
     /// - Register the type for sending/broadcasting over the wire
-    fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self,system_set:S) -> &mut Self;
+    fn register_outbound_message<T: NetworkMessage + Clone, NP: NetworkProvider, S: SystemSet>(
+        &mut self,
+        system_set: S,
+    ) -> &mut Self;
 
-     /// Register a targeted network message type
+    /// Register a targeted network message type
     ///
     /// ## Details
     /// This will:
     /// - Add a new event type of [`NetworkData<TargetedMessage<T>>`]
     /// - Register the type for transformation over the wire
-    fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(&mut self) -> &mut Self;
+    fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(
+        &mut self,
+    ) -> &mut Self;
 
     /// Register a subscription message type
     ///
@@ -320,7 +333,8 @@ pub trait AppNetworkMessage {
     /// This will:
     /// - Register the subscription request, unsubscribe message, and subscription updates
     /// - Add the appropriate event types and system registrations
-    fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self;
+    fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self)
+        -> &mut Self;
 }
 
 impl AppNetworkMessage for App {
@@ -339,7 +353,10 @@ impl AppNetworkMessage for App {
         self.add_systems(PreUpdate, register_message::<T, NP>)
     }
 
-    fn register_outbound_message<T: NetworkMessage+Clone, NP: NetworkProvider, S: SystemSet>(&mut self, system_set:S) -> &mut Self {
+    fn register_outbound_message<T: NetworkMessage + Clone, NP: NetworkProvider, S: SystemSet>(
+        &mut self,
+        system_set: S,
+    ) -> &mut Self {
         let server = self.world_mut().get_resource::<Network<NP>>()
             .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
 
@@ -348,13 +365,15 @@ impl AppNetworkMessage for App {
         if !server.recv_message_map.contains_key(T::NAME) {
             server.recv_message_map.insert(T::NAME, Vec::new());
         }
-        
+
         // Register to listen for PreviousMessage requests
         #[cfg(feature = "cache_messages")]
         {
             let previous_message_name = PreviousMessage::<T>::name();
             if !server.recv_message_map.contains_key(previous_message_name) {
-                server.recv_message_map.insert(previous_message_name, Vec::new());
+                server
+                    .recv_message_map
+                    .insert(previous_message_name, Vec::new());
             }
             self.add_event::<NetworkData<PreviousMessage<T>>>();
             self.add_systems(PreUpdate, register_previous_message::<T, NP>);
@@ -363,12 +382,17 @@ impl AppNetworkMessage for App {
 
         self.add_event::<OutboundMessage<T>>();
 
-        self.add_systems(Update, relay_outbound_notifications::<T, NP>.in_set(system_set));
+        self.add_systems(
+            Update,
+            relay_outbound_notifications::<T, NP>.in_set(system_set),
+        );
 
         self
     }
 
-    fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(&mut self) -> &mut Self {
+    fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(
+        &mut self,
+    ) -> &mut Self {
         let server = self.world_mut().get_resource::<Network<NP>>()
             .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for targeted messages.");
 
@@ -378,27 +402,35 @@ impl AppNetworkMessage for App {
             "Duplicate registration of TargetedMessage: {}",
             targeted_message_name
         );
-        
-        server.recv_message_map.insert(targeted_message_name, Vec::new());
-        
+
+        server
+            .recv_message_map
+            .insert(targeted_message_name, Vec::new());
+
         self.add_event::<NetworkData<TargetedMessage<T>>>();
         self.add_systems(PreUpdate, register_targeted_message::<T, NP>);
-        
+
         self
     }
 
-    fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
+    fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(
+        &mut self,
+    ) -> &mut Self {
         // Check if any of these message types have already been registered
         let need_request = {
             let server = self.world_mut().get_resource::<Network<NP>>()
                 .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
-            !server.recv_message_map.contains_key(T::SubscribeRequest::NAME)
+            !server
+                .recv_message_map
+                .contains_key(T::SubscribeRequest::NAME)
         };
 
         let need_unsubscribe = {
             let server = self.world_mut().get_resource::<Network<NP>>()
                 .expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
-            !server.recv_message_map.contains_key(T::UnsubscribeRequest::NAME)
+            !server
+                .recv_message_map
+                .contains_key(T::UnsubscribeRequest::NAME)
         };
 
         let need_subscription = {
@@ -410,11 +442,11 @@ impl AppNetworkMessage for App {
         if need_request {
             self.listen_for_message::<T::SubscribeRequest, NP>();
         }
-        
+
         if need_unsubscribe {
             self.listen_for_message::<T::UnsubscribeRequest, NP>();
         }
-        
+
         if need_subscription {
             self.listen_for_message::<T, NP>();
         }
@@ -436,7 +468,9 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
 
     #[cfg(feature = "cache_messages")]
     if let Some((_, newest_message)) = messages.last() {
-        net_res.last_messages.insert(T::NAME, newest_message.clone());
+        net_res
+            .last_messages
+            .insert(T::NAME, newest_message.clone());
     }
 
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
@@ -445,7 +479,6 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
             .map(|inner| NetworkData { source, inner })
     }));
 }
-
 
 /// Relays outbound notifications to the appropriate clients.
 ///
@@ -460,7 +493,7 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
 ///
 /// # Parameters
 ///
-/// * `outbound_messages` - An `EventReader` that reads `OutboundMessage<T>` events, 
+/// * `outbound_messages` - An `EventReader` that reads `OutboundMessage<T>` events,
 ///   which contain the messages to be sent to clients.
 /// * `net` - A `Res<Network<NP>>` resource that provides access to the network
 ///   for sending and broadcasting messages.
@@ -468,9 +501,9 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
 /// # Behavior
 ///
 /// The function iterates over all outbound messages:
-/// - If the message is designated for a specific client (`for_client` is `Some(client)`), 
+/// - If the message is designated for a specific client (`for_client` is `Some(client)`),
 ///   it attempts to send the message to that client using `send_message`.
-/// - If the message is intended for all clients (`for_client` is `None`), it broadcasts 
+/// - If the message is intended for all clients (`for_client` is `None`), it broadcasts
 ///   the message using `broadcast`.
 pub fn relay_outbound_notifications<T: NetworkMessage + Clone, NP: NetworkProvider>(
     mut outbound_messages: EventReader<OutboundMessage<T>>,
@@ -520,7 +553,11 @@ fn handle_previous_message_requests<T: NetworkMessage + Clone, NP: NetworkProvid
 
             if let Some(connection) = server.established_connections.get(&request.source) {
                 let _ = connection.send_message.try_send(packet);
-                println!("Sent last message of type {} to client {}", T::NAME, request.source);
+                println!(
+                    "Sent last message of type {} to client {}",
+                    T::NAME,
+                    request.source
+                );
             }
         }
     }
@@ -533,7 +570,10 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
 ) where
     T: NetworkMessage,
 {
-    let mut messages = match net_res.recv_message_map.get_mut(TargetedMessage::<T>::name()) {
+    let mut messages = match net_res
+        .recv_message_map
+        .get_mut(TargetedMessage::<T>::name())
+    {
         Some(messages) => messages,
         None => return,
     };
@@ -541,9 +581,12 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         match bincode::deserialize::<TargetedMessage<T>>(&msg) {
             Ok(inner) => {
-                println!("Successfully deserialized message for target: {}", inner.target_id);
+                println!(
+                    "Successfully deserialized message for target: {}",
+                    inner.target_id
+                );
                 Some(NetworkData { source, inner })
-            },
+            }
             Err(e) => {
                 #[cfg(feature = "debug_messages")]
                 println!("Failed to deserialize message: {:?}", e);
@@ -584,20 +627,24 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
     T: NetworkMessage,
 {
     let name = PreviousMessage::<T>::name();
-    
+
     // Get a mutable reference to the messages
     let mut messages = match net_res.recv_message_map.get_mut(name) {
         Some(messages) => messages,
         None => return,
     };
-    
+
     if messages.is_empty() {
         return;
     }
 
-    println!("Received a request for PreviousMessage of type : {}", T::NAME);
+    #[cfg(feature = "debug_messages")]
+    println!(
+        "Received a request for PreviousMessage of type : {}",
+        T::NAME
+    );
 
-    // Drain the message buffer and send events 
+    // Drain the message buffer and send events
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<PreviousMessage<T>>(&msg)
             .ok()
