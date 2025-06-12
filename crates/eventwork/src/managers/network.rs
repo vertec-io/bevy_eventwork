@@ -581,6 +581,7 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
         match bincode::deserialize::<TargetedMessage<T>>(&msg) {
             Ok(inner) => {
+                #[cfg(feature = "debug_messages")]
                 println!(
                     "Successfully deserialized message for target: {}",
                     inner.target_id
