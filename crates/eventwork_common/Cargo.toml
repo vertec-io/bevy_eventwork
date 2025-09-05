@@ -4,7 +4,7 @@ version = "0.2.8"
 edition = "2021"
 
 [dependencies]
-codee = "0.2.0"
+codee = "0.3.0"
 eventwork_macros = { path = "../eventwork_macros" }
 serde = { version = "1.0.190", features = ["derive"] }
 bincode.workspace = true
