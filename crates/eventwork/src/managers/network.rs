@@ -24,6 +24,7 @@ use crate::{
 use eventwork_common::error::NetworkError;
 use eventwork_common::{
     ConnectionId, NetworkMessage, NetworkPacket, SubscriptionMessage, TargetedMessage,
+    EventworkMessage,
 };
 #[cfg(feature = "cache_messages")]
 use eventwork_common::PreviousMessage;
@@ -59,6 +60,22 @@ impl<NP: NetworkProvider> Network<NP> {
     #[inline(always)]
     pub fn has_connections(&self) -> bool {
         self.established_connections.len() > 0
+    }
+
+    /// Check if a message type is registered
+    ///
+    /// This is primarily useful for testing and debugging.
+    pub fn is_message_registered(&self, message_name: &str) -> bool {
+        self.recv_message_map.contains_key(message_name)
+    }
+
+    /// Get all registered message names
+    ///
+    /// This is primarily useful for testing and debugging.
+    pub fn registered_message_names(&self) -> Vec<String> {
+        self.recv_message_map.iter()
+            .map(|entry| entry.key().to_string())
+            .collect()
     }
 
     /// Start listening for new clients
@@ -145,8 +162,18 @@ impl<NP: NetworkProvider> Network<NP> {
         );
     }
 
-    /// Send a message to a specific client
-    pub fn send_message<T: NetworkMessage>(
+    /// Send a message to a specific client (works for both NetworkMessage and EventworkMessage)
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// // Works with explicit messages
+    /// net.send(conn_id, LoginRequest { ... })?;
+    ///
+    /// // Works with automatic messages
+    /// net.send(conn_id, PlayerPosition { ... })?;
+    /// ```
+    pub fn send<T: EventworkMessage>(
         &self,
         client_id: ConnectionId,
         message: T,
@@ -157,7 +184,7 @@ impl<NP: NetworkProvider> Network<NP> {
         };
 
         let packet = NetworkPacket {
-            kind: String::from(T::NAME),
+            kind: T::type_name().to_string(),
             data: bincode::serialize(&message).map_err(|_| NetworkError::Serialization)?,
         };
 
@@ -172,12 +199,28 @@ impl<NP: NetworkProvider> Network<NP> {
         Ok(())
     }
 
-    /// Broadcast a message to all connected clients
-    pub fn broadcast<T: NetworkMessage + Clone>(&self, message: T) {
+    /// Send a message to a specific client (deprecated, use `send` instead)
+    #[deprecated(since = "0.10.0", note = "Use `send` instead")]
+    pub fn send_message<T: NetworkMessage>(
+        &self,
+        client_id: ConnectionId,
+        message: T,
+    ) -> Result<(), NetworkError> {
+        self.send(client_id, message)
+    }
+
+    /// Broadcast a message to all connected clients (works for both message types)
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// net.broadcast(GameStateUpdate { ... });
+    /// ```
+    pub fn broadcast<T: EventworkMessage + Clone>(&self, message: T) {
         let serialized_message = bincode::serialize(&message).expect("Couldn't serialize message!");
         for connection in self.established_connections.iter() {
             let packet = NetworkPacket {
-                kind: String::from(T::NAME),
+                kind: T::type_name().to_string(),
                 data: serialized_message.clone(),
             };
 
@@ -297,15 +340,88 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
     }
 }
 
+// Since we can't use specialization, we'll just use type_name() for all EventworkMessage types
+// and have a separate path for explicit NetworkMessage types via listen_for_message
+fn register_message_internal<T: EventworkMessage, NP: NetworkProvider>(app: &mut App) -> &mut App {
+    let server = app.world_mut().get_resource::<Network<NP>>()
+        .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering messages.");
+
+    let message_name = T::type_name();
+
+    debug!("Registered network message: {}", message_name);
+
+    assert!(
+        !server.recv_message_map.contains_key(message_name),
+        "Duplicate registration of message: {}",
+        message_name
+    );
+
+    server.recv_message_map.insert(message_name, Vec::new());
+    app.add_event::<NetworkData<T>>();
+    app.add_systems(PreUpdate, register_eventwork_message::<T, NP>)
+}
+
+// Helper for explicit NetworkMessage types
+fn register_explicit_message_internal<T: NetworkMessage, NP: NetworkProvider>(app: &mut App) -> &mut App {
+    let server = app.world_mut().get_resource::<Network<NP>>()
+        .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering messages.");
+
+    let message_name = T::NAME;
+
+    debug!("Registered network message: {}", message_name);
+
+    assert!(
+        !server.recv_message_map.contains_key(message_name),
+        "Duplicate registration of message: {}",
+        message_name
+    );
+
+    server.recv_message_map.insert(message_name, Vec::new());
+    app.add_event::<NetworkData<T>>();
+    app.add_systems(PreUpdate, register_message::<T, NP>)
+}
+
 /// A utility trait on [`App`] to easily register [`NetworkMessage`]s
 pub trait AppNetworkMessage {
-    /// Register a network message type
+    /// Register a network message type using automatic type name generation
+    ///
+    /// This method uses `std::any::type_name()` to automatically generate a message name.
+    /// The name is cached for performance.
+    ///
+    /// **Note**: If you have a type that implements `NetworkMessage` with an explicit `NAME`,
+    /// and you want to use that explicit name, use `listen_for_message` instead (though it's deprecated).
+    /// This method will use the automatic type name even for `NetworkMessage` types.
+    ///
+    /// ## Details
+    /// This will:
+    /// - Add a new event type of [`NetworkData<T>`]
+    /// - Register the type for transformation over the wire using automatic naming
+    /// - Internal bookkeeping
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// // Automatic message (no impl needed)
+    /// #[derive(Serialize, Deserialize)]
+    /// struct PlayerPosition { x: f32, y: f32 }
+    /// app.register_network_message::<PlayerPosition, TcpProvider>();
+    ///
+    /// // Also works with NetworkMessage types, but uses type_name() instead of NAME
+    /// impl NetworkMessage for LoginRequest {
+    ///     const NAME: &'static str = "auth:v1:Login";  // This NAME is ignored by register_network_message
+    /// }
+    /// app.register_network_message::<LoginRequest, TcpProvider>();  // Uses type_name(), not "auth:v1:Login"
+    /// ```
+    fn register_network_message<T: EventworkMessage, NP: NetworkProvider>(&mut self) -> &mut Self;
+
+    /// Register a network message type (deprecated, use `register_network_message` instead)
     ///
     /// ## Details
     /// This will:
     /// - Add a new event type of [`NetworkData<T>`]
     /// - Register the type for transformation over the wire
     /// - Internal bookkeeping
+    #[deprecated(since = "0.10.0", note = "Use `register_network_message` instead")]
     fn listen_for_message<T: NetworkMessage, NP: NetworkProvider>(&mut self) -> &mut Self;
 
     /// Register a network Outgoing message type
@@ -340,19 +456,15 @@ pub trait AppNetworkMessage {
 }
 
 impl AppNetworkMessage for App {
+    fn register_network_message<T: EventworkMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
+        // Use type_name() for all EventworkMessage types
+        // This works for both NetworkMessage and non-NetworkMessage types
+        register_message_internal::<T, NP>(self)
+    }
+
     fn listen_for_message<T: NetworkMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
-        let server = self.world_mut().get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `ServerPlugin` before listening for server messages.");
-
-        debug!("Registered a new NetworkMessage: {}", T::NAME);
-
-        assert!(
-            !server.recv_message_map.contains_key(T::NAME),
-            "Duplicate registration of NetworkMessage: {}",
-            T::NAME
-        );
-        server.recv_message_map.insert(T::NAME, Vec::new());
-        self.add_event::<NetworkData<T>>();
-        self.add_systems(PreUpdate, register_message::<T, NP>)
+        // For backward compatibility, use the explicit NAME
+        register_explicit_message_internal::<T, NP>(self)
     }
 
     fn register_outbound_message<T: NetworkMessage + Clone, NP: NetworkProvider, S: SystemSet>(
@@ -442,15 +554,15 @@ impl AppNetworkMessage for App {
         };
 
         if need_request {
-            self.listen_for_message::<T::SubscribeRequest, NP>();
+            self.register_network_message::<T::SubscribeRequest, NP>();
         }
 
         if need_unsubscribe {
-            self.listen_for_message::<T::UnsubscribeRequest, NP>();
+            self.register_network_message::<T::UnsubscribeRequest, NP>();
         }
 
         if need_subscription {
-            self.listen_for_message::<T, NP>();
+            self.register_network_message::<T, NP>();
         }
 
         self
@@ -473,6 +585,33 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
         net_res
             .last_messages
             .insert(T::NAME, newest_message.clone());
+    }
+
+    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
+        bincode::deserialize::<T>(&msg)
+            .ok()
+            .map(|inner| NetworkData { source, inner })
+    }));
+}
+
+/// System that processes incoming messages for EventworkMessage types
+///
+/// This system handles both explicit (NetworkMessage) and automatic (EventworkMessage) messages.
+pub(crate) fn register_eventwork_message<T, NP: NetworkProvider>(
+    net_res: ResMut<Network<NP>>,
+    mut events: EventWriter<NetworkData<T>>,
+) where
+    T: EventworkMessage,
+{
+    let name = T::type_name();
+    let mut messages = match net_res.recv_message_map.get_mut(name) {
+        Some(messages) => messages,
+        None => return,
+    };
+
+    #[cfg(feature = "cache_messages")]
+    if let Some((_, newest_message)) = messages.last() {
+        net_res.last_messages.insert(name, newest_message.clone());
     }
 
     events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
@@ -514,7 +653,7 @@ pub fn relay_outbound_notifications<T: NetworkMessage + Clone, NP: NetworkProvid
     for notification in outbound_messages.read() {
         match &notification.for_client {
             Some(client) => {
-                let _ = net.send_message(client.clone(), notification.message.clone());
+                let _ = net.send(client.clone(), notification.message.clone());
             }
             None => {
                 let _ = net.broadcast(notification.message.clone());

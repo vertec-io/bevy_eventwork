@@ -64,30 +64,24 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
     type Encoded = [u8];
 
     fn decode(val: &Self::Encoded) -> Result<T, Self::Error> {
-        bincode::deserialize(val).map_err(|_err| NetworkError::Serialization)
-        // if val.len() < 8 {
-        //     // Not enough data to read the length prefix
-        //     // return Err(bincode::Error::custom("Data is too short to contain length prefix"));
-        //     return Err(NetworkError::Serialization);
-        // }
+        if val.len() < 8 {
+            // Not enough data to read the length prefix
+            return Err(NetworkError::Serialization);
+        }
 
-        // // Read the length prefix (first 8 bytes)
-        // let length_prefix = u64::from_le_bytes(val[..8].try_into().map_err(|_err| {
-        //             NetworkError::Serialization
-        //         })?);
+        // Read the length prefix (first 8 bytes)
+        let length_prefix = u64::from_le_bytes(
+            val[..8].try_into().map_err(|_err| NetworkError::Serialization)?
+        );
 
-        // // Check that the length of the remaining data matches the length prefix
-        // if val.len() < 8 + length_prefix as usize {
-        //     // return Err(bincode::Error::custom("Data length does not match length prefix"));
-        //     return Err(NetworkError::Serialization);
+        // Check that the length of the remaining data matches the length prefix
+        if val.len() < 8 + length_prefix as usize {
+            return Err(NetworkError::Serialization);
+        }
 
-        // }
-
-        // // Deserialize the data using bincode
-        // bincode::deserialize(&val[8..8 + length_prefix as usize])
-        //         .map_err(|_err| {
-        //             NetworkError::Serialization
-        //         })
+        // Deserialize the data using bincode (skip the 8-byte length prefix)
+        bincode::deserialize(&val[8..8 + length_prefix as usize])
+            .map_err(|_err| NetworkError::Serialization)
     }
 }
 

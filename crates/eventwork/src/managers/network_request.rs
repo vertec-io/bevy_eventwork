@@ -1,9 +1,9 @@
 //! # Request/Response Network Messages
 //!
 //! This documentation assumes you have an app setup correctly that can send and receive normal messages. Please refer to the repository readme
-//! and the [library documentation](https://docs.rs/bevy_eventwork/latest/bevy_eventwork/index.html) for help with that.
+//! and the [library documentation](https://docs.rs/eventwork/latest/eventwork/index.html) for help with that.
 //!
-//! Note that in bevy_eventwork clients and servers use the same plugin architecture but one (the server) will listen for connections but can't connect while listening and the other (the client) will connect to other apps but can't listen when connected.
+//! Note that in eventwork clients and servers use the same plugin architecture but one (the server) will listen for connections but can't connect while listening and the other (the client) will connect to other apps but can't listen when connected.
 //! This is important to understand because both apps can request and receive from each other as long as the message type is setup to do so in that app.
 //! In this example the client is making requests to the server but if you flipped or duplicated all the message setup the server could make requests to the client.
 //!
@@ -30,7 +30,7 @@
 //!
 //! ```rust
 //! use bevy::prelude::*;
-//! use bevy_eventwork::{NetworkMessage, managers::network_request::RequestMessage};
+//! use eventwork::{NetworkMessage, RequestMessage};
 //! use serde::{Serialize, Deserialize};
 //!
 //! /// A request sent from an eventwork app, in this case the client,
@@ -68,14 +68,14 @@
 //!
 //! ```rust
 //! use bevy::prelude::*;
-//! use bevy_eventwork::{
+//! use eventwork::{
 //!     NetworkMessage,
+//!     RequestMessage,
 //!     ConnectionId,
 //!     tcp::TcpProvider,
 //!     managers::network_request::{
 //!     Response,
 //!     Requester,
-//!     RequestMessage,
 //!     AppNetworkResponseMessage},
 //! };
 //! use serde::{Serialize, Deserialize};
@@ -154,12 +154,12 @@
 //!
 //! ```rust
 //! use bevy::prelude::*;
-//! use bevy_eventwork::{
+//! use eventwork::{
 //!     NetworkMessage,
+//!     RequestMessage,
 //!     tcp::TcpProvider,
 //!     managers::network_request::{
 //!     Request,
-//!     RequestMessage,
 //!     AppNetworkRequestMessage},
 //! };
 //! use serde::{Serialize, Deserialize};
@@ -235,7 +235,7 @@ impl<'w, 's, T: RequestMessage, NP: NetworkProvider> Requester<'w, 's, T, NP> {
     ) -> Result<Response<T::ResponseMessage>, NetworkError> {
         let (id, response) = self.response_map.get_responder();
         self.server
-            .send_message(client_id, RequestInternal { id, request })?;
+            .send(client_id, RequestInternal { id, request })?;
         Ok(response)
     }
 }

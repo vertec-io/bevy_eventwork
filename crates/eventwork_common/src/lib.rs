@@ -1,6 +1,9 @@
 pub mod messages;
 pub use messages::*;
 
+// Explicitly export new traits for clarity
+pub use messages::{EventworkMessage, AnyNetworkMessage};
+
 pub mod codec;
 
 pub mod error;

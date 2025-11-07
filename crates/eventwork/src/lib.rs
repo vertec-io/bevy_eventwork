@@ -20,12 +20,12 @@ Then, register which kind of messages can be received through [`managers::networ
 as well as which provider you wantto handle these messages and you
 can start receiving packets as events of [`NetworkData<T>`].
 
-This plugin also supports Request/Response style messages, see that modules documentation for further info: **[Request Documentation](https://docs.rs/bevy_eventwork/latest/bevy_eventwork/managers/network_request/index.html)**
+This plugin also supports Request/Response style messages, see that modules documentation for further info: **[Request Documentation](https://docs.rs/eventwork/latest/eventwork/managers/network_request/index.html)**
 
 ## Example Client
 ```rust,no_run
 use bevy::prelude::*;
-use bevy_eventwork::{EventworkRuntime, EventworkPlugin, NetworkData, NetworkMessage, NetworkEvent, AppNetworkMessage, tcp::TcpProvider,tcp::NetworkSettings};
+use eventwork::{EventworkRuntime, EventworkPlugin, NetworkData, NetworkMessage, NetworkEvent, AppNetworkMessage, tcp::TcpProvider,tcp::NetworkSettings};
 use serde::{Serialize, Deserialize};
 use bevy::tasks::TaskPoolBuilder;
 
@@ -76,13 +76,12 @@ fn handle_connection_events(mut network_events: EventReader<NetworkEvent>,) {
 ## Example Server
 ```rust,no_run
 use bevy::prelude::*;
-use bevy_eventwork::{EventworkRuntime,
+use eventwork::{EventworkRuntime,
     EventworkPlugin, NetworkData,
-    // NetworkMessage,
+    NetworkMessage,
     Network, NetworkEvent, AppNetworkMessage,
     tcp::TcpProvider,tcp::NetworkSettings
 };
-use network_project::NetworkMessage;
 use bevy::tasks::TaskPoolBuilder;
 use serde::{Serialize, Deserialize};
 

@@ -23,6 +23,7 @@ Forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bev
 
 ## Features
 
+- **✨ Zero Boilerplate**: New automatic message registration - no trait implementation needed!
 - **🔌 Transport Agnostic**: Use TCP, WebSockets, or implement your own transport layer
 - **🌐 Cross-Platform**: Works on Linux, Windows, macOS, and WASM
 - **⚡ Event-Driven**: Integrates seamlessly with Bevy's ECS event system
@@ -30,6 +31,49 @@ Forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bev
 - **📦 Modular**: Lightweight core with optional features and transport providers
 - **🎯 Type-Safe**: Strongly typed messages with compile-time guarantees
 - **🚀 Async Runtime Agnostic**: Works with any async runtime (Bevy TaskPool, Tokio, etc.)
+- **🔧 External Crate Support**: Use types from any crate as network messages
+
+## What's New in 0.10 🎉
+
+Version 0.10 introduces **automatic message registration** - a major ergonomic improvement that eliminates boilerplate!
+
+### Before (0.9 and earlier):
+```rust
+// Had to implement NetworkMessage for every type
+impl NetworkMessage for PlayerPosition {
+    const NAME: &'static str = "game:PlayerPosition";
+}
+app.listen_for_message::<PlayerPosition, TcpProvider>();
+net.send_message(conn_id, msg)?;
+```
+
+### After (0.10+):
+```rust
+// Just derive Serialize + Deserialize - that's it!
+#[derive(Serialize, Deserialize, Clone)]
+struct PlayerPosition { x: f32, y: f32 }
+
+app.register_network_message::<PlayerPosition, TcpProvider>();
+net.send(conn_id, msg)?;
+```
+
+**Benefits:**
+- ✨ **Zero boilerplate** - no trait implementation needed
+- 🔧 **External crate support** - use types from any crate
+- 🚀 **Faster development** - less code to write and maintain
+- ✅ **Fully backward compatible** - existing code continues to work
+
+### Migration Guide
+
+The old API is deprecated but still fully functional:
+
+| Old (Deprecated) | New (Recommended) |
+|-----------------|-------------------|
+| `listen_for_message::<T, P>()` | `register_network_message::<T, P>()` |
+| `send_message(id, msg)` | `send(id, msg)` |
+| `broadcast_message(msg)` | `broadcast(msg)` |
+
+**Note:** If you need explicit message names (e.g., for versioning), continue using `listen_for_message` with `NetworkMessage` trait.
 
 ## Documentation
 
@@ -47,14 +91,34 @@ cargo doc -p eventwork --open
 ```toml
 [dependencies]
 bevy = "0.16"
-eventwork = "0.9"
+eventwork = "0.10"  # New version with automatic message registration!
 serde = { version = "1.0", features = ["derive"] }
 
 # Choose a transport provider:
-# eventwork_websockets = "0.2"  # For WebSocket support (WASM + Native)
+# eventwork_websockets = "0.3"  # For WebSocket support (WASM + Native)
 ```
 
 #### 2. Define Your Messages
+
+**New in 0.10: Automatic Message Registration** 🎉
+
+Just derive `Serialize` and `Deserialize` - no trait implementation needed!
+
+```rust
+use serde::{Serialize, Deserialize};
+
+// That's it! No NetworkMessage trait needed
+#[derive(Serialize, Deserialize, Clone)]
+struct ChatMessage {
+    user: String,
+    message: String,
+}
+```
+
+<details>
+<summary><b>📝 Traditional Approach (Still Supported)</b></summary>
+
+If you need explicit control over message names (e.g., for versioning), you can still use the traditional approach:
 
 ```rust
 use serde::{Serialize, Deserialize};
@@ -67,16 +131,18 @@ struct ChatMessage {
 }
 
 impl NetworkMessage for ChatMessage {
-    const NAME: &'static str = "example:ChatMessage";
+    const NAME: &'static str = "chat:v1:Message";
 }
 ```
+
+</details>
 
 #### 3. Set Up Your App
 
 ```rust
 use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
-use eventwork::{AppNetworkMessage, EventworkPlugin, EventworkRuntime, NetworkProvider};
+use eventwork::{AppNetworkMessage, EventworkPlugin, EventworkRuntime};
 
 fn main() {
     App::new()
@@ -87,8 +153,8 @@ fn main() {
         .insert_resource(EventworkRuntime(
             TaskPoolBuilder::new().num_threads(2).build()
         ))
-        // Register messages to listen for
-        .listen_for_message::<ChatMessage, YourTransportProvider>()
+        // Register messages - now with automatic naming!
+        .register_network_message::<ChatMessage, YourTransportProvider>()
         // Add your systems
         .add_systems(Update, handle_chat_messages)
         .run();
@@ -104,7 +170,8 @@ fn handle_chat_messages(
     mut messages: EventReader<NetworkData<ChatMessage>>,
 ) {
     for message in messages.read() {
-        println!("{}: {}", message.inner.user, message.inner.message);
+        // Access fields directly via Deref
+        println!("{}: {}", message.user, message.message);
     }
 }
 ```
@@ -123,10 +190,10 @@ fn send_chat_message(
     };
 
     // Send to a specific connection
-    net.send_message(connection_id, message).ok();
+    net.send(connection_id, message.clone())?;
 
     // Or broadcast to all connections
-    net.broadcast_message(message).ok();
+    net.broadcast(message);
 }
 ```
 

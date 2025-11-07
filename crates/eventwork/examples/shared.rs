@@ -35,19 +35,23 @@ impl NetworkMessage for NewChatMessage {
 }
 
 #[allow(unused)]
+#[allow(deprecated)] // Using listen_for_message to use explicit NAME
 pub fn client_register_network_messages(app: &mut App) {
     use eventwork::AppNetworkMessage;
 
     // The client registers messages that arrives from the server, so that
     // it is prepared to handle them. Otherwise, an error occurs.
+    // Using listen_for_message because we want to use the explicit NAME
     app.listen_for_message::<NewChatMessage, TcpProvider>();
 }
 
 #[allow(unused)]
+#[allow(deprecated)] // Using listen_for_message to use explicit NAME
 pub fn server_register_network_messages(app: &mut App) {
     use eventwork::AppNetworkMessage;
 
     // The server registers messages that arrives from a client, so that
     // it is prepared to handle them. Otherwise, an error occurs.
+    // Using listen_for_message because we want to use the explicit NAME
     app.listen_for_message::<UserChatMessage, TcpProvider>();
 }
