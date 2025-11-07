@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 pub struct MemoryStats {
     pub last_check: Instant,
     pub check_interval: Duration,
-    pub connection_counts: Vec<(f64, usize)>,  // (time_elapsed, count)
+    pub connection_counts: Vec<(f64, usize)>, // (time_elapsed, count)
     pub message_counts: HashMap<String, Vec<(f64, usize)>>, // (message_type, [(time_elapsed, count)])
     pub start_time: Instant,
 }
@@ -51,7 +51,9 @@ pub fn monitor_memory_usage(
 
     // Monitor connection count
     let connection_count = network.has_connections();
-    stats.connection_counts.push((elapsed, if connection_count { 1 } else { 0 }));
+    stats
+        .connection_counts
+        .push((elapsed, if connection_count { 1 } else { 0 }));
 
     // Print connection count
     println!("Has active connections: {}", connection_count);
@@ -62,7 +64,10 @@ pub fn monitor_memory_usage(
         use std::process;
         let pid = process::id();
         let output = std::process::Command::new("powershell")
-            .args(&["-Command", &format!("Get-Process -Id {} | Select-Object WorkingSet", pid)])
+            .args(&[
+                "-Command",
+                &format!("Get-Process -Id {} | Select-Object WorkingSet", pid),
+            ])
             .output()
             .expect("Failed to execute powershell command");
 
@@ -72,9 +77,7 @@ pub fn monitor_memory_usage(
 }
 
 // System to monitor network events
-pub fn monitor_network_events(
-    mut network_events: EventReader<NetworkEvent>,
-) {
+pub fn monitor_network_events(mut network_events: EventReader<NetworkEvent>) {
     for event in network_events.read() {
         match event {
             NetworkEvent::Connected(conn_id) => {
@@ -92,6 +95,6 @@ pub fn monitor_network_events(
 
 pub fn register_memory_diagnostic_plugin(app: &mut App) {
     app.add_systems(Startup, setup_memory_diagnostics)
-       .add_systems(Update, monitor_memory_usage)
-       .add_systems(Update, monitor_network_events);
+        .add_systems(Update, monitor_memory_usage)
+        .add_systems(Update, monitor_network_events);
 }

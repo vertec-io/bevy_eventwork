@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use eventwork::{tcp::TcpProvider, NetworkMessage};
+use eventwork::{NetworkMessage, tcp::TcpProvider};
 use serde::{Deserialize, Serialize};
 
 /////////////////////////////////////////////////////////////////////

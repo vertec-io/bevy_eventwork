@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
-use crate::memory_diagnostic::*;
 use crate::connection_cleanup::*;
-use crate::message_cleanup::*;
+use crate::memory_diagnostic::*;
 use crate::memory_monitor::*;
+use crate::message_cleanup::*;
 
 /// A Bevy plugin that provides memory leak detection and prevention for eventwork.
 ///
@@ -50,10 +50,8 @@ pub fn force_gc(time: Res<Time>) {
 }
 
 /// A system to periodically clean up network resources
-pub fn cleanup_network_resources<NP>(
-    net: ResMut<eventwork::Network<NP>>,
-    time: Res<Time>,
-) where
+pub fn cleanup_network_resources<NP>(net: ResMut<eventwork::Network<NP>>, time: Res<Time>)
+where
     NP: eventwork::managers::NetworkProvider,
 {
     static mut LAST_CLEANUP: Option<f64> = None;
@@ -73,7 +71,10 @@ pub fn cleanup_network_resources<NP>(
         println!("Performing network resource cleanup...");
 
         // We can't directly access the channels or connections, so we'll just log the status
-        println!("Network resource cleanup check performed at: {:?}", std::time::Instant::now());
+        println!(
+            "Network resource cleanup check performed at: {:?}",
+            std::time::Instant::now()
+        );
         println!("Has active connections: {}", net.has_connections());
     }
 }

@@ -39,10 +39,13 @@ pub fn cleanup_stale_connections(
     println!("Has active connections: {}", network.has_connections());
 
     // We can't directly access the connections or channels, so we'll just log the status
-    println!("Connection cleanup check performed at: {:?}", std::time::Instant::now());
+    println!(
+        "Connection cleanup check performed at: {:?}",
+        std::time::Instant::now()
+    );
 }
 
 pub fn register_connection_cleanup_plugin(app: &mut App) {
     app.add_systems(Startup, setup_connection_cleanup)
-       .add_systems(Update, cleanup_stale_connections);
+        .add_systems(Update, cleanup_stale_connections);
 }

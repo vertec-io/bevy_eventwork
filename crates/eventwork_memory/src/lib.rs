@@ -24,16 +24,16 @@
 //! }
 //! ```
 
-mod memory_diagnostic;
 mod connection_cleanup;
-mod message_cleanup;
+mod memory_diagnostic;
 mod memory_monitor;
+mod message_cleanup;
 mod plugin;
 
-pub use memory_diagnostic::*;
 pub use connection_cleanup::*;
-pub use message_cleanup::*;
+pub use memory_diagnostic::*;
 pub use memory_monitor::*;
+pub use message_cleanup::*;
 pub use plugin::*;
 
 /// Re-export the main plugin

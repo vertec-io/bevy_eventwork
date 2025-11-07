@@ -1,14 +1,12 @@
 use crate::Runtime;
+use std::future::Future;
 
 use super::JoinHandle;
 
 impl Runtime for bevy::tasks::TaskPool {
     type JoinHandle = Option<bevy::tasks::Task<()>>;
 
-    fn spawn(
-        &self,
-        task: impl std::future::Future<Output = ()> + Send + 'static,
-    ) -> Self::JoinHandle {
+    fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) -> Self::JoinHandle {
         #[cfg(not(target_arch = "wasm32"))]
         {
             Some(self.spawn(task))
@@ -21,10 +19,7 @@ impl Runtime for bevy::tasks::TaskPool {
         }
     }
 
-    fn spawn_local(
-        &self,
-        task: impl futures_lite::Future<Output = ()> + 'static,
-    ) -> Self::JoinHandle {
+    fn spawn_local(&self, task: impl Future<Output = ()> + 'static) -> Self::JoinHandle {
         #[cfg(not(target_arch = "wasm32"))]
         {
             Some(self.spawn_local(task))

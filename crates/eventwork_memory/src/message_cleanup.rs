@@ -39,11 +39,14 @@ pub fn cleanup_message_queues(
     config.last_check = Instant::now();
 
     // We can't directly access the message queues, so we'll just log the status
-    println!("Message queue cleanup check performed at: {:?}", std::time::Instant::now());
+    println!(
+        "Message queue cleanup check performed at: {:?}",
+        std::time::Instant::now()
+    );
     println!("Has active connections: {}", network.has_connections());
 }
 
 pub fn register_message_cleanup_plugin(app: &mut App) {
     app.add_systems(Startup, setup_message_cleanup)
-       .add_systems(Update, cleanup_message_queues);
+        .add_systems(Update, cleanup_message_queues);
 }

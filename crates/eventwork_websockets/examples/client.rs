@@ -3,8 +3,8 @@
 use bevy::{
     color::palettes,
     prelude::*,
-    state::commands,
     tasks::{TaskPool, TaskPoolBuilder},
+    ui::Interaction,
 };
 use eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
@@ -55,6 +55,7 @@ fn main() {
 }
 
 #[derive(Resource)]
+#[allow(dead_code)]
 struct NetworkTaskPool(TaskPool);
 
 ///////////////////////////////////////////////////////////////
@@ -65,7 +66,9 @@ fn handle_incoming_messages(
     mut messages: Query<&mut GameChatMessages>,
     mut new_messages: EventReader<NetworkData<shared::NewChatMessage>>,
 ) {
-    let mut messages = messages.get_single_mut().unwrap();
+    let Ok(mut messages) = messages.single_mut() else {
+        return;
+    };
 
     for new_message in new_messages.read() {
         messages.add(UserMessage::new(&new_message.name, &new_message.message));
@@ -78,9 +81,13 @@ fn handle_network_events(
     mut text_query: Query<&mut Text>,
     mut messages: Query<&mut GameChatMessages>,
 ) {
-    let connect_children = connect_query.get_single().unwrap();
+    let Ok(connect_children) = connect_query.single() else {
+        return;
+    };
     let mut text = text_query.get_mut(connect_children[0]).unwrap();
-    let mut messages = messages.get_single_mut().unwrap();
+    let Ok(mut messages) = messages.single_mut() else {
+        return;
+    };
 
     for event in new_network_events.read() {
         info!("Received event");
@@ -220,9 +227,7 @@ fn handle_connect_button(
     mut messages: Query<&mut GameChatMessages>,
     task_pool: Res<EventworkRuntime<TaskPool>>,
 ) {
-    let mut messages = if let Ok(messages) = messages.get_single_mut() {
-        messages
-    } else {
+    let Ok(mut messages) = messages.single_mut() else {
         return;
     };
 
@@ -254,9 +259,7 @@ fn handle_message_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MessageButton>)>,
     mut messages: Query<&mut GameChatMessages>,
 ) {
-    let mut messages = if let Ok(messages) = messages.get_single_mut() {
-        messages
-    } else {
+    let Ok(mut messages) = messages.single_mut() else {
         return;
     };
 
@@ -288,12 +291,12 @@ fn handle_chat_area(
     mut read_messages_index: Local<usize>,
     mut commands: Commands,
 ) {
-    let messages = if let Ok(messages) = messages.get_single() {
-        messages
-    } else {
+    let Ok(messages) = messages.single() else {
         return;
     };
-    let (text_entity, mut text) = chat_text_query.get_single_mut().unwrap();
+    let Ok((text_entity, _text)) = chat_text_query.single_mut() else {
+        return;
+    };
 
     for message_index in *read_messages_index..messages.messages.len() {
         let message = &messages.messages[message_index];

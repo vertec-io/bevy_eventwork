@@ -1,7 +1,8 @@
 [package]
 name = "eventwork_websockets"
 version = "0.2.1"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85.0"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
 readme = "README.md"
@@ -41,6 +42,9 @@ futures = { version = "0.3.29" }
 # Used 1.33.0or Stream type and other ext
 futures-lite = "2.0.0"
 
+# Used for logging
+tracing = "0.1"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-tungstenite = { version = "0.25.0", features = ["async-std-runtime"] }
 ws_stream_tungstenite = { version = "0.13.0" }
@@ -51,6 +55,8 @@ ws_stream_wasm = { version = "0.7.4" }
 async_io_stream = { version = "0.3.3" }
 
 [dev-dependencies]
-bevy = { version = "0.15.0", features = ["default_font"] }
+# Examples need UI features, but these don't affect library users
+bevy = { workspace = true, features = ["bevy_ui", "bevy_text", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_winit", "bevy_color", "x11"] }
 serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.108" }
+async-net = "2.0.0"

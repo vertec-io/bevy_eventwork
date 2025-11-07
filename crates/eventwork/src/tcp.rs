@@ -1,20 +1,18 @@
 use std::{net::SocketAddr, pin::Pin};
 
 use crate::{
+    NetworkPacket,
     async_channel::{Receiver, Sender},
     async_trait,
     // error::NetworkError,
     managers::NetworkProvider,
-    NetworkPacket,
 };
-use eventwork_common::error::NetworkError;
 use async_net::{TcpListener, TcpStream};
-use bevy::{
-    log::{debug, error, info, trace},
-    prelude::Resource,
-};
+use bevy::prelude::Resource;
+use eventwork_common::error::NetworkError;
 use futures_lite::{AsyncReadExt, AsyncWriteExt, FutureExt, Stream};
 use std::future::Future;
+use tracing::{debug, error, info, trace};
 
 #[derive(Default, Debug)]
 /// Provides a tcp stream and listener for eventwork.

@@ -1,9 +1,8 @@
-use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::sync::Arc;
 
-/* 
+/*
 /// Any type that should be sent over the wire has to implement [`NetworkMessage`].
 ///
 /// ## Example
@@ -32,7 +31,6 @@ pub trait NetworkMessage: Serialize + DeserializeOwned + Send + Sync + 'static {
     const NAME: &'static str;
 }
 
-
 /// Marks a type as a request type.
 pub trait RequestMessage:
     Clone + Serialize + DeserializeOwned + Send + Sync + Debug + 'static
@@ -51,8 +49,6 @@ pub trait RequestMessage:
     const REQUEST_NAME: &'static str;
 }
 
-
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "T: NetworkMessage")]
 pub struct TargetedMessage<T: NetworkMessage> {
@@ -67,16 +63,16 @@ impl<T: NetworkMessage> NetworkMessage for TargetedMessage<T> {
 impl<T: NetworkMessage> TargetedMessage<T> {
     pub fn name() -> &'static str {
         // Use a global cache with lazy initialization
-        use std::sync::OnceLock;
+        use std::any::TypeId;
         use std::collections::HashMap;
         use std::sync::Mutex;
-        use std::any::TypeId;
-        
+        use std::sync::OnceLock;
+
         static CACHE: OnceLock<Mutex<HashMap<TypeId, &'static str>>> = OnceLock::new();
         let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-        
+
         let type_id = TypeId::of::<T>();
-        
+
         // Try to get from cache first
         {
             let cache_guard = cache.lock().unwrap();
@@ -84,17 +80,17 @@ impl<T: NetworkMessage> TargetedMessage<T> {
                 return name;
             }
         }
-        
+
         // Not in cache, create it once and leak it (only once per type)
         let formatted_name = format!("Targeted({})", T::NAME);
         let static_name = Box::leak(formatted_name.into_boxed_str());
-        
+
         // Store in cache for future use
         {
             let mut cache_guard = cache.lock().unwrap();
             cache_guard.insert(type_id, static_name);
         }
-        
+
         static_name
     }
 }
@@ -114,22 +110,22 @@ impl<T: NetworkMessage> PreviousMessage<T> {
     pub fn new() -> Self {
         Self {
             _phantom: std::marker::PhantomData,
-            _marker: false
+            _marker: false,
         }
     }
 
     pub fn name() -> &'static str {
         // Use a global cache with lazy initialization
-        use std::sync::OnceLock;
+        use std::any::TypeId;
         use std::collections::HashMap;
         use std::sync::Mutex;
-        use std::any::TypeId;
-        
+        use std::sync::OnceLock;
+
         static CACHE: OnceLock<Mutex<HashMap<TypeId, &'static str>>> = OnceLock::new();
         let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-        
+
         let type_id = TypeId::of::<T>();
-        
+
         // Try to get from cache first
         {
             let cache_guard = cache.lock().unwrap();
@@ -137,17 +133,17 @@ impl<T: NetworkMessage> PreviousMessage<T> {
                 return name;
             }
         }
-        
+
         // Not in cache, create it once and leak it (only once per type)
         let formatted_name = format!("PreviousMessage({})", T::NAME);
         let static_name = Box::leak(formatted_name.into_boxed_str());
-        
+
         // Store in cache for future use
         {
             let mut cache_guard = cache.lock().unwrap();
             cache_guard.insert(type_id, static_name);
         }
-        
+
         static_name
     }
 }
@@ -214,24 +210,47 @@ impl<T: NetworkMessage> NetworkMessage for PreviousMessage<T> {
 ///     }
 /// }
 /// ```
-/// 
+///
 pub trait SubscriptionMessage: NetworkMessage {
     /// The message type used to request a subscription
-    type SubscribeRequest: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
-    
+    type SubscribeRequest: NetworkMessage
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + Debug
+        + 'static;
+
     /// The message type used to terminate a subscription
-    type UnsubscribeRequest: NetworkMessage + Serialize + DeserializeOwned + Send + Sync + Debug + 'static;
-    
+    type UnsubscribeRequest: NetworkMessage
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + Debug
+        + 'static;
+
     /// Parameters needed to create subscription/unsubscribe requests
-    type SubscriptionParams: Serialize + DeserializeOwned + Send + Sync + Debug + PartialEq + Clone + 'static;
-    
+    type SubscriptionParams: Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + Debug
+        + PartialEq
+        + Clone
+        + 'static;
+
     /// Returns the subscription parameters associated with this message
     /// This allows clients to match incoming messages with their original subscription parameters
     fn get_subscription_params(&self) -> Self::SubscriptionParams;
 
     /// Creates a subscription request from the given parameters
-    fn create_subscription_request(subscription_params: Self::SubscriptionParams) -> Self::SubscribeRequest;
+    fn create_subscription_request(
+        subscription_params: Self::SubscriptionParams,
+    ) -> Self::SubscribeRequest;
 
     /// Creates an unsubscribe request from the given parameters
-    fn create_unsubscribe_request(subscription_params: Self::SubscriptionParams) -> Self::UnsubscribeRequest;
+    fn create_unsubscribe_request(
+        subscription_params: Self::SubscriptionParams,
+    ) -> Self::UnsubscribeRequest;
 }

@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
-use eventwork::{EventworkRuntime, Network, NetworkEvent, NetworkMessage, AppNetworkMessage, OutboundMessage};
-use eventwork_websockets::{NetworkSettings, WebSocketProvider};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use eventwork::{
+    AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, NetworkMessage, OutboundMessage,
+};
 use eventwork_memory::NetworkMemoryPlugin;
-use serde::{Serialize, Deserialize};
+use eventwork_websockets::{NetworkSettings, WebSocketProvider};
+use serde::{Deserialize, Serialize};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use tracing::error;
 
 // Define a custom system set for outbound messages
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -22,32 +25,32 @@ impl NetworkMessage for TestMessage {
 
 fn main() {
     let mut app = App::new();
-    
+
     // Add only the minimal required plugins
     app.add_plugins(MinimalPlugins)
-       .add_plugins(bevy::log::LogPlugin::default());
-    
+        .add_plugins(bevy::log::LogPlugin::default());
+
     // Add the eventwork plugin with minimal configuration
     app.add_plugins(eventwork::EventworkPlugin::<
         WebSocketProvider,
         bevy::tasks::TaskPool,
     >::default())
-       .insert_resource(EventworkRuntime(TaskPoolBuilder::new().build()))
-       .insert_resource(NetworkSettings::default());
-    
+        .insert_resource(EventworkRuntime(TaskPoolBuilder::new().build()))
+        .insert_resource(NetworkSettings::default());
+
     // Add our memory leak detection plugin
     app.add_plugins(NetworkMemoryPlugin);
-    
+
     // Configure our custom system set
     app.configure_sets(Update, OutboundMessageSet);
-    
+
     // ONLY register the outbound message type - don't send any
     app.register_outbound_message::<TestMessage, WebSocketProvider, _>(OutboundMessageSet);
-    
+
     // Add only the essential networking system
     app.add_systems(Startup, setup_networking)
-       .add_systems(Update, (log_events));
-    
+        .add_systems(Update, log_events);
+
     println!("Starting outbound message test...");
     app.run();
 }
@@ -59,7 +62,7 @@ fn setup_networking(
 ) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8081);
     println!("Starting server on {}", socket_addr);
-    
+
     match net.listen(socket_addr, &task_pool.0, &settings) {
         Ok(_) => println!("Server listening successfully"),
         Err(err) => {
@@ -81,11 +84,11 @@ fn log_events(
             NetworkEvent::Error(err) => println!("Network error: {:?}", err),
         }
     }
-    
+
     // Log the outbound queue size periodically
     static mut LAST_LOG: Option<f64> = None;
     let current_time = time.elapsed_secs() as f64;
-    
+
     let should_log = unsafe {
         match LAST_LOG {
             Some(last_time) if current_time - last_time < 5.0 => false,
@@ -95,20 +98,23 @@ fn log_events(
             }
         }
     };
-    
+
     if should_log {
         println!("Outbound queue size: {}", outbound_queue.len());
-        
+
         // Check if we have a memory leak by looking at the system memory
         #[cfg(target_os = "windows")]
         {
             use std::process;
             let pid = process::id();
             let output = std::process::Command::new("powershell")
-                .args(&["-Command", &format!("Get-Process -Id {} | Select-Object WorkingSet", pid)])
+                .args(&[
+                    "-Command",
+                    &format!("Get-Process -Id {} | Select-Object WorkingSet", pid),
+                ])
                 .output()
                 .expect("Failed to execute powershell command");
-            
+
             let output_str = String::from_utf8_lossy(&output.stdout);
             println!("Memory usage: {}", output_str);
         }
@@ -116,18 +122,21 @@ fn log_events(
 }
 
 // Add a system to clear the outbound message queue
+#[allow(dead_code)]
 fn clear_outbound_queue(
     mut outbound_queue: EventReader<OutboundMessage<TestMessage>>,
     network: Res<Network<WebSocketProvider>>,
 ) {
     // Only clear if there are no connections
     if !network.has_connections() && !outbound_queue.is_empty() {
-        println!("Clearing {} outbound messages with no connections", outbound_queue.len());
-        
+        println!(
+            "Clearing {} outbound messages with no connections",
+            outbound_queue.len()
+        );
+
         // Read all messages to clear the queue
         for _ in outbound_queue.read() {
             // Just iterate to clear the queue
         }
     }
 }
-

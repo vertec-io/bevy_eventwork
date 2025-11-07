@@ -66,6 +66,7 @@ fn setup_networking(
 }
 
 #[derive(Component)]
+#[allow(dead_code)]
 struct Player(ConnectionId);
 
 fn handle_connection_events(

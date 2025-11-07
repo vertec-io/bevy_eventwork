@@ -20,12 +20,13 @@ mod native_websocket {
     use async_std::net::{TcpListener, TcpStream};
     use async_trait::async_trait;
     use async_tungstenite::tungstenite::protocol::WebSocketConfig;
-    use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
+    use bevy::prelude::{Deref, DerefMut, Resource};
     use eventwork::managers::NetworkProvider;
     use eventwork_common::NetworkPacket;
     use eventwork_common::error::NetworkError;
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
+    use tracing::{debug, error, info, trace};
     use ws_stream_tungstenite::WsStream;
 
     /// A provider for WebSockets
@@ -69,7 +70,7 @@ mod native_websocket {
                     "WSS connections require the TlsWebSocketProvider. Enable the 'tls' feature and use TlsWebSocketProvider instead".to_string(),
                 ));
             }
-            
+
             let (stream, _response) = async_tungstenite::async_std::connect_async_with_config(
                 connect_info,
                 Some(*network_settings),
@@ -314,12 +315,13 @@ mod wasm_websocket {
     use async_channel::{Receiver, Sender};
     use async_io_stream::IoStream;
     use async_trait::async_trait;
-    use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
+    use bevy::prelude::{Deref, DerefMut, Resource};
     use eventwork::managers::NetworkProvider;
     use eventwork_common::NetworkPacket;
     use eventwork_common::error::NetworkError;
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
+    use tracing::{debug, error, info, trace};
     use ws_stream_wasm::{WsMeta, WsStream, WsStreamIo};
 
     /// A provider for WebSockets

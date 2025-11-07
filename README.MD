@@ -1,140 +1,283 @@
-> `bevy_eventwork` is a solution to the "How do I connect multiple bevy instances" problem in your [bevy](https://bevyengine.org/) games, forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bevy_spicy_networking), with significant changes for modularity and including the removal of big dependencies like tokio and typetag.
+# bevy_eventwork
 
-### Contents
+> A modular, event-driven networking solution for [Bevy](https://bevyengine.org/) games. Connect multiple Bevy instances with ease using a flexible, transport-agnostic architecture.
 
+Forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bevy_spicy_networking), with significant improvements for modularity, performance, and ease of use.
+
+[![Crates.io](https://img.shields.io/crates/v/bevy_eventwork)](https://crates.io/crates/bevy_eventwork)
+[![Docs.rs](https://docs.rs/bevy_eventwork/badge.svg)](https://docs.rs/bevy_eventwork)
+[![License](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/jamescarterbell/bevy_eventwork)
+
+## Contents
+
+- [Features](#features)
 - [Documentation](#documentation)
   - [Quickstart](#quickstart)
+- [Examples](#examples)
 - [Bevy Version Compatibility](#bevy-version-compatibility)
 - [Supported Platforms](#supported-platforms)
+- [Transport Providers](#transport-providers)
+- [Workspace Crates](#workspace-crates)
 - [Roadmap](#roadmap)
-- [Crates using `bevy_eventwork`](#crates-using-bevy_eventwork)
-- [Transport providers for`bevy_eventwork`](#transport-providers-for-bevy_eventwork)
-- [Runtimes for`bevy_eventwork`](#transport-providers-for-bevy_eventwork)
 - [Contributing](#contributing)
+
+## Features
+
+- **🔌 Transport Agnostic**: Use TCP, WebSockets, or implement your own transport layer
+- **🌐 Cross-Platform**: Works on Linux, Windows, macOS, and WASM
+- **⚡ Event-Driven**: Integrates seamlessly with Bevy's ECS event system
+- **🔄 Request/Response**: Built-in support for request/response messaging patterns
+- **📦 Modular**: Lightweight core with optional features and transport providers
+- **🎯 Type-Safe**: Strongly typed messages with compile-time guarantees
+- **🚀 Async Runtime Agnostic**: Works with any async runtime (Bevy TaskPool, Tokio, etc.)
 
 ## Documentation
 
-You can check out the [**online documentation**](https://docs.rs/bevy_eventwork), or build it yourself by cloning this repo and running `cargo doc -p bevy_eventwork`.
+📚 **[Online Documentation](https://docs.rs/bevy_eventwork)** - Complete API reference
 
-For examples, check out the [examples directory](https://github.com/jamescarterbell/bevy_eventwork/tree/master/examples).
-
-- In `server.rs` you will find a simple chat server, that broadcasts the messages it receives from clients
-- In `client.rs` you will find a simple graphical chat client, where you can connect to a server and send messages to
-
-(Note: Since bevy does not include a text input widget, it is a very simplified demo. This should be easy to extend once the UI part of bevy
-is more complete.)
+You can also build the documentation locally:
+```bash
+cargo doc -p eventwork --open
+```
 
 ### Quickstart
 
-1. Add `bevy_eventwork`, and `serde` to your `Cargo.toml`
-2. Create the messages you wish to exchange beetween a client and server, or vice-versa.
-   - Implement Serialize and Deserialize from Serde on it
-   - Implement `NetworkMessage`
+#### 1. Add Dependencies
+
+```toml
+[dependencies]
+bevy = "0.16"
+eventwork = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+
+# Choose a transport provider:
+# eventwork_websockets = "0.2"  # For WebSocket support (WASM + Native)
+```
+
+#### 2. Define Your Messages
 
 ```rust
-#[derive(Serialize, Deserialize)]
-struct WhisperMessage {
-    recipient: UserId,
+use serde::{Serialize, Deserialize};
+use eventwork::NetworkMessage;
+
+#[derive(Serialize, Deserialize, Clone)]
+struct ChatMessage {
+    user: String,
     message: String,
 }
 
-/// In this example, we'll be sending this from a client to a server,
-/// BUT, any eventwork bevy instance could recieve the message as
-/// long as they register to listen for it.
-impl NetworkMessage for WhisperMessage {
-    const NAME: &'static str = "example:WhisperMessage";
+impl NetworkMessage for ChatMessage {
+    const NAME: &'static str = "example:ChatMessage";
 }
 ```
 
-3. On the recipient side, set-up the app and register the type to be received
+#### 3. Set Up Your App
 
 ```rust
-use bevy_eventwork::{AppNetworkMessage, tcp::TcpProvider};
+use bevy::prelude::*;
+use bevy::tasks::TaskPoolBuilder;
+use eventwork::{AppNetworkMessage, EventworkPlugin, EventworkRuntime, NetworkProvider};
 
 fn main() {
-    let mut app = App::new();
-
-    /// Add the EventworkPlugin specifying what Transport to use and what runtime
-    app.add_plugins(bevy_eventwork::EventworkPlugin::<
-        TcpProvider,
-        bevy::tasks::TaskPool,
-    >::default());
-
-    /// Insert your desired runtime pool into the app wrapped in EventworkRuntime
-    app.insert_resource(EventworkRuntime(
-        TaskPoolBuilder::new().num_threads(2).build(),
-    ));
-
-    /// Register any messages to be heard
-    ///
-    /// Now whenever a client sends a `WhisperMessage` the server will generate an event of
-    /// `NetworkData<WhisperMessage>` which your application can then handle
-    app.listen_for_message::<WhisperMessage, TcpProvider>();
+    App::new()
+        .add_plugins(DefaultPlugins)
+        // Add the networking plugin with your chosen transport
+        .add_plugins(EventworkPlugin::<YourTransportProvider, bevy::tasks::TaskPool>::default())
+        // Set up the async runtime
+        .insert_resource(EventworkRuntime(
+            TaskPoolBuilder::new().num_threads(2).build()
+        ))
+        // Register messages to listen for
+        .listen_for_message::<ChatMessage, YourTransportProvider>()
+        // Add your systems
+        .add_systems(Update, handle_chat_messages)
+        .run();
 }
 ```
 
-4. Listen for events of that type
+#### 4. Handle Incoming Messages
 
 ```rust
-fn handle_incoming_whisper_messages(
-    mut whisper_messages: EventReader<NetworkMessage<WhisperMessage>>,
+use eventwork::NetworkData;
+
+fn handle_chat_messages(
+    mut messages: EventReader<NetworkData<ChatMessage>>,
 ) {
-    for whisper_message in whisper_messages.iter() {
-        // Handle the whisper
+    for message in messages.read() {
+        println!("{}: {}", message.inner.user, message.inner.message);
     }
 }
 ```
 
-## Request/Response
+#### 5. Send Messages
 
-Starting with version 0.7.1, you can now automatically handle Request/Response style messaging with event work! Check the [documentation](https://docs.rs/bevy_eventwork/latest/bevy_eventwork/managers/network_request/index.html) for more info!
+```rust
+use eventwork::Network;
+
+fn send_chat_message(
+    net: Res<Network<YourTransportProvider>>,
+) {
+    let message = ChatMessage {
+        user: "Player1".to_string(),
+        message: "Hello, world!".to_string(),
+    };
+
+    // Send to a specific connection
+    net.send_message(connection_id, message).ok();
+
+    // Or broadcast to all connections
+    net.broadcast_message(message).ok();
+}
+```
+
+## Examples
+
+Check out the [examples directory](https://github.com/jamescarterbell/bevy_eventwork/tree/master/crates/eventwork/examples) for complete working examples:
+
+- **`server.rs`** - A chat server that broadcasts messages to all connected clients
+- **`client.rs`** - A graphical chat client with Bevy UI
+
+Run the examples:
+```bash
+# Terminal 1 - Start the server
+cargo run --example server -p eventwork
+
+# Terminal 2 - Start a client
+cargo run --example client -p eventwork
+```
+
+For WebSocket examples, see the [`eventwork_websockets` crate](./crates/eventwork_websockets).
 
 ## Bevy Version Compatibility
 
-Simply pick the version compatible to your bevy version:
+| bevy_eventwork | Bevy | Rust |
+| :------------: | :--: | :--: |
+|      0.9       | 0.16 | 1.85 |
+|      0.8       | 0.12 | 1.76 |
+|      0.7       | 0.8  | 1.70 |
 
-| Bevy Eventwork | Bevy |
-| :------------: | :--: |
-|      0.8       | 0.12 |
-|      0.7       | 0.8  |
-
-Any version that is not compatible with the latest bevy version is in maintenance mode.
-It will only receive minor bug fixes from my side, or community supplied ones.
+**Note**: Versions not compatible with the latest Bevy are in maintenance mode and will only receive critical bug fixes.
 
 ## Supported Platforms
 
-- **Linux**
-- **Windows**
-- **WASM** (With a Wasm compatible transport provider like [BEMW](https://github.com/NoahShomette/bevy_eventwork_mod_websockets))
+| Platform | Status | Notes |
+| :------: | :----: | :---: |
+| **Linux** | ✅ Fully Supported | Tested on Ubuntu, Debian, Arch |
+| **Windows** | ✅ Fully Supported | Tested on Windows 10/11 |
+| **macOS** | ⚠️ Should Work | Not regularly tested - community feedback welcome! |
+| **WASM** | ✅ Supported | Requires WebSocket transport provider |
 
-The above three platforms are officially supported. **MacOS** should work but I do not have a Mac to test. If you have a Mac, and wish to test it out and report back, please let me know!
+**WASM Support**: Use the [`eventwork_websockets`](./crates/eventwork_websockets) transport provider for full WASM compatibility.
+
+## Transport Providers
+
+bevy_eventwork uses a modular transport system. Choose the provider that fits your needs:
+
+| Provider | Platforms | WASM | Status | Crate |
+| :------: | :-------: | :--: | :----: | :---: |
+| **TCP** | Linux, Windows, macOS | ❌ | ✅ Included | Built-in |
+| **WebSocket** | Linux, Windows, macOS, WASM | ✅ | ✅ Available | [`eventwork_websockets`](./crates/eventwork_websockets) |
+| **Memory** | All | ✅ | 🧪 Testing | [`eventwork_memory`](./crates/eventwork_memory) |
+
+### Implementing Custom Transports
+
+You can implement your own transport layer by implementing the `NetworkProvider` trait. See the [documentation](https://docs.rs/bevy_eventwork/latest/bevy_eventwork/trait.NetworkProvider.html) for details.
+
+## Workspace Crates
+
+This repository is organized as a Cargo workspace with multiple crates:
+
+### Core Crates
+
+- **[`eventwork`](./crates/eventwork)** - The main networking library
+- **[`eventwork_common`](./crates/eventwork_common)** - Shared types and utilities
+- **[`eventwork_macros`](./crates/eventwork_macros)** - Procedural macros
+
+### Transport Providers
+
+- **[`eventwork_websockets`](./crates/eventwork_websockets)** - WebSocket transport (WASM + Native)
+- **[`eventwork_memory`](./crates/eventwork_memory)** - In-memory transport for testing
 
 ## Roadmap
 
-- General code cleanup, testing, and documentation work
-- Message wide event pipelines
-  - Useful for mapping connection id to user provided ids
-- Message type mapping
-  - Currently the message type is sent as a string with each method, it would be nice if you could just send a few bytes instead.
-- RPCs!
+### Current Focus
+- ✅ Bevy 0.16 support
+- ✅ Rust 2024 edition
+- ✅ Improved documentation
+- ✅ WebSocket transport provider
 
-## Crates using `bevy_eventwork`
+### Future Plans
+- 🔄 Message type ID optimization (reduce bandwidth by using numeric IDs instead of strings)
+- 🔄 Enhanced request/response patterns
+- 🔄 Connection pooling and load balancing
+- 🔄 Built-in encryption support
+- 🔄 Metrics and monitoring tools
+- 🔄 RPC-style function calls
 
-> Currently none, you can help by expanding this list. Just send a PR and add it to the table below!
-
-| Name | Version |
-| :--: | :-----: |
-|  -   |    -    |
-
-## Transport providers for `bevy_eventwork`
-
-|                                                 Name                                                  | Version |
-| :---------------------------------------------------------------------------------------------------: | :-----: |
-|                                       eventwork_tcp (included)                                        |   0.8   |
-| bevy_eventwork_mod_websockets ([LINK](https://github.com/NoahShomette/bevy_eventwork_mod_websockets)) |   0.1   |
+### Community Contributions Welcome!
+- Additional transport providers (QUIC, UDP, etc.)
+- Performance optimizations
+- More examples and tutorials
+- Platform-specific testing (especially macOS)
 
 ## Contributing
 
-To contribute, simply fork the repository and send a PR.
+Contributions are welcome! Here's how you can help:
 
-Feel free to chat me up on the bevy discord under `@SirCarter#8209` if you have any questions, suggestions, or I'm not looking into your PR fast enough and you need someone to yell at (respectfully of course).
+### Ways to Contribute
+
+- 🐛 **Report bugs** - Open an issue with reproduction steps
+- 💡 **Suggest features** - Share your ideas for improvements
+- 📝 **Improve documentation** - Help make the docs clearer
+- 🔧 **Submit PRs** - Fix bugs or implement features
+- 🧪 **Test on different platforms** - Especially macOS!
+- 📦 **Create transport providers** - Implement new network protocols
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/jamescarterbell/bevy_eventwork.git
+cd bevy_eventwork
+
+# Build the workspace
+cargo build --workspace --all-features
+
+# Run tests
+cargo test --workspace
+
+# Run examples
+cargo run --example server -p eventwork
+cargo run --example client -p eventwork
+```
+
+### Guidelines
+
+- Follow Rust's standard style guidelines (`cargo fmt`)
+- Ensure all tests pass (`cargo test`)
+- Add tests for new features
+- Update documentation for API changes
+- Keep PRs focused on a single change
+
+### Getting Help
+
+- 💬 **Discord**: Find us on the [Bevy Discord](https://discord.gg/bevy) - look for `@SirCarter`
+- 📖 **Documentation**: Check the [online docs](https://docs.rs/bevy_eventwork)
+- 🐛 **Issues**: Browse [existing issues](https://github.com/jamescarterbell/bevy_eventwork/issues) or open a new one
+
+## License
+
+Licensed under either of:
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+---
+
+**Built with ❤️ for the Bevy community**

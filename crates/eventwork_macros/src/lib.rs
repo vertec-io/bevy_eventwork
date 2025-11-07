@@ -1,19 +1,19 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields};
+use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 #[proc_macro_derive(SubscribeById, attributes(subscribe_id))]
 pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident;
-    
+
     // Generate the struct names
     let subscribe_struct_name = quote::format_ident!("SubscribeTo{}", name);
     let unsubscribe_struct_name = quote::format_ident!("UnsubscribeFrom{}", name);
-    
+
     // Get the subscribe_id field and its type, if any
     let subscribe_id_field = find_subscribe_id_field(&ast.data);
-    
+
     // Generate the Subscribe and Unsubscribe message structs
     let subscribe_struct = match &subscribe_id_field {
         Some((field_name, _field_type)) => quote! {
@@ -25,7 +25,7 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
         None => quote! {
             #[derive(Serialize, Deserialize, Debug)]
             pub struct #subscribe_struct_name;
-        }
+        },
     };
 
     let unsubscribe_struct = match &subscribe_id_field {
@@ -38,7 +38,7 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
         None => quote! {
             #[derive(Serialize, Deserialize, Debug)]
             pub struct #unsubscribe_struct_name;
-        }
+        },
     };
 
     // Implement NetworkMessage for both structs
@@ -83,7 +83,7 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
                     #unsubscribe_struct_name
                 }
             }
-        }
+        },
     };
 
     quote! {
@@ -99,21 +99,25 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
         }
 
         #subscription_impl
-    }.into()
+    }
+    .into()
 }
 
 fn find_subscribe_id_field(data: &Data) -> Option<(syn::Ident, syn::Type)> {
     match data {
-        Data::Struct(data_struct) => {
-            match &data_struct.fields {
-                Fields::Named(fields) => {
-                    fields.named.iter().find(|field| {
-                        field.attrs.iter().any(|attr| attr.path().is_ident("subscribe_id"))
-                    }).map(|field| (field.ident.clone().unwrap(), field.ty.clone()))
-                }
-                _ => None,
-            }
-        }
+        Data::Struct(data_struct) => match &data_struct.fields {
+            Fields::Named(fields) => fields
+                .named
+                .iter()
+                .find(|field| {
+                    field
+                        .attrs
+                        .iter()
+                        .any(|attr| attr.path().is_ident("subscribe_id"))
+                })
+                .map(|field| (field.ident.clone().unwrap(), field.ty.clone())),
+            _ => None,
+        },
         _ => None,
     }
 }

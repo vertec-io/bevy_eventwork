@@ -8,7 +8,6 @@
     clippy::unwrap_used
 )]
 #![allow(clippy::type_complexity)]
-
 // //
 
 /*!
@@ -78,7 +77,7 @@ fn handle_connection_events(mut network_events: EventReader<NetworkEvent>,) {
 ```rust,no_run
 use bevy::prelude::*;
 use bevy_eventwork::{EventworkRuntime,
-    EventworkPlugin, NetworkData, 
+    EventworkPlugin, NetworkData,
     // NetworkMessage,
     Network, NetworkEvent, AppNetworkMessage,
     tcp::TcpProvider,tcp::NetworkSettings
@@ -155,20 +154,17 @@ Currently, Bevy's [TaskPool](bevy::tasks::TaskPool) is the default runtime used 
 
 /// Contains all functionality for starting a server or client, sending, and recieving messages from clients.
 pub mod managers;
-pub use managers::{network::AppNetworkMessage, Network};
+pub use managers::{Network, network::AppNetworkMessage};
 mod runtime;
 use managers::NetworkProvider;
 pub use runtime::EventworkRuntime;
 use runtime::JoinHandle;
 pub use runtime::Runtime;
 
-use std::{
-    fmt::Debug,
-    marker::PhantomData,
-};
+use std::{fmt::Debug, marker::PhantomData};
 
 pub use async_channel;
-use async_channel::{unbounded, Receiver, Sender};
+use async_channel::{Receiver, Sender, unbounded};
 pub use async_trait::async_trait;
 use bevy::prelude::*;
 
@@ -227,9 +223,9 @@ impl<T> Deref for NetworkData<T> {
 impl<T> NetworkData<T> {
     /// Allows manual creation of networkdata for sending events within bevy
     pub fn new(source: &ConnectionId, inner: T) -> NetworkData<T> {
-        Self{
+        Self {
             source: *source,
-            inner
+            inner,
         }
     }
 
@@ -277,9 +273,9 @@ impl<NP: NetworkProvider + Default, RT: Runtime> Plugin for EventworkPlugin<NP, 
 }
 
 /// Represents an outbound message to be sent to clients.
-/// 
-/// This struct encapsulates the message payload (`message`), 
-/// an optional target client (`for_client`), and a name (`name`) 
+///
+/// This struct encapsulates the message payload (`message`),
+/// an optional target client (`for_client`), and a name (`name`)
 /// associated with the message.
 #[derive(Event, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct OutboundMessage<T>
@@ -288,10 +284,10 @@ where
 {
     /// The name associated with the outbound message.
     pub name: String,
-    
+
     /// The actual message payload to be sent.
     pub message: T,
-    
+
     /// Optional target client for the message.
     /// If `None`, the message will be broadcasted.
     pub for_client: Option<ConnectionId>,
@@ -302,14 +298,14 @@ where
     T: NetworkMessage, // Reapply the constraint for the implementation block
 {
     /// Creates a new `OutboundMessage` instance with the given name and message payload.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `name` - A `String` representing the name of the message.
     /// * `message` - The message payload that implements `NetworkMessage`.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a new `OutboundMessage` instance.
     pub fn new(name: String, message: T) -> Self {
         Self {
@@ -320,13 +316,13 @@ where
     }
 
     /// Sets a specific client connection ID to target the message to.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `id` - The `ConnectionId` of the client to send the message to.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns an updated `OutboundMessage` instance with the target client set.
     pub fn for_client(mut self, id: ConnectionId) -> Self {
         self.for_client = Some(id);

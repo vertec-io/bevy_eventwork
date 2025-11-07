@@ -44,21 +44,25 @@ pub fn monitor_system_memory(
     monitor.memory_samples.push((elapsed, memory_usage));
 
     // Print memory stats with more details
-    println!("Time elapsed: {:.2}s, Memory usage: {} bytes", elapsed, memory_usage);
-    
+    println!(
+        "Time elapsed: {:.2}s, Memory usage: {} bytes",
+        elapsed, memory_usage
+    );
+
     // Print network details if available
     if let Some(net) = network {
         // println!("  - Connection tasks: {}", net.connection_tasks.len());
         println!("  - Established connections: {}", net.has_connections());
         // println!("  - Message map entries: {}", net.recv_message_map.len());
-
     }
 
     // Check for memory leaks
     if monitor.memory_samples.len() >= 10 {
         let trend = analyze_memory_trend(&monitor.memory_samples);
         if trend > 0.05 {
-            println!("WARNING: Memory usage is steadily increasing. Possible memory leak detected!");
+            println!(
+                "WARNING: Memory usage is steadily increasing. Possible memory leak detected!"
+            );
             println!("Memory growth rate: {:.2}% per sample", trend * 100.0);
         }
     }
@@ -88,7 +92,13 @@ fn get_windows_memory_info(pid: u32) -> Result<usize, String> {
     use std::process::Command;
 
     let output = Command::new("powershell")
-        .args(&["-Command", &format!("Get-Process -Id {} | Select-Object -ExpandProperty WorkingSet", pid)])
+        .args(&[
+            "-Command",
+            &format!(
+                "Get-Process -Id {} | Select-Object -ExpandProperty WorkingSet",
+                pid
+            ),
+        ])
         .output()
         .map_err(|e| format!("Failed to execute powershell command: {}", e))?;
 
@@ -97,7 +107,9 @@ fn get_windows_memory_info(pid: u32) -> Result<usize, String> {
     }
 
     let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    output_str.parse::<usize>().map_err(|e| format!("Failed to parse memory usage: {}", e))
+    output_str
+        .parse::<usize>()
+        .map_err(|e| format!("Failed to parse memory usage: {}", e))
 }
 
 /// Analyze memory trend to detect leaks
@@ -110,7 +122,7 @@ fn analyze_memory_trend(samples: &[(f64, usize)]) -> f64 {
     // Calculate the average growth rate
     let mut growth_rates = Vec::new();
     for i in 1..samples.len() {
-        let prev = samples[i-1].1 as f64;
+        let prev = samples[i - 1].1 as f64;
         let curr = samples[i].1 as f64;
 
         if prev > 0.0 {
@@ -130,7 +142,5 @@ fn analyze_memory_trend(samples: &[(f64, usize)]) -> f64 {
 /// Register the memory monitor plugin
 pub fn register_memory_monitor_plugin(app: &mut App) {
     app.add_systems(Startup, setup_memory_monitor)
-       .add_systems(Update, monitor_system_memory);
+        .add_systems(Update, monitor_system_memory);
 }
-
-

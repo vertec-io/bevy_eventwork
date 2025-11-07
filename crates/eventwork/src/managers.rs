@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicU32, Arc};
+use std::sync::{Arc, atomic::AtomicU32};
 
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
@@ -6,12 +6,10 @@ use bevy::prelude::Resource;
 use dashmap::DashMap;
 use futures_lite::Stream;
 
-use crate::{
-    runtime::JoinHandle, AsyncChannel, Connection
-};
+use crate::{AsyncChannel, Connection, runtime::JoinHandle};
 
 use eventwork_common::error::NetworkError;
-use eventwork_common::{NetworkPacket, ConnectionId};
+use eventwork_common::{ConnectionId, NetworkPacket};
 
 /// Contains logic for using [`Network`]
 pub mod network;

@@ -1,10 +1,10 @@
-# `bevy_eventwork_mod_websockets` (BEMW)
+# eventwork_websockets
 
-[![Following released Bevy versions](https://img.shields.io/badge/Bevy%20tracking-released%20version-lightblue)](https://bevyengine.org/learn/quick-start/plugin-development/#main-branch-tracking)
-[![crates.io](https://img.shields.io/crates/v/bevy_eventwork_mod_websockets)](https://crates.io/crates/bevy_eventwork_mod_websockets)
-[![docs.rs](https://docs.rs/bevy_eventwork_mod_websockets/badge.svg)](https://docs.rs/bevy_eventwork_mod_websockets)
+[![Crates.io](https://img.shields.io/crates/v/eventwork_websockets)](https://crates.io/crates/eventwork_websockets)
+[![Docs.rs](https://docs.rs/eventwork_websockets/badge.svg)](https://docs.rs/eventwork_websockets)
+[![License](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/jamescarterbell/bevy_eventwork)
 
-A crate that provides a websocket networking transport layer for [Bevy_eventwork](https://github.com/jamescarterbell/bevy_eventwork) that supports WASM and Native.
+WebSocket transport provider for [bevy_eventwork](https://github.com/jamescarterbell/bevy_eventwork) with full WASM and native support.
 
 ## Supported Platforms
 
@@ -13,26 +13,104 @@ A crate that provides a websocket networking transport layer for [Bevy_eventwork
 - Linux
 - Mac
 
+## Features
+
+- ✅ **WASM Support** - Works in web browsers
+- ✅ **Native Support** - Works on Linux, Windows, macOS
+- ✅ **Async Runtime** - Uses `async-std` for cross-platform compatibility
+- ✅ **Drop-in Replacement** - Easy to switch from TCP to WebSockets
+
 ## Getting Started
 
-See [Bevy_eventwork](https://github.com/jamescarterbell/bevy_eventwork) for details on how to use `bevy_eventwork`.
+Add the dependency to your `Cargo.toml`:
 
-The only difference from bevy_eventworks getting started directions is to use this crates `WebSocketProvider` and `NetworkSettings`.
-Other than that the crate functions identically to stock bevy_eventworks. No features, changes, or manual shenanigans are needed to compile for WASM.
-It just works.
-
-```rust
-    app.add_plugins(bevy_eventwork::EventworkPlugin::<
-        WebSocketProvider,
-        bevy::tasks::TaskPool,
-    >::default());
-
-    app.insert_resource(NetworkSettings::default());
-
+```toml
+[dependencies]
+bevy = "0.16"
+eventwork = "0.9"
+eventwork_websockets = "0.2"
+serde = { version = "1.0", features = ["derive"] }
 ```
 
-## Supported Eventwork + Bevy Version
+### Basic Usage
 
-| EventWork Version | BEMW Version | Bevy Version |
-| :---------------: | :----------: | :----------: |
-|        0.8        |     0.1      |     0.13     |
+```rust
+use bevy::prelude::*;
+use bevy::tasks::TaskPoolBuilder;
+use eventwork::{AppNetworkMessage, EventworkPlugin, EventworkRuntime};
+use eventwork_websockets::{WebSocketProvider, NetworkSettings};
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        // Add the EventworkPlugin with WebSocketProvider
+        .add_plugins(EventworkPlugin::<WebSocketProvider, bevy::tasks::TaskPool>::default())
+        // Configure network settings
+        .insert_resource(NetworkSettings::default())
+        // Set up the async runtime
+        .insert_resource(EventworkRuntime(
+            TaskPoolBuilder::new().num_threads(2).build()
+        ))
+        // Register your messages
+        .listen_for_message::<YourMessage, WebSocketProvider>()
+        .run();
+}
+```
+
+### Network Settings
+
+Configure the WebSocket connection:
+
+```rust
+use eventwork_websockets::NetworkSettings;
+
+// Default settings (localhost:3000)
+app.insert_resource(NetworkSettings::default());
+
+// Custom settings
+app.insert_resource(NetworkSettings {
+    ip: "127.0.0.1".to_string(),
+    port: 8080,
+});
+```
+
+## Examples
+
+Check out the [examples directory](./examples) for complete working examples:
+
+- **`server.rs`** - WebSocket chat server
+- **`client.rs`** - WebSocket chat client with Bevy UI
+
+Run the examples:
+```bash
+# Terminal 1 - Start the server
+cargo run --example server -p eventwork_websockets
+
+# Terminal 2 - Start a client
+cargo run --example client -p eventwork_websockets
+```
+
+## WASM Compilation
+
+To compile for WASM:
+
+```bash
+# Add the WASM target
+rustup target add wasm32-unknown-unknown
+
+# Build for WASM
+cargo build --target wasm32-unknown-unknown --example client -p eventwork_websockets
+```
+
+No special features or configuration needed - it just works! ✨
+
+## Version Compatibility
+
+| eventwork_websockets | eventwork | Bevy |
+| :------------------: | :-------: | :--: |
+|         0.2          |    0.9    | 0.16 |
+|         0.1          |    0.8    | 0.13 |
+
+## License
+
+Licensed under either of Apache License, Version 2.0 or MIT license at your option.

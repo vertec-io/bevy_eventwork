@@ -1,30 +1,32 @@
 use std::sync::{
-    atomic::{AtomicU32, Ordering},
     Arc,
+    atomic::{AtomicU32, Ordering},
 };
 
 use async_channel::unbounded;
 use bevy::prelude::*;
 use dashmap::DashMap;
 use futures_lite::StreamExt;
+use tracing::{debug, error, trace, warn};
 
 use super::{Network, NetworkProvider};
 use crate::{
-    // error::NetworkError,
-    // network_message::NetworkMessage,
-    runtime::{run_async, EventworkRuntime},
     AsyncChannel,
     Connection,
     NetworkData,
     NetworkEvent,
     OutboundMessage,
     Runtime,
+    // error::NetworkError,
+    // network_message::NetworkMessage,
+    runtime::{EventworkRuntime, run_async},
 };
 use eventwork_common::error::NetworkError;
-use eventwork_common::PreviousMessage;
 use eventwork_common::{
     ConnectionId, NetworkMessage, NetworkPacket, SubscriptionMessage, TargetedMessage,
 };
+#[cfg(feature = "cache_messages")]
+use eventwork_common::PreviousMessage;
 
 impl<NP: NetworkProvider> std::fmt::Debug for Network<NP> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -284,14 +286,14 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
                 },
             );
 
-        network_events.send(NetworkEvent::Connected(conn_id));
+        network_events.write(NetworkEvent::Connected(conn_id));
     }
 
     while let Ok(disconnected_connection) = server.disconnected_connections.receiver.try_recv() {
         server
             .established_connections
             .remove(&disconnected_connection);
-        network_events.send(NetworkEvent::Disconnected(disconnected_connection));
+        network_events.write(NetworkEvent::Disconnected(disconnected_connection));
     }
 }
 
@@ -334,7 +336,7 @@ pub trait AppNetworkMessage {
     /// - Register the subscription request, unsubscribe message, and subscription updates
     /// - Add the appropriate event types and system registrations
     fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self)
-        -> &mut Self;
+    -> &mut Self;
 }
 
 impl AppNetworkMessage for App {
@@ -473,7 +475,7 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
             .insert(T::NAME, newest_message.clone());
     }
 
-    events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<T>(&msg)
             .ok()
             .map(|inner| NetworkData { source, inner })
@@ -578,7 +580,7 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
         None => return,
     };
 
-    events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
         match bincode::deserialize::<TargetedMessage<T>>(&msg) {
             Ok(inner) => {
                 #[cfg(feature = "debug_messages")]
@@ -588,9 +590,9 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
                 );
                 Some(NetworkData { source, inner })
             }
-            Err(e) => {
+            Err(_e) => {
                 #[cfg(feature = "debug_messages")]
-                println!("Failed to deserialize message: {:?}", e);
+                println!("Failed to deserialize message: {:?}", _e);
                 None
             }
         }
@@ -646,7 +648,7 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
     );
 
     // Drain the message buffer and send events
-    events.send_batch(messages.drain(..).filter_map(|(source, msg)| {
+    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
         bincode::deserialize::<PreviousMessage<T>>(&msg)
             .ok()
             .map(|inner| NetworkData { source, inner })

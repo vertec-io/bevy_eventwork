@@ -1,13 +1,17 @@
 use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
-use eventwork::{EventworkRuntime, Network, NetworkEvent, NetworkMessage, SubscriptionMessage, AppNetworkMessage, NetworkData, OutboundMessage};
-use eventwork_websockets::{NetworkSettings, WebSocketProvider};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use eventwork_memory::NetworkMemoryPlugin;
-use std::fmt::Debug;
+use eventwork::{
+    AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, NetworkMessage, OutboundMessage,
+    SubscriptionMessage,
+};
 use eventwork_common::SubscribeById;
-use serde::{Serialize, Deserialize};
+use eventwork_memory::NetworkMemoryPlugin;
+use eventwork_websockets::{NetworkSettings, WebSocketProvider};
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
+use tracing::error;
 
 // Define subscription message types
 #[derive(SubscribeById, Serialize, Deserialize, Clone, Debug)]
@@ -23,39 +27,42 @@ impl NetworkMessage for TestUpdate {
 #[derive(Component)]
 struct ConnectedClient {
     id: eventwork::ConnectionId,
+    #[allow(dead_code)]
     connected_at: f64,
 }
 
 fn main() {
     let mut app = App::new();
-    
+
     // Add only the minimal required plugins
     app.add_plugins(MinimalPlugins)
-       .add_plugins(bevy::log::LogPlugin::default());
-    
+        .add_plugins(bevy::log::LogPlugin::default());
+
     // Add the eventwork plugin with minimal configuration
     app.add_plugins(eventwork::EventworkPlugin::<
         WebSocketProvider,
         bevy::tasks::TaskPool,
     >::default())
-       .insert_resource(EventworkRuntime(TaskPoolBuilder::new().build()))
-       .insert_resource(NetworkSettings::default());
-    
+        .insert_resource(EventworkRuntime(TaskPoolBuilder::new().build()))
+        .insert_resource(NetworkSettings::default());
+
     // Add our memory leak detection plugin
     app.add_plugins(NetworkMemoryPlugin);
-    
+
     // Register subscription message types
     app.listen_for_message::<TestUpdate, WebSocketProvider>();
     app.listen_for_subscription::<TestUpdate, WebSocketProvider>();
-    
+
     // Add only the essential networking system
-    app.add_systems(Startup, setup_networking)
-       .add_systems(Update, (
-           handle_connection_events, 
-           log_subscription_stats,
-           send_periodic_updates
-       ));
-    
+    app.add_systems(Startup, setup_networking).add_systems(
+        Update,
+        (
+            handle_connection_events,
+            log_subscription_stats,
+            send_periodic_updates,
+        ),
+    );
+
     println!("Starting minimal server with subscription messages...");
     app.run();
 }
@@ -67,7 +74,7 @@ fn setup_networking(
 ) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8081);
     println!("Starting server on {}", socket_addr);
-    
+
     match net.listen(socket_addr, &task_pool.0, &settings) {
         Ok(_) => println!("Server listening successfully"),
         Err(err) => {
@@ -87,23 +94,23 @@ fn handle_connection_events(
         match event {
             NetworkEvent::Connected(conn_id) => {
                 println!("Client connected: {}", conn_id);
-                
+
                 // Spawn an entity to track this client
                 commands.spawn(ConnectedClient {
                     id: *conn_id,
                     connected_at: time.elapsed_secs() as f64,
                 });
-            },
+            }
             NetworkEvent::Disconnected(conn_id) => {
                 println!("Client disconnected: {}", conn_id);
-                
+
                 // Remove the client entity
                 for (entity, client) in clients.iter() {
                     if client.id == *conn_id {
                         commands.entity(entity).despawn();
                     }
                 }
-            },
+            }
             NetworkEvent::Error(err) => println!("Network error: {:?}", err),
         }
     }
@@ -120,22 +127,23 @@ fn send_periodic_updates(
     if update_timer.is_none() {
         *update_timer = Some(Timer::new(Duration::from_secs(5), TimerMode::Repeating));
     }
-    
+
     // Update timer
     let timer = update_timer.as_mut().unwrap();
     timer.tick(time.delta());
-    
+
     // Send updates when timer finishes
     if timer.just_finished() {
         let timestamp = time.elapsed_secs();
         let update = TestUpdate {
             data: format!("Server update at {:.2}s", timestamp),
         };
-        
+
         // Send to all connected clients
         for client in clients.iter() {
-            let outbound = OutboundMessage::new(TestUpdate::NAME.to_string(), update.clone()).for_client(client.id);
-            outbound_messages.send(outbound);
+            let outbound = OutboundMessage::new(TestUpdate::NAME.to_string(), update.clone())
+                .for_client(client.id);
+            outbound_messages.write(outbound);
             println!("Sent update to client {}", client.id);
         }
     }
@@ -144,11 +152,11 @@ fn send_periodic_updates(
 // System to log subscription-related stats
 fn log_subscription_stats(
     time: Res<Time>,
-    network: Res<Network<WebSocketProvider>>,
+    _network: Res<Network<WebSocketProvider>>,
     clients: Query<&ConnectedClient>,
 ) {
     static mut LAST_LOG: Option<f64> = None;
-    
+
     let current_time = time.elapsed_secs() as f64;
     let should_log = unsafe {
         match LAST_LOG {
@@ -159,19 +167,18 @@ fn log_subscription_stats(
             }
         }
     };
-    
+
     if should_log {
         println!("=== SUBSCRIPTION STATS ===");
         println!("Connected clients: {}", clients.iter().count());
         // println!("Message map entries: {}", network.recv_message_map.len());
-        
+
         // Log the message types that are registered
         println!("Registered message types:");
         // for (msg_type, _) in network.recv_message_map.iter() {
         //     println!("  - {}", msg_type);
         // }
-        
+
         println!("=========================");
     }
 }
-

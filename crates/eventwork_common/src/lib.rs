@@ -1,5 +1,4 @@
 pub mod messages;
-use codee::Decoder;
 pub use messages::*;
 
 pub mod codec;
@@ -12,8 +11,6 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 pub use eventwork_macros::SubscribeById;
-
-use crate::error::NetworkError;
 
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire

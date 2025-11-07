@@ -206,23 +206,23 @@ use std::{fmt::Debug, marker::PhantomData, sync::atomic::AtomicU64};
 use async_channel::{Receiver, Sender};
 use bevy::{
     ecs::system::SystemParam,
-    prelude::{debug, App, Event, EventReader, EventWriter, PreUpdate, Res, ResMut, Resource},
+    prelude::{App, Event, EventReader, EventWriter, PreUpdate, Res, ResMut, Resource},
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::NetworkData;
-use eventwork_common::{NetworkMessage, NetworkPacket, ConnectionId, RequestMessage};
 use eventwork_common::error::NetworkError;
+use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, RequestMessage};
 
-use super::{network::register_message, Network, NetworkProvider};
+use super::{Network, NetworkProvider, network::register_message};
 
 #[derive(SystemParam, Debug)]
 /// A wrapper around [`Network`] that allows for the sending of [`RequestMessage`]'s.
 pub struct Requester<'w, 's, T: RequestMessage, NP: NetworkProvider> {
     server: Res<'w, Network<NP>>,
     response_map: Res<'w, ResponseMap<T>>,
-    #[system_param(ignore)]
     marker: PhantomData<&'s usize>,
 }
 
@@ -401,7 +401,7 @@ fn create_request_handlers<T: RequestMessage, NP: NetworkProvider>(
 ) {
     for request in requests.read() {
         if let Some(connection) = &network.established_connections.get(request.source()) {
-            requests_wrapped.send(Request {
+            requests_wrapped.write(Request {
                 request: request.request.clone(),
                 request_id: request.id,
                 response_tx: connection.send_message.clone(),

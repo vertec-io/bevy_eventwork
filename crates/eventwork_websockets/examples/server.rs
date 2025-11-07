@@ -1,8 +1,8 @@
 use bevy::tasks::TaskPool;
 use bevy::{prelude::*, tasks::TaskPoolBuilder};
 use eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod shared;
 
@@ -64,6 +64,7 @@ fn setup_networking(
 }
 
 #[derive(Component)]
+#[allow(dead_code)]
 struct Player(ConnectionId);
 
 fn handle_connection_events(

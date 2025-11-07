@@ -1,8 +1,8 @@
-use codee::{Decoder, Encoder, HybridDecoder};
-use serde::{de::DeserializeOwned, Serialize};
+use codee::{Decoder, Encoder};
+use serde::{Serialize, de::DeserializeOwned};
 // use std::convert::TryInto;
 
-use crate::{error::NetworkError, NetworkPacket};
+use crate::error::NetworkError;
 
 /// A custom codec that encodes data using bincode and adds a length prefix.
 pub struct EventworkBincodeCodec;
