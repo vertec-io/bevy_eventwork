@@ -460,6 +460,8 @@ impl AppNetworkMessage for App {
 
         let type_name = T::type_name();
         debug!("Registered a new OutboundMessage: {}", type_name);
+        println!("📝 [OUTBOUND REGISTRATION] Registering OutboundMessage for type: {}", type_name);
+        println!("📝 [OUTBOUND REGISTRATION] Adding relay_outbound_notifications system to Update schedule");
 
         if !server.recv_message_map.contains_key(type_name) {
             server.recv_message_map.insert(type_name, Vec::new());
@@ -481,10 +483,12 @@ impl AppNetworkMessage for App {
 
         self.add_event::<OutboundMessage<T>>();
 
+        println!("📝 [OUTBOUND REGISTRATION] Adding system relay_outbound_notifications::<{}, {}> to Update schedule in system set", type_name, std::any::type_name::<NP>());
         self.add_systems(
             Update,
             relay_outbound_notifications::<T, NP>.in_set(system_set),
         );
+        println!("📝 [OUTBOUND REGISTRATION] System added successfully");
 
         self
     }
