@@ -64,8 +64,27 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
     type Encoded = [u8];
 
     fn decode(val: &Self::Encoded) -> Result<T, Self::Error> {
+        // Add detailed logging to understand what we're receiving
+        #[cfg(target_arch = "wasm32")]
+        {
+            use wasm_bindgen::prelude::*;
+            web_sys::console::log_1(&JsValue::from_str(&format!(
+                "[Codec] Decoding {} bytes. First 16 bytes (hex): {:02x?}",
+                val.len(),
+                &val[..val.len().min(16)]
+            )));
+        }
+
         if val.len() < 8 {
             // Not enough data to read the length prefix
+            #[cfg(target_arch = "wasm32")]
+            {
+                use wasm_bindgen::prelude::*;
+                web_sys::console::error_1(&JsValue::from_str(&format!(
+                    "[Codec] ERROR: Not enough bytes for length prefix. Got {} bytes",
+                    val.len()
+                )));
+            }
             return Err(NetworkError::Serialization);
         }
 
@@ -74,14 +93,51 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
             val[..8].try_into().map_err(|_err| NetworkError::Serialization)?
         );
 
+        #[cfg(target_arch = "wasm32")]
+        {
+            use wasm_bindgen::prelude::*;
+            web_sys::console::log_1(&JsValue::from_str(&format!(
+                "[Codec] Length prefix: {}, total bytes: {}, expected data bytes: {}",
+                length_prefix, val.len(), 8 + length_prefix
+            )));
+        }
+
         // Check that the length of the remaining data matches the length prefix
         if val.len() < 8 + length_prefix as usize {
+            #[cfg(target_arch = "wasm32")]
+            {
+                use wasm_bindgen::prelude::*;
+                web_sys::console::error_1(&JsValue::from_str(&format!(
+                    "[Codec] ERROR: Length mismatch. Expected {} bytes, got {} bytes",
+                    8 + length_prefix, val.len()
+                )));
+            }
             return Err(NetworkError::Serialization);
         }
 
         // Deserialize the data using bincode (skip the 8-byte length prefix)
-        bincode::deserialize(&val[8..8 + length_prefix as usize])
-            .map_err(|_err| NetworkError::Serialization)
+        let result = bincode::deserialize(&val[8..8 + length_prefix as usize])
+            .map_err(|err| {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    use wasm_bindgen::prelude::*;
+                    web_sys::console::error_1(&JsValue::from_str(&format!(
+                        "[Codec] ERROR: Bincode deserialization failed: {:?}",
+                        err
+                    )));
+                }
+                NetworkError::Serialization
+            });
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use wasm_bindgen::prelude::*;
+            if result.is_ok() {
+                web_sys::console::log_1(&JsValue::from_str("[Codec] Successfully decoded message"));
+            }
+        }
+
+        result
     }
 }
 
