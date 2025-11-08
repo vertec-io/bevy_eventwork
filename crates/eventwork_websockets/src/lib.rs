@@ -211,17 +211,14 @@ mod native_websocket {
                 let len = encoded.len() as u64;
                 debug!("Sending a new message of size: {}", len);
 
-                match write_half.write(&len.to_le_bytes()).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        error!("Could not send packet length: {:?}: {}", len, err);
-                        break;
-                    }
-                }
+                // Combine length prefix and data into a single buffer to avoid fragmentation
+                let mut buffer = Vec::with_capacity(8 + encoded.len());
+                buffer.extend_from_slice(&len.to_le_bytes());
+                buffer.extend_from_slice(&encoded);
 
-                trace!("Sending the content of the message!");
+                trace!("Sending the complete message with length prefix!");
 
-                match write_half.write_all(&encoded).await {
+                match write_half.write_all(&buffer).await {
                     Ok(_) => (),
                     Err(err) => {
                         error!("Could not send packet: {:?}: {}", message, err);
