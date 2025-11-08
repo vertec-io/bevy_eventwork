@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use eventwork_common::NetworkMessage;
 use eventwork_websockets::WebSocketProvider;
 use serde::{Deserialize, Serialize};
 
@@ -12,17 +11,13 @@ use serde::{Deserialize, Serialize};
 // name.
 //
 // You can have a single message be sent both ways, it simply needs
-// to implement both `NetworkMessage" and both client and server can
-// send and recieve
+// to be Serialize + Deserialize and both client and server can
+// send and receive
 /////////////////////////////////////////////////////////////////////
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UserChatMessage {
     pub message: String,
-}
-
-impl NetworkMessage for UserChatMessage {
-    const NAME: &'static str = "example:UserChatMessage";
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -31,17 +26,13 @@ pub struct NewChatMessage {
     pub message: String,
 }
 
-impl NetworkMessage for NewChatMessage {
-    const NAME: &'static str = "example:NewChatMessage";
-}
-
 #[allow(unused)]
 pub fn client_register_network_messages(app: &mut App) {
     use eventwork::AppNetworkMessage;
 
     // The client registers messages that arrives from the server, so that
     // it is prepared to handle them. Otherwise, an error occurs.
-    app.listen_for_message::<NewChatMessage, WebSocketProvider>();
+    app.register_network_message::<NewChatMessage, WebSocketProvider>();
 }
 
 #[allow(unused)]
@@ -50,5 +41,5 @@ pub fn server_register_network_messages(app: &mut App) {
 
     // The server registers messages that arrives from a client, so that
     // it is prepared to handle them. Otherwise, an error occurs.
-    app.listen_for_message::<UserChatMessage, WebSocketProvider>();
+    app.register_network_message::<UserChatMessage, WebSocketProvider>();
 }

@@ -265,7 +265,7 @@ fn handle_message_button(
 
     for interaction in interaction_query.iter() {
         if let Interaction::Pressed = interaction {
-            match net.send_message(
+            match net.send(
                 ConnectionId { id: 0 },
                 shared::UserChatMessage {
                     message: String::from("Hello there!"),

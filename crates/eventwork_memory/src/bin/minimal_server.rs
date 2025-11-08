@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
 use eventwork::{
-    AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, NetworkMessage, OutboundMessage,
+    AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, OutboundMessage,
     SubscriptionMessage,
 };
 use eventwork_common::SubscribeById;
@@ -17,10 +17,6 @@ use tracing::error;
 #[derive(SubscribeById, Serialize, Deserialize, Clone, Debug)]
 struct TestUpdate {
     pub data: String,
-}
-
-impl NetworkMessage for TestUpdate {
-    const NAME: &'static str = "test:TestUpdate";
 }
 
 // Component to track connected clients
@@ -49,21 +45,8 @@ fn main() {
     // Add our memory leak detection plugin
     app.add_plugins(NetworkMemoryPlugin);
 
-    // Register subscription message types
-    // Old API (deprecated but still works):
-    // app.listen_for_message::<TestUpdate, WebSocketProvider>();
-    // app.listen_for_subscription::<TestUpdate, WebSocketProvider>();
-
-    // New unified API (recommended):
-    #[allow(deprecated)]
-    {
-        app.listen_for_message::<TestUpdate, WebSocketProvider>();
-        app.listen_for_subscription::<TestUpdate, WebSocketProvider>();
-    }
-
-    // Note: You can also use the new API without NetworkMessage implementation:
-    // app.register_subscription::<TestUpdate, WebSocketProvider>();
-    // This would work even without the NetworkMessage impl on line 22-24!
+    // Register subscription message types using EventworkMessage
+    app.register_subscription::<TestUpdate, WebSocketProvider>();
 
     // Add only the essential networking system
     app.add_systems(Startup, setup_networking).add_systems(

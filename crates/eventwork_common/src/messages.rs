@@ -197,7 +197,7 @@ impl<T: EventworkMessage> PreviousMessage<T> {
 ///
 /// # Examples
 /// ```rust
-/// use eventwork_common::{NetworkMessage, SubscriptionMessage};
+/// use eventwork_common::SubscriptionMessage;
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Serialize, Deserialize, Debug)]
@@ -214,18 +214,6 @@ impl<T: EventworkMessage> PreviousMessage<T> {
 /// #[derive(Serialize, Deserialize, Debug)]
 /// struct UnsubscribeFromGame {
 ///     game_id: String,
-/// }
-///
-/// impl NetworkMessage for GameUpdate {
-///     const NAME: &'static str = "game:GameUpdate";
-/// }
-///
-/// impl NetworkMessage for SubscribeToGame {
-///     const NAME: &'static str = "game:Subscribe";
-/// }
-///
-/// impl NetworkMessage for UnsubscribeFromGame {
-///     const NAME: &'static str = "game:Unsubscribe";
 /// }
 ///
 /// impl SubscriptionMessage for GameUpdate {

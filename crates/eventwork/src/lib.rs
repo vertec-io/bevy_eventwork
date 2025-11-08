@@ -25,16 +25,12 @@ This plugin also supports Request/Response style messages, see that modules docu
 ## Example Client
 ```rust,no_run
 use bevy::prelude::*;
-use eventwork::{EventworkRuntime, EventworkPlugin, NetworkData, NetworkMessage, NetworkEvent, AppNetworkMessage, tcp::TcpProvider,tcp::NetworkSettings};
+use eventwork::{EventworkRuntime, EventworkPlugin, NetworkData, NetworkEvent, AppNetworkMessage, tcp::TcpProvider,tcp::NetworkSettings};
 use serde::{Serialize, Deserialize};
 use bevy::tasks::TaskPoolBuilder;
 
 #[derive(Serialize, Deserialize)]
 struct WorldUpdate;
-
-impl NetworkMessage for WorldUpdate {
-    const NAME: &'static str = "example:WorldUpdate";
-}
 
 fn main() {
      let mut app = App::new();
@@ -49,8 +45,8 @@ fn main() {
     ));
     app.insert_resource(NetworkSettings::default());
 
-    // We are receiving this from the server, so we need to listen for it
-     app.listen_for_message::<WorldUpdate, TcpProvider>();
+    // We are receiving this from the server, so we need to register it
+     app.register_network_message::<WorldUpdate, TcpProvider>();
      app.add_systems(Update, (handle_world_updates,handle_connection_events));
 }
 
@@ -78,7 +74,6 @@ fn handle_connection_events(mut network_events: EventReader<NetworkEvent>,) {
 use bevy::prelude::*;
 use eventwork::{EventworkRuntime,
     EventworkPlugin, NetworkData,
-    NetworkMessage,
     Network, NetworkEvent, AppNetworkMessage,
     tcp::TcpProvider,tcp::NetworkSettings
 };
@@ -88,9 +83,8 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize)]
 struct UserInput;
 
-impl NetworkMessage for UserInput {
-    const NAME: &'static str = "example:UserInput";
-}
+#[derive(Serialize, Deserialize)]
+struct PlayerUpdate;
 
 fn main() {
      let mut app = App::new();
@@ -106,8 +100,8 @@ fn main() {
     ));
     app.insert_resource(NetworkSettings::default());
 
-     // We are receiving this from a client, so we need to listen for it!
-     app.listen_for_message::<UserInput, TcpProvider>();
+     // We are receiving this from a client, so we need to register it!
+     app.register_network_message::<UserInput, TcpProvider>();
      app.add_systems(Update, (handle_world_updates,handle_connection_events));
 }
 
@@ -119,13 +113,6 @@ fn handle_world_updates(
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct PlayerUpdate;
-
-impl NetworkMessage for PlayerUpdate {
-    const NAME: &'static str = "example:PlayerUpdate";
-}
-
 fn handle_connection_events(
     net: Res<Network<TcpProvider>>,
     mut network_events: EventReader<NetworkEvent>,
@@ -133,7 +120,7 @@ fn handle_connection_events(
     for event in network_events.read() {
         match event {
             &NetworkEvent::Connected(conn_id) => {
-                net.send_message(conn_id, PlayerUpdate);
+                net.send(conn_id, PlayerUpdate);
                 info!("New client connected: {:?}", conn_id);
             }
             _ => (),

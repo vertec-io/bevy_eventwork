@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::tasks::{TaskPool, TaskPoolBuilder};
 use eventwork::{EventworkRuntime, Network, NetworkData, NetworkEvent};
-use eventwork::{NetworkMessage, OutboundMessage};
+use eventwork::OutboundMessage;
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
 use eventwork_common::{ConnectionId, EventworkMessage};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -50,7 +50,7 @@ impl Plugin for NetworkingPlugin {
     }
 }
 
-pub fn new_server_message<T: NetworkMessage>(message: T) -> OutboundMessage<T> {
+pub fn new_server_message<T: EventworkMessage>(message: T) -> OutboundMessage<T> {
     OutboundMessage::new(module_path!().to_string(), message)
 }
 

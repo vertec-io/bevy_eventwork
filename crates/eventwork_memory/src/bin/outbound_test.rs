@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
 use eventwork::{
-    AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, NetworkMessage, OutboundMessage,
+    AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, OutboundMessage,
 };
 use eventwork_memory::NetworkMemoryPlugin;
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
@@ -17,10 +17,6 @@ struct OutboundMessageSet;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct TestMessage {
     pub data: String,
-}
-
-impl NetworkMessage for TestMessage {
-    const NAME: &'static str = "test:TestMessage";
 }
 
 fn main() {

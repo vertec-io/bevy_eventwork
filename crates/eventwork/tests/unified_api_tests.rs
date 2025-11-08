@@ -2,25 +2,21 @@ use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
 use eventwork::{
     AppNetworkMessage, EventworkPlugin, EventworkRuntime, Network,
-    NetworkMessage, ConnectionId, SubscriptionMessage,
+    ConnectionId, SubscriptionMessage,
     tcp::{TcpProvider, NetworkSettings},
 };
 use eventwork_common::SubscribeById;
 use serde::{Deserialize, Serialize};
 
-// Explicit message with NetworkMessage implementation
+// Test message type
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-struct ExplicitMessage {
+struct TestMessage {
     content: String,
 }
 
-impl NetworkMessage for ExplicitMessage {
-    const NAME: &'static str = "test:ExplicitMessage";
-}
-
-// Automatic message (no NetworkMessage impl)
+// Another test message type
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-struct AutoMessage {
+struct AnotherMessage {
     content: String,
 }
 
@@ -35,63 +31,60 @@ fn create_test_app() -> App {
 }
 
 #[test]
-#[allow(deprecated)]
-fn test_register_explicit_message() {
+fn test_register_message() {
     let mut app = create_test_app();
 
-    // For explicit NAME, use listen_for_message
-    app.listen_for_message::<ExplicitMessage, TcpProvider>();
+    // Register message using EventworkMessage
+    app.register_network_message::<TestMessage, TcpProvider>();
 
-    // Verify registration with explicit name
-    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    assert!(net.is_message_registered("test:ExplicitMessage"));
-}
-
-#[test]
-fn test_register_explicit_message_with_auto_name() {
-    let mut app = create_test_app();
-
-    // register_network_message uses type_name() even for NetworkMessage types
-    app.register_network_message::<ExplicitMessage, TcpProvider>();
-
-    // Verify registration with type name (not explicit NAME)
+    // Verify registration with auto-generated name
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
     let names = net.registered_message_names();
-    let has_explicit = names.iter().any(|name| name.contains("ExplicitMessage"));
-    assert!(has_explicit, "ExplicitMessage should be registered with type name");
-
-    // Should NOT be registered with explicit NAME when using register_network_message
-    assert!(!net.is_message_registered("test:ExplicitMessage"));
+    assert!(names.iter().any(|name| name.contains("TestMessage")));
 }
 
 #[test]
-fn test_register_auto_message() {
+fn test_register_another_message() {
     let mut app = create_test_app();
 
-    // Should work without NetworkMessage impl
-    app.register_network_message::<AutoMessage, TcpProvider>();
-    
-    // Verify registration (name will be full type path)
+    // Register another message using EventworkMessage
+    app.register_network_message::<AnotherMessage, TcpProvider>();
+
+    // Verify registration with auto-generated name
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
     let names = net.registered_message_names();
-    let has_auto_msg = names.iter().any(|name| name.contains("AutoMessage"));
-    assert!(has_auto_msg, "AutoMessage should be registered");
+    assert!(names.iter().any(|name| name.contains("AnotherMessage")));
 }
 
 #[test]
-#[allow(deprecated)]
-fn test_mixed_registration() {
+fn test_is_message_registered() {
     let mut app = create_test_app();
 
-    // Mix explicit (with listen_for_message) and automatic (with register_network_message)
-    app.listen_for_message::<ExplicitMessage, TcpProvider>();
-    app.register_network_message::<AutoMessage, TcpProvider>();
+    app.register_network_message::<TestMessage, TcpProvider>();
+
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    let names = net.registered_message_names();
+
+    // Find the auto-generated name
+    let auto_name = names.iter().find(|name| name.contains("TestMessage")).unwrap();
+
+    // Verify is_message_registered works with auto-generated name
+    assert!(net.is_message_registered(auto_name));
+}
+
+#[test]
+fn test_multiple_registration() {
+    let mut app = create_test_app();
+
+    // Register multiple messages
+    app.register_network_message::<TestMessage, TcpProvider>();
+    app.register_network_message::<AnotherMessage, TcpProvider>();
 
     // Both should be registered
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    assert!(net.is_message_registered("test:ExplicitMessage"));
     let names = net.registered_message_names();
-    assert!(names.iter().any(|name| name.contains("AutoMessage")));
+    assert!(names.iter().any(|name| name.contains("TestMessage")));
+    assert!(names.iter().any(|name| name.contains("AnotherMessage")));
 }
 
 #[test]
@@ -99,36 +92,21 @@ fn test_mixed_registration() {
 fn test_duplicate_registration_panics() {
     let mut app = create_test_app();
 
-    app.register_network_message::<AutoMessage, TcpProvider>();
-    app.register_network_message::<AutoMessage, TcpProvider>(); // Should panic
+    app.register_network_message::<TestMessage, TcpProvider>();
+    app.register_network_message::<TestMessage, TcpProvider>(); // Should panic
 }
 
 #[test]
-#[allow(deprecated)]
-fn test_backward_compatibility() {
+fn test_send_message() {
     let mut app = create_test_app();
 
-    // Old API should still work (though deprecated)
-    app.listen_for_message::<ExplicitMessage, TcpProvider>();
-    
-    // Verify registration
-    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    assert!(net.is_message_registered("test:ExplicitMessage"));
-}
-
-#[test]
-#[allow(deprecated)]
-fn test_send_explicit_message() {
-    let mut app = create_test_app();
-
-    // Use listen_for_message for explicit NAME
-    app.listen_for_message::<ExplicitMessage, TcpProvider>();
+    app.register_network_message::<TestMessage, TcpProvider>();
 
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
 
     // Test that send method exists and compiles
     // (We can't actually send without a connection, but we can verify the API works)
-    let msg = ExplicitMessage { content: "test".to_string() };
+    let msg = TestMessage { content: "test".to_string() };
     let result = net.send(ConnectionId { id: 999 }, msg);
 
     // Should fail because connection doesn't exist, but that's expected
@@ -136,50 +114,17 @@ fn test_send_explicit_message() {
 }
 
 #[test]
-fn test_send_auto_message() {
+fn test_broadcast_message() {
     let mut app = create_test_app();
 
-    app.register_network_message::<AutoMessage, TcpProvider>();
-    
-    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    
-    // Test that send method works with auto messages
-    let msg = AutoMessage { content: "test".to_string() };
-    let result = net.send(ConnectionId { id: 999 }, msg);
-    
-    // Should fail because connection doesn't exist, but that's expected
-    assert!(result.is_err());
-}
-
-#[test]
-#[allow(deprecated)]
-fn test_broadcast_explicit_message() {
-    let mut app = create_test_app();
-
-    // Use listen_for_message for explicit NAME
-    app.listen_for_message::<ExplicitMessage, TcpProvider>();
+    app.register_network_message::<TestMessage, TcpProvider>();
 
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
 
-    // Test that broadcast method exists and compiles
-    let msg = ExplicitMessage { content: "test".to_string() };
+    // Test that broadcast method works
+    let msg = TestMessage { content: "test".to_string() };
     net.broadcast(msg);
 
-    // No connections, so nothing happens, but API works
-}
-
-#[test]
-fn test_broadcast_auto_message() {
-    let mut app = create_test_app();
-
-    app.register_network_message::<AutoMessage, TcpProvider>();
-    
-    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    
-    // Test that broadcast method works with auto messages
-    let msg = AutoMessage { content: "test".to_string() };
-    net.broadcast(msg);
-    
     // No connections, so nothing happens, but API works
 }
 
@@ -228,55 +173,33 @@ fn test_generic_type_registration() {
     assert_eq!(registrations.len(), 2, "Both generic instantiations should be registered");
 }
 
-// Subscription message with explicit NetworkMessage implementation (old style)
+// Subscription message using EventworkMessage
 #[derive(SubscribeById, Serialize, Deserialize, Clone, Debug)]
-struct ExplicitSubscriptionMessage {
-    data: String,
-}
-
-impl NetworkMessage for ExplicitSubscriptionMessage {
-    const NAME: &'static str = "test:ExplicitSubscription";
-}
-
-// Subscription message without NetworkMessage implementation (new style)
-#[derive(SubscribeById, Serialize, Deserialize, Clone, Debug)]
-struct AutoSubscriptionMessage {
+struct SubscriptionMessage1 {
     data: String,
 }
 
 #[test]
-#[allow(deprecated)]
-fn test_subscription_with_explicit_names() {
+fn test_subscription_registration() {
     let mut app = create_test_app();
 
-    // Old API: requires explicit NetworkMessage implementation
-    app.listen_for_subscription::<ExplicitSubscriptionMessage, TcpProvider>();
-
-    // Verify all three message types are registered with explicit names
-    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    assert!(net.is_message_registered("test:ExplicitSubscription"), "Base subscription message should be registered");
-    assert!(net.is_message_registered("ExplicitSubscriptionMessage:Subscribe"), "Subscribe message should be registered");
-    assert!(net.is_message_registered("ExplicitSubscriptionMessage:Unsubscribe"), "Unsubscribe message should be registered");
-}
-
-#[test]
-fn test_subscription_with_auto_names() {
-    let mut app = create_test_app();
-
-    // New API: works without explicit NetworkMessage implementation for base type
-    app.register_subscription::<AutoSubscriptionMessage, TcpProvider>();
+    // Register subscription using EventworkMessage
+    app.register_subscription::<SubscriptionMessage1, TcpProvider>();
 
     // Verify all three message types are registered
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
     let names = net.registered_message_names();
 
-    // Base subscription message uses auto-generated name
-    let has_base = names.iter().any(|name| name.contains("AutoSubscriptionMessage") && !name.contains("Subscribe") && !name.contains("Unsubscribe"));
+    // All three messages now use auto-generated names (EventworkMessage)
+    let has_base = names.iter().any(|name| name.contains("SubscriptionMessage1") && !name.contains("Subscribe") && !name.contains("Unsubscribe"));
     assert!(has_base, "Base subscription message should be registered with auto-generated name");
 
-    // Subscribe/Unsubscribe messages use explicit names from macro
-    assert!(net.is_message_registered("AutoSubscriptionMessage:Subscribe"), "Subscribe message should be registered");
-    assert!(net.is_message_registered("AutoSubscriptionMessage:Unsubscribe"), "Unsubscribe message should be registered");
+    // Subscribe/Unsubscribe messages also use auto-generated names now
+    let has_subscribe = names.iter().any(|name| name.contains("Subscribe") && name.contains("SubscriptionMessage1"));
+    assert!(has_subscribe, "Subscribe message should be registered with auto-generated name");
+
+    let has_unsubscribe = names.iter().any(|name| name.contains("Unsubscribe") && name.contains("SubscriptionMessage1"));
+    assert!(has_unsubscribe, "Unsubscribe message should be registered with auto-generated name");
 }
 
 #[test]
@@ -284,41 +207,28 @@ fn test_subscription_no_duplicate_registration() {
     let mut app = create_test_app();
 
     // Register subscription twice - should not panic because we check for duplicates
-    app.register_subscription::<AutoSubscriptionMessage, TcpProvider>();
-    app.register_subscription::<AutoSubscriptionMessage, TcpProvider>();
+    app.register_subscription::<SubscriptionMessage1, TcpProvider>();
+    app.register_subscription::<SubscriptionMessage1, TcpProvider>();
 
     // Verify registration still works
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    assert!(net.is_message_registered("AutoSubscriptionMessage:Subscribe"));
+    let names = net.registered_message_names();
+    let has_subscribe = names.iter().any(|name| name.contains("Subscribe") && name.contains("SubscriptionMessage1"));
+    assert!(has_subscribe, "Subscribe message should be registered");
 }
 
 #[test]
-#[allow(deprecated)]
-fn test_targeted_message_with_explicit_names() {
+fn test_targeted_message() {
     let mut app = create_test_app();
 
-    // Old API: requires explicit NetworkMessage implementation
-    app.listen_for_targeted_message::<ExplicitMessage, TcpProvider>();
+    // Register targeted message using EventworkMessage
+    app.register_targeted_message::<TestMessage, TcpProvider>();
 
     // Verify targeted message is registered
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
     let names = net.registered_message_names();
-    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("ExplicitMessage"));
+    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("TestMessage"));
     assert!(has_targeted, "Targeted message should be registered");
-}
-
-#[test]
-fn test_targeted_message_with_auto_names() {
-    let mut app = create_test_app();
-
-    // New API: works without explicit NetworkMessage implementation
-    app.register_targeted_message::<AutoMessage, TcpProvider>();
-
-    // Verify targeted message is registered
-    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
-    let names = net.registered_message_names();
-    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("AutoMessage"));
-    assert!(has_targeted, "Targeted message should be registered with auto-generated name");
 }
 
 #[test]
@@ -326,13 +236,13 @@ fn test_targeted_message_no_duplicate_registration() {
     let mut app = create_test_app();
 
     // Register targeted message twice - should not panic
-    app.register_targeted_message::<AutoMessage, TcpProvider>();
-    app.register_targeted_message::<AutoMessage, TcpProvider>();
+    app.register_targeted_message::<AnotherMessage, TcpProvider>();
+    app.register_targeted_message::<AnotherMessage, TcpProvider>();
 
     // Verify registration still works
     let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
     let names = net.registered_message_names();
-    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("AutoMessage"));
+    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("AnotherMessage"));
     assert!(has_targeted);
 }
 

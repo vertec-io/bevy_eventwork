@@ -30,7 +30,7 @@
 //!
 //! ```rust
 //! use bevy::prelude::*;
-//! use eventwork::{NetworkMessage, RequestMessage};
+//! use eventwork::RequestMessage;
 //! use serde::{Serialize, Deserialize};
 //!
 //! /// A request sent from an eventwork app, in this case the client,
@@ -42,9 +42,9 @@
 //!
 //! impl RequestMessage for RequestStatus {
 //!     /// The type of message that the server will send back to the client.
-//!     /// It must implement [`NetworkMessage`]
+//!     /// It must implement EventworkMessage (auto-implemented for Serialize + DeserializeOwned types)
 //!    type ResponseMessage = StatusResponse;
-//!    
+//!
 //!     /// A unique identifying name for the request message.
 //!    const REQUEST_NAME: &'static str = "client_request_status";
 //! }
@@ -53,10 +53,6 @@
 //! #[derive(Debug, Serialize, Deserialize, Clone)]
 //! struct StatusResponse{
 //!     pub response: bool
-//! }
-//!
-//! impl NetworkMessage for StatusResponse {
-//!     const NAME: &'static str = "client_request_status_response";
 //! }
 //!
 //! ```
@@ -69,7 +65,6 @@
 //! ```rust
 //! use bevy::prelude::*;
 //! use eventwork::{
-//!     NetworkMessage,
 //!     RequestMessage,
 //!     ConnectionId,
 //!     tcp::TcpProvider,
@@ -89,9 +84,6 @@
 //! # #[derive(Debug, Serialize, Deserialize, Clone)]
 //! # struct StatusResponse{
 //! #    pub response: bool
-//! # }
-//! # impl NetworkMessage for StatusResponse {
-//! #    const NAME: &'static str = "client_request_status_response";
 //! # }
 //!
 //! struct ClientPlugin;
@@ -155,7 +147,6 @@
 //! ```rust
 //! use bevy::prelude::*;
 //! use eventwork::{
-//!     NetworkMessage,
 //!     RequestMessage,
 //!     tcp::TcpProvider,
 //!     managers::network_request::{
@@ -173,9 +164,6 @@
 //! # #[derive(Debug, Serialize, Deserialize, Clone)]
 //! # struct StatusResponse{
 //! #    pub response: bool
-//! # }
-//! # impl NetworkMessage for StatusResponse {
-//! #    const NAME: &'static str = "client_request_status_response";
 //! # }
 //!
 //! struct ServerPlugin;
