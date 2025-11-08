@@ -72,7 +72,10 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
                 type SubscriptionParams = String;
 
                 fn get_subscription_params(&self) -> Self::SubscriptionParams {
-                    Self::NAME.to_string()
+                    // Use type_name() for types without a subscribe_id field
+                    // This works for both NetworkMessage (with explicit NAME) and EventworkMessage types
+                    use std::any::type_name;
+                    type_name::<Self>().to_string()
                 }
 
                 fn create_subscription_request(_params: Self::SubscriptionParams) -> Self::SubscribeRequest {

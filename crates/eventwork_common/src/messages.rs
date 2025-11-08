@@ -284,6 +284,9 @@ impl<T: NetworkMessage> NetworkMessage for PreviousMessage<T> {
 
 /// Marks a type as a subscription message that can be used in a pub/sub pattern.
 ///
+/// This trait now works with both explicit `NetworkMessage` types and auto-generated
+/// `EventworkMessage` types, providing a unified subscription API.
+///
 /// # Type Parameters
 /// * `Request` - The message type used to initiate a subscription
 /// * `Unsubscribe` - The message type used to terminate a subscription
@@ -341,9 +344,9 @@ impl<T: NetworkMessage> NetworkMessage for PreviousMessage<T> {
 /// }
 /// ```
 ///
-pub trait SubscriptionMessage: NetworkMessage {
+pub trait SubscriptionMessage: EventworkMessage {
     /// The message type used to request a subscription
-    type SubscribeRequest: NetworkMessage
+    type SubscribeRequest: EventworkMessage
         + Serialize
         + DeserializeOwned
         + Send
@@ -352,7 +355,7 @@ pub trait SubscriptionMessage: NetworkMessage {
         + 'static;
 
     /// The message type used to terminate a subscription
-    type UnsubscribeRequest: NetworkMessage
+    type UnsubscribeRequest: EventworkMessage
         + Serialize
         + DeserializeOwned
         + Send

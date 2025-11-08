@@ -72,7 +72,7 @@ mod native_websocket {
             }
 
             let (stream, _response) = async_tungstenite::async_std::connect_async_with_config(
-                connect_info,
+                connect_info.as_str(),
                 Some(*network_settings),
             )
             .await

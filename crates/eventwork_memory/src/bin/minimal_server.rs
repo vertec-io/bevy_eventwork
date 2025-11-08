@@ -50,8 +50,20 @@ fn main() {
     app.add_plugins(NetworkMemoryPlugin);
 
     // Register subscription message types
-    app.listen_for_message::<TestUpdate, WebSocketProvider>();
-    app.listen_for_subscription::<TestUpdate, WebSocketProvider>();
+    // Old API (deprecated but still works):
+    // app.listen_for_message::<TestUpdate, WebSocketProvider>();
+    // app.listen_for_subscription::<TestUpdate, WebSocketProvider>();
+
+    // New unified API (recommended):
+    #[allow(deprecated)]
+    {
+        app.listen_for_message::<TestUpdate, WebSocketProvider>();
+        app.listen_for_subscription::<TestUpdate, WebSocketProvider>();
+    }
+
+    // Note: You can also use the new API without NetworkMessage implementation:
+    // app.register_subscription::<TestUpdate, WebSocketProvider>();
+    // This would work even without the NetworkMessage impl on line 22-24!
 
     // Add only the essential networking system
     app.add_systems(Startup, setup_networking).add_systems(

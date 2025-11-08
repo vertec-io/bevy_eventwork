@@ -2,9 +2,10 @@ use bevy::prelude::*;
 use bevy::tasks::TaskPoolBuilder;
 use eventwork::{
     AppNetworkMessage, EventworkPlugin, EventworkRuntime, Network,
-    NetworkMessage, ConnectionId,
+    NetworkMessage, ConnectionId, SubscriptionMessage,
     tcp::{TcpProvider, NetworkSettings},
 };
+use eventwork_common::SubscribeById;
 use serde::{Deserialize, Serialize};
 
 // Explicit message with NetworkMessage implementation
@@ -225,5 +226,69 @@ fn test_generic_type_registration() {
         .collect();
 
     assert_eq!(registrations.len(), 2, "Both generic instantiations should be registered");
+}
+
+// Subscription message with explicit NetworkMessage implementation (old style)
+#[derive(SubscribeById, Serialize, Deserialize, Clone, Debug)]
+struct ExplicitSubscriptionMessage {
+    data: String,
+}
+
+impl NetworkMessage for ExplicitSubscriptionMessage {
+    const NAME: &'static str = "test:ExplicitSubscription";
+}
+
+// Subscription message without NetworkMessage implementation (new style)
+#[derive(SubscribeById, Serialize, Deserialize, Clone, Debug)]
+struct AutoSubscriptionMessage {
+    data: String,
+}
+
+#[test]
+#[allow(deprecated)]
+fn test_subscription_with_explicit_names() {
+    let mut app = create_test_app();
+
+    // Old API: requires explicit NetworkMessage implementation
+    app.listen_for_subscription::<ExplicitSubscriptionMessage, TcpProvider>();
+
+    // Verify all three message types are registered with explicit names
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    assert!(net.is_message_registered("test:ExplicitSubscription"), "Base subscription message should be registered");
+    assert!(net.is_message_registered("ExplicitSubscriptionMessage:Subscribe"), "Subscribe message should be registered");
+    assert!(net.is_message_registered("ExplicitSubscriptionMessage:Unsubscribe"), "Unsubscribe message should be registered");
+}
+
+#[test]
+fn test_subscription_with_auto_names() {
+    let mut app = create_test_app();
+
+    // New API: works without explicit NetworkMessage implementation for base type
+    app.register_subscription::<AutoSubscriptionMessage, TcpProvider>();
+
+    // Verify all three message types are registered
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    let names = net.registered_message_names();
+
+    // Base subscription message uses auto-generated name
+    let has_base = names.iter().any(|name| name.contains("AutoSubscriptionMessage") && !name.contains("Subscribe") && !name.contains("Unsubscribe"));
+    assert!(has_base, "Base subscription message should be registered with auto-generated name");
+
+    // Subscribe/Unsubscribe messages use explicit names from macro
+    assert!(net.is_message_registered("AutoSubscriptionMessage:Subscribe"), "Subscribe message should be registered");
+    assert!(net.is_message_registered("AutoSubscriptionMessage:Unsubscribe"), "Unsubscribe message should be registered");
+}
+
+#[test]
+fn test_subscription_no_duplicate_registration() {
+    let mut app = create_test_app();
+
+    // Register subscription twice - should not panic because we check for duplicates
+    app.register_subscription::<AutoSubscriptionMessage, TcpProvider>();
+    app.register_subscription::<AutoSubscriptionMessage, TcpProvider>();
+
+    // Verify registration still works
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    assert!(net.is_message_registered("AutoSubscriptionMessage:Subscribe"));
 }
 

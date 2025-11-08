@@ -381,6 +381,44 @@ fn register_explicit_message_internal<T: NetworkMessage, NP: NetworkProvider>(ap
     app.add_systems(PreUpdate, register_message::<T, NP>)
 }
 
+/// Helper that registers a message if not already registered, using explicit NAME
+/// Returns true if registration was performed, false if already registered
+fn register_explicit_if_needed<T: NetworkMessage, NP: NetworkProvider>(app: &mut App) -> bool {
+    let already_registered = {
+        let server = app.world().get_resource::<Network<NP>>()
+            .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering messages.");
+
+        let message_name = T::NAME;
+        server.recv_message_map.contains_key(message_name)
+    };
+
+    if already_registered {
+        return false;
+    }
+
+    register_explicit_message_internal::<T, NP>(app);
+    true
+}
+
+/// Helper that registers a message if not already registered, using auto-generated type_name
+/// Returns true if registration was performed, false if already registered
+fn register_auto_if_needed<T: EventworkMessage, NP: NetworkProvider>(app: &mut App) -> bool {
+    let already_registered = {
+        let server = app.world().get_resource::<Network<NP>>()
+            .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering messages.");
+
+        let message_name = T::type_name();
+        server.recv_message_map.contains_key(message_name)
+    };
+
+    if already_registered {
+        return false;
+    }
+
+    register_message_internal::<T, NP>(app);
+    true
+}
+
 /// A utility trait on [`App`] to easily register [`NetworkMessage`]s
 pub trait AppNetworkMessage {
     /// Register a network message type using automatic type name generation
@@ -445,14 +483,52 @@ pub trait AppNetworkMessage {
         &mut self,
     ) -> &mut Self;
 
-    /// Register a subscription message type
+    /// Register a subscription message type (deprecated, use `register_subscription` instead)
+    ///
+    /// This method requires explicit `NetworkMessage` implementations for all subscription types.
     ///
     /// ## Details
     /// This will:
     /// - Register the subscription request, unsubscribe message, and subscription updates
     /// - Add the appropriate event types and system registrations
+    #[deprecated(since = "0.10.0", note = "Use `register_subscription` instead for unified API")]
     fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self)
-    -> &mut Self;
+    -> &mut Self
+    where
+        T::SubscribeRequest: NetworkMessage,
+        T::UnsubscribeRequest: NetworkMessage,
+        T: NetworkMessage;
+
+    /// Register a subscription message type using automatic type name generation
+    ///
+    /// This method works with subscription types that use auto-generated names via `EventworkMessage`.
+    /// It automatically registers the subscription message, subscribe request, and unsubscribe request
+    /// if they haven't been registered yet.
+    ///
+    /// **Note**: When using the `SubscribeById` macro, the Subscribe/Unsubscribe types will have
+    /// explicit `NetworkMessage` implementations. This method will use those explicit names for
+    /// Subscribe/Unsubscribe types, but can use auto-generated names for the base subscription type.
+    ///
+    /// ## Details
+    /// This will:
+    /// - Register the subscription request, unsubscribe message, and subscription updates
+    /// - Use explicit names for Subscribe/Unsubscribe types (from SubscribeById macro)
+    /// - Use automatic type name generation for the base subscription type
+    /// - Add the appropriate event types and system registrations
+    ///
+    /// ## Example
+    /// ```rust,ignore
+    /// // With auto-generated names (no explicit NetworkMessage impl needed for base type)
+    /// #[derive(SubscribeById, Serialize, Deserialize)]
+    /// struct GameUpdate { game_id: String }
+    ///
+    /// // No need to implement NetworkMessage for GameUpdate!
+    /// app.register_subscription::<GameUpdate, WebSocketProvider>();
+    /// ```
+    fn register_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self
+    where
+        T::SubscribeRequest: NetworkMessage,
+        T::UnsubscribeRequest: NetworkMessage;
 }
 
 impl AppNetworkMessage for App {
@@ -527,9 +603,16 @@ impl AppNetworkMessage for App {
         self
     }
 
+    #[allow(deprecated)]
     fn listen_for_subscription<T: SubscriptionMessage, NP: NetworkProvider>(
         &mut self,
-    ) -> &mut Self {
+    ) -> &mut Self
+    where
+        T::SubscribeRequest: NetworkMessage,
+        T::UnsubscribeRequest: NetworkMessage,
+        T: NetworkMessage,
+    {
+        // For backward compatibility: explicit NetworkMessage types
         // Check if any of these message types have already been registered
         let need_request = {
             let server = self.world_mut().get_resource::<Network<NP>>()
@@ -554,16 +637,57 @@ impl AppNetworkMessage for App {
         };
 
         if need_request {
-            self.register_network_message::<T::SubscribeRequest, NP>();
+            self.listen_for_message::<T::SubscribeRequest, NP>();
         }
 
         if need_unsubscribe {
-            self.register_network_message::<T::UnsubscribeRequest, NP>();
+            self.listen_for_message::<T::UnsubscribeRequest, NP>();
         }
 
         if need_subscription {
-            self.register_network_message::<T, NP>();
+            self.listen_for_message::<T, NP>();
         }
+
+        self
+    }
+
+    /// Register a subscription message type using automatic type name generation
+    ///
+    /// This method works with subscription types that use auto-generated names via `EventworkMessage`.
+    /// It automatically registers the subscription message, subscribe request, and unsubscribe request
+    /// if they haven't been registered yet.
+    ///
+    /// **Note**: When using the `SubscribeById` macro, the Subscribe/Unsubscribe types will have
+    /// explicit `NetworkMessage` implementations. This method will use those explicit names for
+    /// Subscribe/Unsubscribe types, but can use auto-generated names for the base subscription type.
+    ///
+    /// # Type Parameters
+    /// * `T` - The subscription message type implementing `SubscriptionMessage`
+    /// * `NP` - The network provider type
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// // With auto-generated names (no explicit NetworkMessage impl needed for base type)
+    /// #[derive(SubscribeById, Serialize, Deserialize)]
+    /// struct GameUpdate { game_id: String }
+    ///
+    /// // No need to implement NetworkMessage for GameUpdate!
+    /// app.register_subscription::<GameUpdate, WebSocketProvider>();
+    /// ```
+    fn register_subscription<T: SubscriptionMessage, NP: NetworkProvider>(
+        &mut self,
+    ) -> &mut Self
+    where
+        T::SubscribeRequest: NetworkMessage,
+        T::UnsubscribeRequest: NetworkMessage,
+    {
+        // The SubscribeById macro generates NetworkMessage impls for Subscribe/Unsubscribe types
+        // So we use explicit registration for those
+        register_explicit_if_needed::<T::SubscribeRequest, NP>(self);
+        register_explicit_if_needed::<T::UnsubscribeRequest, NP>(self);
+
+        // The base subscription type can use auto-generated names
+        register_auto_if_needed::<T, NP>(self);
 
         self
     }
