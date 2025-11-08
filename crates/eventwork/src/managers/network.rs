@@ -614,10 +614,10 @@ pub fn relay_outbound_notifications<T: EventworkMessage + Clone, NP: NetworkProv
     for notification in outbound_messages.read() {
         match &notification.for_client {
             Some(client) => {
-                let _ = net.send(client.clone(), notification.message.clone());
+                let _ = net.send(*client, notification.message.clone());
             }
             None => {
-                let _ = net.broadcast(notification.message.clone());
+                net.broadcast(notification.message.clone());
             }
         }
     }

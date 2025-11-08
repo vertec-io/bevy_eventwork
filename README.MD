@@ -13,6 +13,7 @@ Forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bev
 - [Features](#features)
 - [Documentation](#documentation)
   - [Quickstart](#quickstart)
+  - [Sending Messages Guide](./SENDING_MESSAGES.md) 📖
 - [Examples](#examples)
 - [Bevy Version Compatibility](#bevy-version-compatibility)
 - [Supported Platforms](#supported-platforms)
@@ -196,6 +197,8 @@ fn send_chat_message(
     net.broadcast(message);
 }
 ```
+
+> 📚 **Advanced:** Eventwork also supports `OutboundMessage` with `EventWriter` for precise control over network scheduling. See **[SENDING_MESSAGES.md](./SENDING_MESSAGES.md)** for the complete guide on both approaches.
 
 ## Examples
 

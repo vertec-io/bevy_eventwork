@@ -1917,6 +1917,7 @@ dependencies = [
  "bincode",
  "dashmap",
  "eventwork_common",
+ "examples_common",
  "futures-lite",
  "serde",
  "tracing",
@@ -1980,6 +1981,15 @@ dependencies = [
  "url",
  "ws_stream_tungstenite",
  "ws_stream_wasm",
+]
+
+[[package]]
+name = "examples_common"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "eventwork",
+ "serde",
 ]
 
 [[package]]

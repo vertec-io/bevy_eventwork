@@ -8,11 +8,11 @@ use bevy::{
     ui::Interaction,
 };
 use eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
+use eventwork_common::EventworkMessage;
 use std::net::IpAddr;
 
 use eventwork::tcp::{NetworkSettings, TcpProvider};
-
-mod shared;
+use examples_common as shared;
 
 fn main() {
     let mut app = App::new();
@@ -42,6 +42,7 @@ fn main() {
         (
             handle_connect_button,
             handle_message_button,
+            handle_outbound_button,
             handle_incoming_messages,
             handle_network_events,
         ),
@@ -51,6 +52,7 @@ fn main() {
     app.insert_resource(NetworkSettings::default());
 
     app.init_resource::<GlobalChatSettings>();
+    app.init_resource::<ServerConnection>();
 
     app.add_systems(PostUpdate, handle_chat_area);
 
@@ -83,6 +85,7 @@ fn handle_network_events(
     connect_query: Query<&Children, With<ConnectButton>>,
     mut text_query: Query<&mut Text>,
     mut messages: Query<&mut GameChatMessages>,
+    mut server_connection: ResMut<ServerConnection>,
 ) {
     let Ok(connect_children) = connect_query.single() else {
         return;
@@ -95,14 +98,17 @@ fn handle_network_events(
     for event in new_network_events.read() {
         info!("Received event");
         match event {
-            NetworkEvent::Connected(_) => {
-                messages.add(SystemMessage::new(
-                    "Succesfully connected to server!".to_string(),
-                ));
+            NetworkEvent::Connected(conn_id) => {
+                server_connection.connection_id = Some(*conn_id);
+                messages.add(SystemMessage::new(format!(
+                    "Successfully connected to server! Connection ID: {}",
+                    conn_id.id
+                )));
                 text.0 = String::from("Disconnect");
             }
 
             NetworkEvent::Disconnected(_) => {
+                server_connection.connection_id = None;
                 messages.add(SystemMessage::new("Disconnected from server!".to_string()));
                 text.0 = String::from("Connect to server");
             }
@@ -116,6 +122,11 @@ fn handle_network_events(
 ///////////////////////////////////////////////////////////////
 ////////////// Data Definitions ///////////////////////////////
 ///////////////////////////////////////////////////////////////
+
+#[derive(Resource, Default)]
+struct ServerConnection {
+    connection_id: Option<ConnectionId>,
+}
 
 #[derive(Resource)]
 struct GlobalChatSettings {
@@ -229,6 +240,7 @@ fn handle_connect_button(
     mut text_query: Query<&mut Text>,
     mut messages: Query<&mut GameChatMessages>,
     task_pool: Res<EventworkRuntime<TaskPool>>,
+    mut server_connection: ResMut<ServerConnection>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
         return;
@@ -237,15 +249,26 @@ fn handle_connect_button(
     for (interaction, children) in interaction_query.iter() {
         let mut text = text_query.get_mut(children[0]).unwrap();
         if let Interaction::Pressed = interaction {
-            if net.has_connections() {
-                net.disconnect(ConnectionId { id: 0 })
-                    .expect("Couldn't disconnect from server!");
+            if let Some(conn_id) = server_connection.connection_id {
+                match net.disconnect(conn_id) {
+                    Ok(()) => {
+                        server_connection.connection_id = None;
+                        messages.add(SystemMessage::new("Disconnecting...".to_string()));
+                        text.0 = String::from("Connect to server");
+                    }
+                    Err(err) => {
+                        messages.add(SystemMessage::new(format!(
+                            "Couldn't disconnect: {}",
+                            err
+                        )));
+                    }
+                }
             } else {
                 text.0 = String::from("Connecting...");
                 messages.add(SystemMessage::new("Connecting to server..."));
 
                 net.connect(
-                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3030),
                     &task_pool.0,
                     &settings,
                 );
@@ -257,10 +280,14 @@ fn handle_connect_button(
 #[derive(Component)]
 struct MessageButton;
 
+#[derive(Component)]
+struct OutboundButton;
+
 fn handle_message_button(
     net: Res<Network<TcpProvider>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MessageButton>)>,
     mut messages: Query<&mut GameChatMessages>,
+    server_connection: Res<ServerConnection>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
         return;
@@ -268,18 +295,60 @@ fn handle_message_button(
 
     for interaction in interaction_query.iter() {
         if let Interaction::Pressed = interaction {
+            let Some(conn_id) = server_connection.connection_id else {
+                messages.add(SystemMessage::new("Not connected to server!".to_string()));
+                return;
+            };
+
             match net.send(
-                ConnectionId { id: 0 },
+                conn_id,
                 shared::UserChatMessage {
                     message: String::from("Hello there!"),
                 },
             ) {
-                Ok(()) => (),
+                Ok(()) => {
+                    messages.add(SystemMessage::new("Message sent via net.send()!".to_string()));
+                }
                 Err(err) => messages.add(SystemMessage::new(format!(
                     "Could not send message: {}",
                     err
                 ))),
             }
+        }
+    }
+}
+
+fn handle_outbound_button(
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<OutboundButton>)>,
+    mut messages: Query<&mut GameChatMessages>,
+    server_connection: Res<ServerConnection>,
+    mut outbound_writer: EventWriter<eventwork::OutboundMessage<shared::OutboundTestMessage>>,
+) {
+    let Ok(mut messages) = messages.single_mut() else {
+        return;
+    };
+
+    for interaction in interaction_query.iter() {
+        if let Interaction::Pressed = interaction {
+            let Some(conn_id) = server_connection.connection_id else {
+                messages.add(SystemMessage::new("Not connected to server!".to_string()));
+                return;
+            };
+
+            // Send message using OutboundMessage EventWriter
+            outbound_writer.send(
+                eventwork::OutboundMessage::new(
+                    shared::OutboundTestMessage::type_name().to_string(),
+                    shared::OutboundTestMessage {
+                        content: String::from("Hello via OutboundMessage!"),
+                    },
+                )
+                .for_client(conn_id),
+            );
+
+            messages.add(SystemMessage::new(
+                "Message sent via OutboundMessage EventWriter!".to_string(),
+            ));
         }
     }
 }
@@ -290,14 +359,14 @@ struct ChatArea;
 fn handle_chat_area(
     chat_settings: Res<GlobalChatSettings>,
     messages: Query<&GameChatMessages, Changed<GameChatMessages>>,
-    mut chat_text_query: Query<(Entity, &mut Text), With<ChatArea>>,
+    chat_area_query: Query<Entity, With<ChatArea>>,
     mut read_messages_index: Local<usize>,
     mut commands: Commands,
 ) {
     let Ok(messages) = messages.single() else {
         return;
     };
-    let Ok((text_entity, _text)) = chat_text_query.single_mut() else {
+    let Ok(chat_area_entity) = chat_area_query.single() else {
         return;
     };
 
@@ -309,11 +378,11 @@ fn handle_chat_area(
                 chat_settings.author_style.clone(),
             ))
             .with_child((
-                TextSpan::new(format!("{}\n", message.get_text())),
+                TextSpan::new(format!(" {}", message.get_text())),
                 chat_settings.chat_style.clone(),
             ))
             .id();
-        commands.entity(text_entity).add_children(&[new_message]);
+        commands.entity(chat_area_entity).add_children(&[new_message]);
     }
 
     *read_messages_index = messages.messages.len();
@@ -330,21 +399,24 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 justify_content: JustifyContent::SpaceBetween,
-                flex_direction: FlexDirection::ColumnReverse,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
-            Into::<BackgroundColor>::into(Color::NONE),
+            Into::<BackgroundColor>::into(Color::WHITE),
         ))
         .with_children(|parent| {
             parent
-                .spawn(Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(90.0),
-                    ..default()
-                })
-                .with_children(|parent| {
-                    parent.spawn(Text::default()).insert(ChatArea);
-                });
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(90.0),
+                        flex_direction: FlexDirection::Column,
+                        padding: UiRect::all(Val::Px(10.0)),
+                        overflow: Overflow::clip_y(),
+                        ..default()
+                    },
+                    ChatArea,
+                ));
             parent
                 .spawn((
                     Node {
@@ -359,43 +431,67 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                         .spawn((
                             Button,
                             Node {
-                                width: Val::Percent(50.0),
+                                width: Val::Percent(33.33),
                                 height: Val::Percent(100.0),
                                 align_items: AlignItems::Center,
                                 justify_content: JustifyContent::Center,
                                 ..default()
                             },
+                            BackgroundColor(Color::srgb(0.2, 0.5, 0.8)),
+                            MessageButton,
                         ))
-                        .insert(MessageButton)
-                        .with_children(|button| {
-                            button.spawn((
-                                Text::new("Send Message!"),
-                                TextFont::from_font_size(40.0),
-                                TextColor::from(Color::BLACK),
-                                TextLayout::new_with_justify(JustifyText::Center),
-                            ));
-                        });
+                        .with_child((
+                            Text::new("Send Message!"),
+                            TextFont {
+                                font_size: 30.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                        ));
 
                     parent_button_bar
                         .spawn((
                             Button,
                             Node {
-                                width: Val::Percent(50.0),
+                                width: Val::Percent(33.33),
                                 height: Val::Percent(100.0),
                                 align_items: AlignItems::Center,
                                 justify_content: JustifyContent::Center,
                                 ..default()
                             },
+                            BackgroundColor(Color::srgb(0.8, 0.5, 0.2)),
+                            OutboundButton,
                         ))
-                        .insert(ConnectButton)
-                        .with_children(|button| {
-                            button.spawn((
-                                Text::new("Connect to server"),
-                                TextFont::from_font_size(40.0),
-                                TextColor::from(Color::BLACK),
-                                TextLayout::new_with_justify(JustifyText::Center),
-                            ));
-                        });
+                        .with_child((
+                            Text::new("Send Outbound!"),
+                            TextFont {
+                                font_size: 30.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                        ));
+
+                    parent_button_bar
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Percent(33.33),
+                                height: Val::Percent(100.0),
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.2, 0.8, 0.3)),
+                            ConnectButton,
+                        ))
+                        .with_child((
+                            Text::new("Connect to server"),
+                            TextFont {
+                                font_size: 30.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                        ));
                 });
         });
 }

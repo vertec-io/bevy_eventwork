@@ -64,5 +64,6 @@ eventwork_common = { path = "../eventwork_common", version = "1.0.0" }
 
 [dev-dependencies]
 # Examples need UI features, but these don't affect library users
-bevy = { workspace = true, features = ["bevy_ui", "bevy_text", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_winit", "bevy_color", "x11"] }
+bevy = { workspace = true, features = ["bevy_ui", "bevy_text", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_winit", "bevy_color", "x11", "default_font"] }
 async-net = "2.0.0"
+examples_common = { path = "examples_common" }

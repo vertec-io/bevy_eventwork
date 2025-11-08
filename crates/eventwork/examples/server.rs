@@ -5,8 +5,7 @@ use eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEve
 use std::net::{IpAddr, SocketAddr};
 
 use eventwork::tcp::{NetworkSettings, TcpProvider};
-
-mod shared;
+use examples_common as shared;
 
 fn main() {
     let mut app = App::new();
@@ -29,7 +28,14 @@ fn main() {
     shared::server_register_network_messages(&mut app);
 
     app.add_systems(Startup, setup_networking);
-    app.add_systems(Update, (handle_connection_events, handle_messages));
+    app.add_systems(
+        Update,
+        (
+            handle_connection_events,
+            handle_messages,
+            handle_outbound_messages,
+        ),
+    );
 
     // We have to insert the TCP [`NetworkSettings`] with our chosen settings.
     app.insert_resource(NetworkSettings::default());
@@ -51,7 +57,7 @@ fn setup_networking(
     let _socket_address = SocketAddr::new(ip_address, 9999);
 
     match net.listen(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3030),
         &task_pool.0,
         &settings,
     ) {
@@ -102,5 +108,19 @@ fn handle_messages(
             name: format!("{}", user),
             message: message.message.clone(),
         });
+    }
+}
+
+// Handle messages sent via OutboundMessage EventWriter
+fn handle_outbound_messages(
+    mut new_messages: EventReader<NetworkData<shared::OutboundTestMessage>>,
+) {
+    for message in new_messages.read() {
+        let user = message.source();
+
+        info!(
+            "✅ Received OutboundTestMessage from {}: {}",
+            user, message.content
+        );
     }
 }
