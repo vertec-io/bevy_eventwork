@@ -292,3 +292,47 @@ fn test_subscription_no_duplicate_registration() {
     assert!(net.is_message_registered("AutoSubscriptionMessage:Subscribe"));
 }
 
+#[test]
+#[allow(deprecated)]
+fn test_targeted_message_with_explicit_names() {
+    let mut app = create_test_app();
+
+    // Old API: requires explicit NetworkMessage implementation
+    app.listen_for_targeted_message::<ExplicitMessage, TcpProvider>();
+
+    // Verify targeted message is registered
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    let names = net.registered_message_names();
+    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("ExplicitMessage"));
+    assert!(has_targeted, "Targeted message should be registered");
+}
+
+#[test]
+fn test_targeted_message_with_auto_names() {
+    let mut app = create_test_app();
+
+    // New API: works without explicit NetworkMessage implementation
+    app.register_targeted_message::<AutoMessage, TcpProvider>();
+
+    // Verify targeted message is registered
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    let names = net.registered_message_names();
+    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("AutoMessage"));
+    assert!(has_targeted, "Targeted message should be registered with auto-generated name");
+}
+
+#[test]
+fn test_targeted_message_no_duplicate_registration() {
+    let mut app = create_test_app();
+
+    // Register targeted message twice - should not panic
+    app.register_targeted_message::<AutoMessage, TcpProvider>();
+    app.register_targeted_message::<AutoMessage, TcpProvider>();
+
+    // Verify registration still works
+    let net = app.world().get_resource::<Network<TcpProvider>>().unwrap();
+    let names = net.registered_message_names();
+    let has_targeted = names.iter().any(|name| name.contains("Targeted") && name.contains("AutoMessage"));
+    assert!(has_targeted);
+}
+

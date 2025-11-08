@@ -180,17 +180,17 @@ pub trait RequestMessage:
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(bound = "T: NetworkMessage")]
-pub struct TargetedMessage<T: NetworkMessage> {
+#[serde(bound = "T: EventworkMessage")]
+pub struct TargetedMessage<T: EventworkMessage> {
     pub target_id: String,
     pub message: T,
 }
 
-impl<T: NetworkMessage> NetworkMessage for TargetedMessage<T> {
+impl<T: EventworkMessage> NetworkMessage for TargetedMessage<T> {
     const NAME: &'static str = "eventwork::TargetedMessage";
 }
 
-impl<T: NetworkMessage> TargetedMessage<T> {
+impl<T: EventworkMessage> TargetedMessage<T> {
     pub fn name() -> &'static str {
         // Use a global cache with lazy initialization
         use std::any::TypeId;
@@ -212,7 +212,9 @@ impl<T: NetworkMessage> TargetedMessage<T> {
         }
 
         // Not in cache, create it once and leak it (only once per type)
-        let formatted_name = format!("Targeted({})", T::NAME);
+        // Use the message_kind() method which works for both NetworkMessage and EventworkMessage
+        let inner_name = T::type_name();
+        let formatted_name = format!("Targeted({})", inner_name);
         let static_name = Box::leak(formatted_name.into_boxed_str());
 
         // Store in cache for future use
@@ -226,8 +228,8 @@ impl<T: NetworkMessage> TargetedMessage<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(bound = "T: NetworkMessage")]
-pub struct PreviousMessage<T: NetworkMessage> {
+#[serde(bound = "T: EventworkMessage")]
+pub struct PreviousMessage<T: EventworkMessage> {
     // Empty struct - only used for type information
     #[serde(skip)]
     _phantom: std::marker::PhantomData<T>,
@@ -236,7 +238,7 @@ pub struct PreviousMessage<T: NetworkMessage> {
     _marker: bool,
 }
 
-impl<T: NetworkMessage> PreviousMessage<T> {
+impl<T: EventworkMessage> PreviousMessage<T> {
     pub fn new() -> Self {
         Self {
             _phantom: std::marker::PhantomData,
@@ -265,7 +267,9 @@ impl<T: NetworkMessage> PreviousMessage<T> {
         }
 
         // Not in cache, create it once and leak it (only once per type)
-        let formatted_name = format!("PreviousMessage({})", T::NAME);
+        // Use type_name() which works for all EventworkMessage types
+        let inner_name = T::type_name();
+        let formatted_name = format!("PreviousMessage({})", inner_name);
         let static_name = Box::leak(formatted_name.into_boxed_str());
 
         // Store in cache for future use

@@ -473,13 +473,26 @@ pub trait AppNetworkMessage {
         system_set: S,
     ) -> &mut Self;
 
-    /// Register a targeted network message type
+    /// Register a targeted network message type (deprecated, use `register_targeted_message` instead)
     ///
     /// ## Details
     /// This will:
     /// - Add a new event type of [`NetworkData<TargetedMessage<T>>`]
     /// - Register the type for transformation over the wire
+    #[deprecated(since = "0.10.0", note = "Use `register_targeted_message` instead for unified API")]
     fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(
+        &mut self,
+    ) -> &mut Self;
+
+    /// Register a targeted network message type using automatic type name generation
+    ///
+    /// This method works with message types that use auto-generated names via `EventworkMessage`.
+    ///
+    /// ## Details
+    /// This will:
+    /// - Add a new event type of [`NetworkData<TargetedMessage<T>>`]
+    /// - Register the type for transformation over the wire
+    fn register_targeted_message<T: EventworkMessage + Clone, NP: NetworkProvider>(
         &mut self,
     ) -> &mut Self;
 
@@ -580,6 +593,7 @@ impl AppNetworkMessage for App {
         self
     }
 
+    #[allow(deprecated)]
     fn listen_for_targeted_message<T: NetworkMessage + Clone, NP: NetworkProvider>(
         &mut self,
     ) -> &mut Self {
@@ -593,6 +607,35 @@ impl AppNetworkMessage for App {
             targeted_message_name
         );
 
+        server
+            .recv_message_map
+            .insert(targeted_message_name, Vec::new());
+
+        self.add_event::<NetworkData<TargetedMessage<T>>>();
+        self.add_systems(PreUpdate, register_targeted_message::<T, NP>);
+
+        self
+    }
+
+    fn register_targeted_message<T: EventworkMessage + Clone, NP: NetworkProvider>(
+        &mut self,
+    ) -> &mut Self {
+        let already_registered = {
+            let server = self.world().get_resource::<Network<NP>>()
+                .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering targeted messages.");
+
+            let targeted_message_name = TargetedMessage::<T>::name();
+            server.recv_message_map.contains_key(targeted_message_name)
+        };
+
+        if already_registered {
+            return self;
+        }
+
+        let server = self.world_mut().get_resource::<Network<NP>>()
+            .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering targeted messages.");
+
+        let targeted_message_name = TargetedMessage::<T>::name();
         server
             .recv_message_map
             .insert(targeted_message_name, Vec::new());
@@ -833,7 +876,7 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     net_res: ResMut<Network<NP>>,
     mut events: EventWriter<NetworkData<TargetedMessage<T>>>,
 ) where
-    T: NetworkMessage,
+    T: EventworkMessage,
 {
     let mut messages = match net_res
         .recv_message_map
