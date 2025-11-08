@@ -3,7 +3,7 @@ use bevy::tasks::{TaskPool, TaskPoolBuilder};
 use eventwork::{EventworkRuntime, Network, NetworkData, NetworkEvent};
 use eventwork::{NetworkMessage, OutboundMessage};
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
-use eventwork_common::ConnectionId;
+use eventwork_common::{ConnectionId, EventworkMessage};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::ops::Deref;
 
@@ -54,7 +54,7 @@ pub fn new_server_message<T: NetworkMessage>(message: T) -> OutboundMessage<T> {
     OutboundMessage::new(module_path!().to_string(), message)
 }
 
-pub fn new_authorized_server_message<T: NetworkMessage>(message:T, target_node: String) -> AuthorizedNetworkData<T>{
+pub fn new_authorized_server_message<T: EventworkMessage>(message:T, target_node: String) -> AuthorizedNetworkData<T>{
     AuthorizedNetworkData{
         inner: message,
         authorized: true,

@@ -279,7 +279,7 @@ impl<NP: NetworkProvider + Default, RT: Runtime> Plugin for EventworkPlugin<NP, 
 #[derive(Event, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct OutboundMessage<T>
 where
-    T: NetworkMessage,
+    T: EventworkMessage,
 {
     /// The name associated with the outbound message.
     pub name: String,
@@ -294,14 +294,14 @@ where
 
 impl<T> OutboundMessage<T>
 where
-    T: NetworkMessage, // Reapply the constraint for the implementation block
+    T: EventworkMessage,
 {
     /// Creates a new `OutboundMessage` instance with the given name and message payload.
     ///
     /// # Arguments
     ///
     /// * `name` - A `String` representing the name of the message.
-    /// * `message` - The message payload that implements `NetworkMessage`.
+    /// * `message` - The message payload that implements `EventworkMessage`.
     ///
     /// # Returns
     ///
@@ -329,7 +329,7 @@ where
     }
 }
 
-impl<T: NetworkMessage> Deref for OutboundMessage<T> {
+impl<T: EventworkMessage> Deref for OutboundMessage<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {

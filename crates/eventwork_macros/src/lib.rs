@@ -41,10 +41,6 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
         },
     };
 
-    // Implement NetworkMessage for both structs
-    let subscribe_name = format!("{}:Subscribe", name);
-    let unsubscribe_name = format!("{}:Unsubscribe", name);
-
     let subscription_impl = match &subscribe_id_field {
         Some((field_name, _field_type)) => quote! {
             impl SubscriptionMessage for #name {
@@ -92,14 +88,6 @@ pub fn derive_subscribe_by_id(input: TokenStream) -> TokenStream {
     quote! {
         #subscribe_struct
         #unsubscribe_struct
-
-        impl NetworkMessage for #subscribe_struct_name {
-            const NAME: &'static str = #subscribe_name;
-        }
-
-        impl NetworkMessage for #unsubscribe_struct_name {
-            const NAME: &'static str = #unsubscribe_name;
-        }
 
         #subscription_impl
     }

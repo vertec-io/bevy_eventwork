@@ -214,7 +214,7 @@ use tracing::debug;
 
 use crate::NetworkData;
 use eventwork_common::error::NetworkError;
-use eventwork_common::{ConnectionId, NetworkMessage, NetworkPacket, RequestMessage};
+use eventwork_common::{ConnectionId, NetworkPacket, RequestMessage, EventworkMessage};
 
 use super::{Network, NetworkProvider, network::register_message};
 
@@ -313,10 +313,6 @@ struct RequestInternal<T> {
     request: T,
 }
 
-impl<T: RequestMessage> NetworkMessage for RequestInternal<T> {
-    const NAME: &'static str = T::REQUEST_NAME;
-}
-
 /// A wrapper around a request that allows sending a response that will automatically be written
 ///  to eventwork for network transmission.
 #[derive(Debug, Event, Clone)]
@@ -343,7 +339,7 @@ impl<T: RequestMessage> Request<T> {
     /// Consume the request and automatically send the response back to the client.
     pub fn respond(self, response: T::ResponseMessage) -> Result<(), NetworkError> {
         let packet = NetworkPacket {
-            kind: String::from(T::ResponseMessage::NAME),
+            kind: ResponseInternal::<T::ResponseMessage>::type_name().to_string(),
             data: bincode::serialize(&ResponseInternal {
                 response_id: self.request_id,
                 response,
@@ -367,21 +363,22 @@ impl AppNetworkRequestMessage for App {
     fn listen_for_request_message<T: RequestMessage, NP: NetworkProvider>(&mut self) -> &mut Self {
         let server = self.world_mut().get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before listening for server messages.");
 
+        let request_name = RequestInternal::<T>::type_name();
         debug!(
             "Registered a new RequestMessage: {}",
-            RequestInternal::<T>::NAME
+            request_name
         );
 
         assert!(
             !server
                 .recv_message_map
-                .contains_key(RequestInternal::<T>::NAME),
+                .contains_key(request_name),
             "Duplicate registration of RequestMessage: {}",
-            RequestInternal::<T>::NAME
+            request_name
         );
         server
             .recv_message_map
-            .insert(RequestInternal::<T>::NAME, Vec::new());
+            .insert(request_name, Vec::new());
         self.add_event::<NetworkData<RequestInternal<T>>>();
         self.add_event::<Request<T>>();
         self.add_systems(
@@ -417,10 +414,6 @@ struct ResponseInternal<T> {
     response: T,
 }
 
-impl<T: NetworkMessage> NetworkMessage for ResponseInternal<T> {
-    const NAME: &'static str = T::NAME;
-}
-
 /// A utility trait on [`App`] to easily register [`RequestMessage::ResponseMessage`]s for clients to recieve
 pub trait AppNetworkResponseMessage {
     /// Register the response message from the request message type to listen for in the app
@@ -432,21 +425,22 @@ impl AppNetworkResponseMessage for App {
         self.insert_resource(ResponseMap::<T>::default());
         let client = self.world_mut().get_resource::<Network<NP>>().expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before listening for server messages.");
 
+        let response_name = ResponseInternal::<T::ResponseMessage>::type_name();
         debug!(
             "Registered a new ResponseMessage: {}",
-            ResponseInternal::<T::ResponseMessage>::NAME
+            response_name
         );
 
         assert!(
             !client
                 .recv_message_map
-                .contains_key(ResponseInternal::<T::ResponseMessage>::NAME),
+                .contains_key(response_name),
             "Duplicate registration of ResponseMessage: {}",
-            ResponseInternal::<T::ResponseMessage>::NAME
+            response_name
         );
         client
             .recv_message_map
-            .insert(ResponseInternal::<T::ResponseMessage>::NAME, Vec::new());
+            .insert(response_name, Vec::new());
         self.add_event::<NetworkData<ResponseInternal<T::ResponseMessage>>>();
         self.add_systems(
             PreUpdate,
