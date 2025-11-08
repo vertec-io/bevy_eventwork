@@ -616,17 +616,15 @@ pub fn relay_outbound_notifications<T: EventworkMessage + Clone, NP: NetworkProv
     net: Res<Network<NP>>,
 ) {
     // Log EVERY call to this system, even if there are no messages
-    static mut CALL_COUNT: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-    unsafe {
-        let type_name = T::type_name().to_string();
-        let count = CALL_COUNT.entry(type_name.clone()).or_insert(0);
-        *count += 1;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static CALL_COUNT: AtomicU32 = AtomicU32::new(0);
 
-        // Log every 60 calls (once per second at 60fps) OR if there are messages
-        if *count % 60 == 0 || !outbound_messages.is_empty() {
-            println!("📤 [OUTBOUND] relay_outbound_notifications<{}> called (call #{}, {} messages)",
-                     type_name, count, outbound_messages.len());
-        }
+    let count = CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+
+    // Log every 60 calls (once per second at 60fps) OR if there are messages
+    if count % 60 == 0 || !outbound_messages.is_empty() {
+        println!("📤 [OUTBOUND] relay_outbound_notifications<{}> called (call #{}, {} messages)",
+                 T::type_name(), count, outbound_messages.len());
     }
 
     // Check if there are messages WITHOUT consuming them first
