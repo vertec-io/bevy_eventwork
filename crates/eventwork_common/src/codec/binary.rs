@@ -117,13 +117,13 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeCodec {
 
         // Deserialize the data using bincode (skip the 8-byte length prefix)
         let result = bincode::deserialize(&val[8..8 + length_prefix as usize])
-            .map_err(|err| {
+            .map_err(|_err| {
                 #[cfg(target_arch = "wasm32")]
                 {
                     use wasm_bindgen::prelude::*;
                     web_sys::console::error_1(&JsValue::from_str(&format!(
                         "[Codec] ERROR: Bincode deserialization failed: {:?}",
-                        err
+                        _err
                     )));
                 }
                 NetworkError::Serialization
