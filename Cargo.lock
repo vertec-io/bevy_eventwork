@@ -1931,6 +1931,8 @@ dependencies = [
  "codee",
  "eventwork_macros",
  "serde",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

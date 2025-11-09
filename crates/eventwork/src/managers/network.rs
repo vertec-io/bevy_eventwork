@@ -460,8 +460,6 @@ impl AppNetworkMessage for App {
 
         let type_name = T::type_name();
         debug!("Registered a new OutboundMessage: {}", type_name);
-        println!("📝 [OUTBOUND REGISTRATION] Registering OutboundMessage for type: {}", type_name);
-        println!("📝 [OUTBOUND REGISTRATION] Adding relay_outbound_notifications system to Update schedule");
 
         if !server.recv_message_map.contains_key(type_name) {
             server.recv_message_map.insert(type_name, Vec::new());
@@ -483,12 +481,10 @@ impl AppNetworkMessage for App {
 
         self.add_event::<OutboundMessage<T>>();
 
-        println!("📝 [OUTBOUND REGISTRATION] Adding system relay_outbound_notifications::<{}, {}> to Update schedule in system set", type_name, std::any::type_name::<NP>());
         self.add_systems(
             Update,
             relay_outbound_notifications::<T, NP>.in_set(system_set),
         );
-        println!("📝 [OUTBOUND REGISTRATION] System added successfully");
 
         self
     }
@@ -615,36 +611,14 @@ pub fn relay_outbound_notifications<T: EventworkMessage + Clone, NP: NetworkProv
     mut outbound_messages: EventReader<OutboundMessage<T>>,
     net: Res<Network<NP>>,
 ) {
-    // Log EVERY call to this system, even if there are no messages
-    use std::sync::atomic::{AtomicU32, Ordering};
-    static CALL_COUNT: AtomicU32 = AtomicU32::new(0);
-
-    let count = CALL_COUNT.fetch_add(1, Ordering::Relaxed);
-
-    // Log every 60 calls (once per second at 60fps) OR if there are messages
-    if count % 60 == 0 || !outbound_messages.is_empty() {
-        println!("📤 [OUTBOUND] relay_outbound_notifications<{}> called (call #{}, {} messages)",
-                 T::type_name(), count, outbound_messages.len());
-    }
-
-    // Check if there are messages WITHOUT consuming them first
-    let has_messages = !outbound_messages.is_empty();
-
-    if has_messages {
-        println!("📤 [OUTBOUND] Processing {} outbound messages for type: {}", outbound_messages.len(), T::type_name());
-    }
-
     for notification in outbound_messages.read() {
         match &notification.for_client {
             Some(client) => {
-                println!("📤 [OUTBOUND] Sending {} to client {}", T::type_name(), client.id);
-                match net.send(*client, notification.message.clone()) {
-                    Ok(_) => println!("📤 [OUTBOUND] Successfully sent to client {}", client.id),
-                    Err(e) => println!("📤 [OUTBOUND] ERROR sending to client {}: {:?}", client.id, e),
+                if let Err(e) = net.send(*client, notification.message.clone()) {
+                    error!("Failed to send {} to client {}: {:?}", T::type_name(), client.id, e);
                 }
             }
             None => {
-                println!("📤 [OUTBOUND] Broadcasting {} to all clients", T::type_name());
                 net.broadcast(notification.message.clone());
             }
         }
@@ -684,11 +658,6 @@ fn handle_previous_message_requests<T: EventworkMessage + Clone, NP: NetworkProv
 
             if let Some(connection) = server.established_connections.get(&request.source) {
                 let _ = connection.send_message.try_send(packet);
-                println!(
-                    "Sent last message of type {} to client {}",
-                    type_name,
-                    request.source
-                );
             }
         }
     }
