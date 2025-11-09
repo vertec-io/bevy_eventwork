@@ -142,6 +142,12 @@ pub struct PreviousMessage<T: EventworkMessage> {
     _marker: bool,
 }
 
+impl<T: EventworkMessage> Default for PreviousMessage<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: EventworkMessage> PreviousMessage<T> {
     pub fn new() -> Self {
         Self {

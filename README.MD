@@ -91,13 +91,15 @@ cargo doc -p eventwork --open
 
 ```toml
 [dependencies]
-bevy = "0.16"
-eventwork = "0.10"  # New version with automatic message registration!
+bevy = "0.17"
+eventwork = "1.1"  # Bevy 0.17 support with automatic message registration!
 serde = { version = "1.0", features = ["derive"] }
 
 # Choose a transport provider:
-# eventwork_websockets = "0.3"  # For WebSocket support (WASM + Native)
+# eventwork_websockets = "1.1"  # For WebSocket support (WASM + Native)
 ```
+
+**Important**: Bevy 0.17 requires Rust 1.88.0 (nightly). See [Rust Nightly Requirement](#rust-nightly-requirement) for setup instructions.
 
 #### 2. Define Your Messages
 
@@ -220,13 +222,44 @@ For WebSocket examples, see the [`eventwork_websockets` crate](./crates/eventwor
 
 ## Bevy Version Compatibility
 
-| bevy_eventwork | Bevy | Rust |
-| :------------: | :--: | :--: |
-|      0.9       | 0.16 | 1.85 |
-|      0.8       | 0.12 | 1.76 |
-|      0.7       | 0.8  | 1.70 |
+| bevy_eventwork | Bevy | Rust | Notes |
+| :------------: | :--: | :--: | :---: |
+|      1.1       | 0.17 | 1.88 (nightly) | **Current** - See [Rust Nightly Requirement](#rust-nightly-requirement) |
+|      0.9       | 0.16 | 1.85 | Maintenance mode |
+|      0.8       | 0.12 | 1.76 | Maintenance mode |
+|      0.7       | 0.8  | 1.70 | Maintenance mode |
+
+### Rust Nightly Requirement
+
+**Why Nightly?** Bevy 0.17 requires Rust 1.88.0, which hasn't been released to stable yet. This is because Bevy 0.17 uses Rust Edition 2024 and other cutting-edge features.
+
+**When can I use stable?** Once Rust 1.88.0 is released to the stable channel (expected in Q1 2026), you'll be able to switch back to stable Rust.
+
+**How to use nightly:**
+1. Create `rust-toolchain.toml` in your project root:
+   ```toml
+   [toolchain]
+   channel = "nightly"
+   ```
+2. Run `rustup update` to install/update nightly
+
+📖 **For detailed information**, see [Rust Nightly Requirement Guide](./docs/RUST_NIGHTLY_REQUIREMENT.md)
 
 **Note**: Versions not compatible with the latest Bevy are in maintenance mode and will only receive critical bug fixes.
+
+### Crate Version Compatibility
+
+All eventwork crates are versioned together for simplicity:
+
+| Crate | Version | Bevy | Status |
+| :---: | :-----: | :--: | :----: |
+| `eventwork` | 1.1.0 | 0.17 | ✅ Current |
+| `eventwork_common` | 1.1.0 | 0.17 | ✅ Current |
+| `eventwork_websockets` | 1.1.0 | 0.17 | ✅ Current |
+| `eventwork_macros` | 1.1.0 | 0.17 | ✅ Current |
+| `eventwork_memory` | 1.1.0 | 0.17 | ✅ Current |
+
+**Always use matching versions** of all eventwork crates to avoid compatibility issues.
 
 ## Supported Platforms
 

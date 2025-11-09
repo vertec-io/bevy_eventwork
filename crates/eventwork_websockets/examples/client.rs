@@ -64,7 +64,7 @@ struct NetworkTaskPool(TaskPool);
 
 fn handle_incoming_messages(
     mut messages: Query<&mut GameChatMessages>,
-    mut new_messages: EventReader<NetworkData<shared::NewChatMessage>>,
+    mut new_messages: MessageReader<NetworkData<shared::NewChatMessage>>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
         return;
@@ -76,7 +76,7 @@ fn handle_incoming_messages(
 }
 
 fn handle_network_events(
-    mut new_network_events: EventReader<NetworkEvent>,
+    mut new_network_events: MessageReader<NetworkEvent>,
     connect_query: Query<&Children, With<ConnectButton>>,
     mut text_query: Query<&mut Text>,
     mut messages: Query<&mut GameChatMessages>,
@@ -316,7 +316,7 @@ fn handle_chat_area(
     *read_messages_index = messages.messages.len();
 }
 
-fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
+fn setup_ui(mut commands: Commands) {
     commands.spawn(Camera2d::default());
 
     commands.spawn((GameChatMessages::new(),));
@@ -369,7 +369,7 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                                 Text::new("Send Message!"),
                                 TextFont::from_font_size(40.0),
                                 TextColor::from(Color::BLACK),
-                                TextLayout::new_with_justify(JustifyText::Center),
+                                TextLayout::new_with_justify(Justify::Center),
                             ));
                         });
 
@@ -390,7 +390,7 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                                 Text::new("Connect to server"),
                                 TextFont::from_font_size(40.0),
                                 TextColor::from(Color::BLACK),
-                                TextLayout::new_with_justify(JustifyText::Center),
+                                TextLayout::new_with_justify(Justify::Center),
                             ));
                         });
                 });

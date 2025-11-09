@@ -2,6 +2,19 @@
 
 Memory leak detection and prevention tools for the eventwork networking library.
 
+## Version Compatibility
+
+| eventwork_memory | eventwork | Bevy | Rust |
+| :--------------: | :-------: | :--: | :--: |
+| 1.1.0 | 1.1.0 | 0.17 | 1.88 (nightly) |
+| 1.0.0 | 1.0.0 | 0.16 | 1.85 |
+
+**Note**: Bevy 0.17 requires Rust 1.88.0 (nightly). Create `rust-toolchain.toml`:
+```toml
+[toolchain]
+channel = "nightly"
+```
+
 ## Overview
 
 This crate provides tools to help identify and fix memory leaks in Bevy applications that use eventwork for networking. It includes systems for monitoring memory usage, cleaning up stale connections, and preventing message queue accumulation.

@@ -137,7 +137,6 @@ Currently, Bevy's [TaskPool](bevy::tasks::TaskPool) is the default runtime used 
 /// Contains error enum.
 // pub mod error;
 // mod network_message;
-
 /// Contains all functionality for starting a server or client, sending, and recieving messages from clients.
 pub mod managers;
 pub use managers::{Network, network::AppNetworkMessage};
@@ -178,7 +177,7 @@ impl<T> AsyncChannel<T> {
     }
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 /// A network event originating from another eventwork app
 pub enum NetworkEvent {
     /// A new client has connected
@@ -189,7 +188,7 @@ pub enum NetworkEvent {
     Error(NetworkError),
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 /// [`NetworkData`] is what is sent over the bevy event system
 ///
 /// Please check the root documentation how to up everything
@@ -250,7 +249,7 @@ pub struct EventworkPlugin<NP: NetworkProvider, RT: Runtime = bevy::tasks::TaskP
 impl<NP: NetworkProvider + Default, RT: Runtime> Plugin for EventworkPlugin<NP, RT> {
     fn build(&self, app: &mut App) {
         app.insert_resource(Network::new(NP::default()));
-        app.add_event::<NetworkEvent>();
+        app.add_message::<NetworkEvent>();
         app.add_systems(
             PreUpdate,
             managers::network::handle_new_incoming_connections::<NP, RT>,
@@ -263,7 +262,7 @@ impl<NP: NetworkProvider + Default, RT: Runtime> Plugin for EventworkPlugin<NP, 
 /// This struct encapsulates the message payload (`message`),
 /// an optional target client (`for_client`), and a name (`name`)
 /// associated with the message.
-#[derive(Event, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Message, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct OutboundMessage<T>
 where
     T: EventworkMessage,

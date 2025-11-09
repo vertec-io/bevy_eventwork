@@ -69,9 +69,9 @@ fn setup_networking(
 }
 
 fn log_events(
-    mut events: EventReader<NetworkEvent>,
+    mut events: MessageReader<NetworkEvent>,
     time: Res<Time>,
-    outbound_queue: EventReader<OutboundMessage<TestMessage>>,
+    outbound_queue: MessageReader<OutboundMessage<TestMessage>>,
 ) {
     for event in events.read() {
         match event {
@@ -104,7 +104,7 @@ fn log_events(
             use std::process;
             let pid = process::id();
             let output = std::process::Command::new("powershell")
-                .args(&[
+                .args([
                     "-Command",
                     &format!("Get-Process -Id {} | Select-Object WorkingSet", pid),
                 ])
@@ -120,7 +120,7 @@ fn log_events(
 // Add a system to clear the outbound message queue
 #[allow(dead_code)]
 fn clear_outbound_queue(
-    mut outbound_queue: EventReader<OutboundMessage<TestMessage>>,
+    mut outbound_queue: MessageReader<OutboundMessage<TestMessage>>,
     network: Res<Network<WebSocketProvider>>,
 ) {
     // Only clear if there are no connections

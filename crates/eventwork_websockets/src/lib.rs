@@ -99,10 +99,10 @@ mod native_websocket {
                     NetworkError::Error(format!("Write Buffer Full Error: {}", buf))
                 }
                 async_tungstenite::tungstenite::Error::Utf8 => {
-                    NetworkError::Error(format!("Utf8 Error"))
+                    NetworkError::Error("Utf8 Error".to_string())
                 }
                 async_tungstenite::tungstenite::Error::AttackAttempt => {
-                    NetworkError::Error(format!("Attack Attempt"))
+                    NetworkError::Error("Attack Attempt".to_string())
                 }
                 async_tungstenite::tungstenite::Error::Url(url) => {
                     NetworkError::Error(format!("Url Error: {}", url))
@@ -241,9 +241,11 @@ mod native_websocket {
     pub struct NetworkSettings(WebSocketConfig);
 
     /// A special stream for recieving ws connections
+    type WsStreamFuture = Pin<Box<dyn Future<Output = Option<WsStream<TcpStream>>>>>;
+
     pub struct OwnedIncoming {
         inner: TcpListener,
-        stream: Option<Pin<Box<dyn Future<Output = Option<WsStream<TcpStream>>>>>>,
+        stream: Option<WsStreamFuture>,
     }
 
     impl OwnedIncoming {
@@ -278,7 +280,7 @@ mod native_websocket {
 
                     let stream: WsStream<TcpStream> = match stream {
                         Some(stream) => {
-                            if let Some(stream) = async_tungstenite::accept_async(stream).await.ok()
+                            if let Ok(stream) = async_tungstenite::accept_async(stream).await
                             {
                                 WsStream::new(stream)
                             } else {
@@ -291,11 +293,10 @@ mod native_websocket {
                     Some(stream)
                 }));
             }
-            if let Some(stream) = &mut incoming.stream {
-                if let std::task::Poll::Ready(res) = stream.poll(cx) {
+            if let Some(stream) = &mut incoming.stream
+                 && let std::task::Poll::Ready(res) = stream.poll(cx) {
                     incoming.stream = None;
                     return std::task::Poll::Ready(res);
-                }
             }
             std::task::Poll::Pending
         }

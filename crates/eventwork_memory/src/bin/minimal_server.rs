@@ -4,7 +4,7 @@ use eventwork::{
     AppNetworkMessage, EventworkRuntime, Network, NetworkEvent, OutboundMessage,
     SubscriptionMessage,
 };
-use eventwork_common::SubscribeById;
+use eventwork_common::{EventworkMessage, SubscribeById};
 use eventwork_memory::NetworkMemoryPlugin;
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
 use serde::{Deserialize, Serialize};
@@ -81,7 +81,7 @@ fn setup_networking(
 
 fn handle_connection_events(
     mut commands: Commands,
-    mut network_events: EventReader<NetworkEvent>,
+    mut network_events: MessageReader<NetworkEvent>,
     time: Res<Time>,
     clients: Query<(Entity, &ConnectedClient)>,
 ) {
@@ -116,7 +116,7 @@ fn send_periodic_updates(
     time: Res<Time>,
     mut update_timer: Local<Option<Timer>>,
     clients: Query<&ConnectedClient>,
-    mut outbound_messages: EventWriter<OutboundMessage<TestUpdate>>,
+    mut outbound_messages: MessageWriter<OutboundMessage<TestUpdate>>,
 ) {
     // Initialize timer if needed
     if update_timer.is_none() {
@@ -136,7 +136,7 @@ fn send_periodic_updates(
 
         // Send to all connected clients
         for client in clients.iter() {
-            let outbound = OutboundMessage::new(TestUpdate::NAME.to_string(), update.clone())
+            let outbound = OutboundMessage::new(TestUpdate::type_name().to_string(), update.clone())
                 .for_client(client.id);
             outbound_messages.write(outbound);
             println!("Sent update to client {}", client.id);

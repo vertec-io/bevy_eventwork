@@ -240,11 +240,10 @@ impl Stream for OwnedIncoming {
                 .ok()
             }));
         }
-        if let Some(stream) = &mut incoming.stream {
-            if let std::task::Poll::Ready(res) = stream.poll(cx) {
+        if let Some(stream) = &mut incoming.stream
+             && let std::task::Poll::Ready(res) = stream.poll(cx) {
                 incoming.stream = None;
                 return std::task::Poll::Ready(res);
-            }
         }
         std::task::Poll::Pending
     }

@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.1.0] - 2025-11-09
+
+### Changed - Bevy 0.17 Upgrade
+
+#### ⚠️ Breaking Changes
+
+**Bevy 0.17.2 Upgrade** - The library has been upgraded to support Bevy 0.17.2, which includes significant breaking changes to the event system API.
+
+**Event → Message API Migration**
+- All `#[derive(Event)]` changed to `#[derive(Message)]`
+- All `EventReader<T>` changed to `MessageReader<T>`
+- All `EventWriter<T>` changed to `MessageWriter<T>`
+- All `App::add_event::<T>()` changed to `App::add_message::<T>()`
+- `MessageWriter::send()` method renamed to `MessageWriter::write()`
+
+**Affected Types:**
+- `NetworkEvent` - Now derives `Message` instead of `Event`
+- `NetworkData<T>` - Now derives `Message` instead of `Event`
+- `OutboundMessage<T>` - Now derives `Message` instead of `Event`
+
+**Rust Version Requirement**
+- Minimum Rust version: 1.88.0 (currently requires nightly Rust 1.93.0)
+- Rust edition: 2024
+
+#### Migration Guide
+
+See [docs/MIGRATION_0.17.md](docs/MIGRATION_0.17.md) for detailed migration instructions.
+
+#### Dependencies
+
+- Updated `bevy` from 0.16.2 to 0.17.2
+- All Bevy-related dependencies updated to 0.17.2
+
+#### Internal Changes
+
+- Updated all internal systems to use `MessageReader` and `MessageWriter`
+- Updated all examples to use the new Message API
+- Fixed clippy warnings:
+  - Added `Default` implementation for `PreviousMessage<T>`
+  - Changed `len() > 0` to `!is_empty()`
+  - Collapsed nested if statements
+  - Simplified format! calls
+  - Removed unnecessary borrows
+
+---
+
 ## [0.10.0] - 2025-01-XX
 
 ### Added

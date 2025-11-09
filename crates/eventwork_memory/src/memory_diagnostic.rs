@@ -64,7 +64,7 @@ pub fn monitor_memory_usage(
         use std::process;
         let pid = process::id();
         let output = std::process::Command::new("powershell")
-            .args(&[
+            .args([
                 "-Command",
                 &format!("Get-Process -Id {} | Select-Object WorkingSet", pid),
             ])
@@ -77,7 +77,7 @@ pub fn monitor_memory_usage(
 }
 
 // System to monitor network events
-pub fn monitor_network_events(mut network_events: EventReader<NetworkEvent>) {
+pub fn monitor_network_events(mut network_events: MessageReader<NetworkEvent>) {
     for event in network_events.read() {
         match event {
             NetworkEvent::Connected(conn_id) => {

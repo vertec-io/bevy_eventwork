@@ -26,11 +26,24 @@ Add the dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy = "0.16"
-eventwork = "0.9"
-eventwork_websockets = "0.2"
+bevy = "0.17"
+eventwork = "1.1"
+eventwork_websockets = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 ```
+
+**Important**: Bevy 0.17 requires Rust 1.88.0 (nightly). Create `rust-toolchain.toml`:
+```toml
+[toolchain]
+channel = "nightly"
+```
+
+## Version Compatibility
+
+| eventwork_websockets | eventwork | Bevy | Rust |
+| :------------------: | :-------: | :--: | :--: |
+| 1.1.0 | 1.1.0 | 0.17 | 1.88 (nightly) |
+| 0.2.0 | 0.9.0 | 0.16 | 1.85 |
 
 ### Basic Usage
 

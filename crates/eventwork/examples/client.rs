@@ -69,7 +69,7 @@ struct NetworkTaskPool(TaskPool);
 
 fn handle_incoming_messages(
     mut messages: Query<&mut GameChatMessages>,
-    mut new_messages: EventReader<NetworkData<shared::NewChatMessage>>,
+    mut new_messages: MessageReader<NetworkData<shared::NewChatMessage>>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
         return;
@@ -81,7 +81,7 @@ fn handle_incoming_messages(
 }
 
 fn handle_network_events(
-    mut new_network_events: EventReader<NetworkEvent>,
+    mut new_network_events: MessageReader<NetworkEvent>,
     connect_query: Query<&Children, With<ConnectButton>>,
     mut text_query: Query<&mut Text>,
     mut messages: Query<&mut GameChatMessages>,
@@ -322,7 +322,7 @@ fn handle_outbound_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<OutboundButton>)>,
     mut messages: Query<&mut GameChatMessages>,
     server_connection: Res<ServerConnection>,
-    mut outbound_writer: EventWriter<eventwork::OutboundMessage<shared::OutboundTestMessage>>,
+    mut outbound_writer: MessageWriter<eventwork::OutboundMessage<shared::OutboundTestMessage>>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
         return;
@@ -335,8 +335,8 @@ fn handle_outbound_button(
                 return;
             };
 
-            // Send message using OutboundMessage EventWriter
-            outbound_writer.send(
+            // Send message using OutboundMessage MessageWriter
+            outbound_writer.write(
                 eventwork::OutboundMessage::new(
                     shared::OutboundTestMessage::type_name().to_string(),
                     shared::OutboundTestMessage {
@@ -347,7 +347,7 @@ fn handle_outbound_button(
             );
 
             messages.add(SystemMessage::new(
-                "Message sent via OutboundMessage EventWriter!".to_string(),
+                "Message sent via OutboundMessage MessageWriter!".to_string(),
             ));
         }
     }
@@ -388,7 +388,7 @@ fn handle_chat_area(
     *read_messages_index = messages.messages.len();
 }
 
-fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
+fn setup_ui(mut commands: Commands) {
     commands.spawn(Camera2d::default());
 
     commands.spawn((GameChatMessages::new(),));

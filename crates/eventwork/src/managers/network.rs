@@ -59,7 +59,7 @@ impl<NP: NetworkProvider> Network<NP> {
     /// Returns true if there are any active connections
     #[inline(always)]
     pub fn has_connections(&self) -> bool {
-        self.established_connections.len() > 0
+        !self.established_connections.is_empty()
     }
 
     /// Check if a message type is registered
@@ -265,7 +265,7 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
     mut server: ResMut<Network<NP>>,
     runtime: Res<EventworkRuntime<RT>>,
     network_settings: Res<NP::NetworkSettings>,
-    mut network_events: EventWriter<NetworkEvent>,
+    mut network_events: MessageWriter<NetworkEvent>,
 ) {
     while let Ok(new_conn) = server.new_connections.receiver.try_recv() {
         let id = server.connection_count;
@@ -349,7 +349,7 @@ fn register_message_internal<T: EventworkMessage, NP: NetworkProvider>(app: &mut
     );
 
     server.recv_message_map.insert(message_name, Vec::new());
-    app.add_event::<NetworkData<T>>();
+    app.add_message::<NetworkData<T>>();
     app.add_systems(PreUpdate, register_message::<T, NP>)
 }
 
@@ -474,12 +474,12 @@ impl AppNetworkMessage for App {
                     .recv_message_map
                     .insert(previous_message_name, Vec::new());
             }
-            self.add_event::<NetworkData<PreviousMessage<T>>>();
+            self.add_message::<NetworkData<PreviousMessage<T>>>();
             self.add_systems(PreUpdate, register_previous_message::<T, NP>);
             self.add_systems(PreUpdate, handle_previous_message_requests::<T, NP>);
         }
 
-        self.add_event::<OutboundMessage<T>>();
+        self.add_message::<OutboundMessage<T>>();
 
         self.add_systems(
             Update,
@@ -512,7 +512,7 @@ impl AppNetworkMessage for App {
             .recv_message_map
             .insert(targeted_message_name, Vec::new());
 
-        self.add_event::<NetworkData<TargetedMessage<T>>>();
+        self.add_message::<NetworkData<TargetedMessage<T>>>();
         self.add_systems(PreUpdate, register_targeted_message::<T, NP>);
 
         self
@@ -560,7 +560,7 @@ impl AppNetworkMessage for App {
 /// System that processes incoming messages for EventworkMessage types
 pub(crate) fn register_message<T, NP: NetworkProvider>(
     net_res: ResMut<Network<NP>>,
-    mut events: EventWriter<NetworkData<T>>,
+    mut events: MessageWriter<NetworkData<T>>,
 ) where
     T: EventworkMessage,
 {
@@ -595,7 +595,7 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
 ///
 /// # Parameters
 ///
-/// * `outbound_messages` - An `EventReader` that reads `OutboundMessage<T>` events,
+/// * `outbound_messages` - A `MessageReader` that reads `OutboundMessage<T>` events,
 ///   which contain the messages to be sent to clients.
 /// * `net` - A `Res<Network<NP>>` resource that provides access to the network
 ///   for sending and broadcasting messages.
@@ -608,7 +608,7 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
 /// - If the message is intended for all clients (`for_client` is `None`), it broadcasts
 ///   the message using `broadcast`.
 pub fn relay_outbound_notifications<T: EventworkMessage + Clone, NP: NetworkProvider>(
-    mut outbound_messages: EventReader<OutboundMessage<T>>,
+    mut outbound_messages: MessageReader<OutboundMessage<T>>,
     net: Res<Network<NP>>,
 ) {
     for notification in outbound_messages.read() {
@@ -644,7 +644,7 @@ pub fn relay_outbound_notifications<T: EventworkMessage + Clone, NP: NetworkProv
 /// * `server` - The network resource containing connection and message information
 #[cfg(feature = "cache_messages")]
 fn handle_previous_message_requests<T: EventworkMessage + Clone, NP: NetworkProvider>(
-    mut previous_message_requests: EventReader<NetworkData<PreviousMessage<T>>>,
+    mut previous_message_requests: MessageReader<NetworkData<PreviousMessage<T>>>,
     server: Res<Network<NP>>,
 ) {
     for request in previous_message_requests.read() {
@@ -666,7 +666,7 @@ fn handle_previous_message_requests<T: EventworkMessage + Clone, NP: NetworkProv
 /// Registers a targeted message type for the network.
 pub fn register_targeted_message<T, NP: NetworkProvider>(
     net_res: ResMut<Network<NP>>,
-    mut events: EventWriter<NetworkData<TargetedMessage<T>>>,
+    mut events: MessageWriter<NetworkData<TargetedMessage<T>>>,
 ) where
     T: EventworkMessage,
 {
@@ -723,7 +723,7 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
 #[cfg(feature = "cache_messages")]
 pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
     net_res: ResMut<Network<NP>>,
-    mut events: EventWriter<NetworkData<PreviousMessage<T>>>,
+    mut events: MessageWriter<NetworkData<PreviousMessage<T>>>,
 ) where
     T: EventworkMessage,
 {
@@ -742,7 +742,7 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
     #[cfg(feature = "debug_messages")]
     println!(
         "Received a request for PreviousMessage of type : {}",
-        T::NAME
+        T::type_name()
     );
 
     // Drain the message buffer and send events

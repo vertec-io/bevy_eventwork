@@ -178,13 +178,13 @@
 //!
 //! /// A system that will read status requests and return the current status of the app.
 //! fn handle_request_status(
-//!     mut network_events: EventReader<Request<RequestStatus>>,
+//!     mut network_events: MessageReader<Request<RequestStatus>>,
 //! ){
 //!     for event in network_events.read() {
 //!         let _ = event.clone().respond(StatusResponse{
-//!             response: true    
+//!             response: true
 //!         });
-//!         
+//!
 //!     }
 //! }
 //! ```
@@ -194,7 +194,7 @@ use std::{fmt::Debug, marker::PhantomData, sync::atomic::AtomicU64};
 use async_channel::{Receiver, Sender};
 use bevy::{
     ecs::system::SystemParam,
-    prelude::{App, Event, EventReader, EventWriter, PreUpdate, Res, ResMut, Resource},
+    prelude::{App, Message, MessageReader, MessageWriter, PreUpdate, Res, ResMut, Resource},
 };
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -303,7 +303,7 @@ struct RequestInternal<T> {
 
 /// A wrapper around a request that allows sending a response that will automatically be written
 ///  to eventwork for network transmission.
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Message, Clone)]
 pub struct Request<T: RequestMessage> {
     request: T,
     source: ConnectionId,
@@ -367,8 +367,8 @@ impl AppNetworkRequestMessage for App {
         server
             .recv_message_map
             .insert(request_name, Vec::new());
-        self.add_event::<NetworkData<RequestInternal<T>>>();
-        self.add_event::<Request<T>>();
+        self.add_message::<NetworkData<RequestInternal<T>>>();
+        self.add_message::<Request<T>>();
         self.add_systems(
             PreUpdate,
             (
@@ -380,8 +380,8 @@ impl AppNetworkRequestMessage for App {
 }
 
 fn create_request_handlers<T: RequestMessage, NP: NetworkProvider>(
-    mut requests: EventReader<NetworkData<RequestInternal<T>>>,
-    mut requests_wrapped: EventWriter<Request<T>>,
+    mut requests: MessageReader<NetworkData<RequestInternal<T>>>,
+    mut requests_wrapped: MessageWriter<Request<T>>,
     network: Res<Network<NP>>,
 ) {
     for request in requests.read() {
@@ -429,7 +429,7 @@ impl AppNetworkResponseMessage for App {
         client
             .recv_message_map
             .insert(response_name, Vec::new());
-        self.add_event::<NetworkData<ResponseInternal<T::ResponseMessage>>>();
+        self.add_message::<NetworkData<ResponseInternal<T::ResponseMessage>>>();
         self.add_systems(
             PreUpdate,
             (
@@ -441,7 +441,7 @@ impl AppNetworkResponseMessage for App {
 }
 
 fn create_client_response_handlers<T: RequestMessage>(
-    mut responses: EventReader<NetworkData<ResponseInternal<T::ResponseMessage>>>,
+    mut responses: MessageReader<NetworkData<ResponseInternal<T::ResponseMessage>>>,
     response_map: ResMut<ResponseMap<T>>,
 ) {
     for response in responses.read() {

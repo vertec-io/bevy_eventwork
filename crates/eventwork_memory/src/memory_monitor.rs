@@ -74,10 +74,7 @@ fn get_current_memory_usage() -> usize {
     {
         use std::process;
         let pid = process::id();
-        match get_windows_memory_info(pid) {
-            Ok(mem) => mem,
-            Err(_) => 0,
-        }
+        get_windows_memory_info(pid).unwrap_or_default()
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -92,7 +89,7 @@ fn get_windows_memory_info(pid: u32) -> Result<usize, String> {
     use std::process::Command;
 
     let output = Command::new("powershell")
-        .args(&[
+        .args([
             "-Command",
             &format!(
                 "Get-Process -Id {} | Select-Object -ExpandProperty WorkingSet",

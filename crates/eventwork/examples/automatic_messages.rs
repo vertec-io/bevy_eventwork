@@ -81,7 +81,7 @@ fn server_listen(
     }
 }
 
-fn server_handle_connections(mut events: EventReader<NetworkEvent>) {
+fn server_handle_connections(mut events: MessageReader<NetworkEvent>) {
     for event in events.read() {
         match event {
             NetworkEvent::Connected(conn_id) => {
@@ -98,7 +98,7 @@ fn server_handle_connections(mut events: EventReader<NetworkEvent>) {
 }
 
 fn server_handle_chat_messages(
-    mut messages: EventReader<NetworkData<ChatMessage>>,
+    mut messages: MessageReader<NetworkData<ChatMessage>>,
     net: Res<Network<TcpProvider>>,
 ) {
     for msg in messages.read() {
@@ -110,7 +110,7 @@ fn server_handle_chat_messages(
 }
 
 fn server_handle_positions(
-    mut positions: EventReader<NetworkData<PlayerPosition>>,
+    mut positions: MessageReader<NetworkData<PlayerPosition>>,
 ) {
     for pos in positions.read() {
         info!("Player {} moved to ({}, {})", pos.player_id, pos.x, pos.y);
@@ -162,7 +162,7 @@ fn client_connect(
     info!("Connecting to server at {}", socket_address);
 }
 
-fn client_handle_connections(mut events: EventReader<NetworkEvent>) {
+fn client_handle_connections(mut events: MessageReader<NetworkEvent>) {
     for event in events.read() {
         match event {
             NetworkEvent::Connected(_) => {
@@ -178,13 +178,13 @@ fn client_handle_connections(mut events: EventReader<NetworkEvent>) {
     }
 }
 
-fn client_handle_chat_messages(mut messages: EventReader<NetworkData<ChatMessage>>) {
+fn client_handle_chat_messages(mut messages: MessageReader<NetworkData<ChatMessage>>) {
     for msg in messages.read() {
         info!("Chat: {} says '{}'", msg.username, msg.message);
     }
 }
 
-fn client_handle_announcements(mut announcements: EventReader<NetworkData<ServerAnnouncement>>) {
+fn client_handle_announcements(mut announcements: MessageReader<NetworkData<ServerAnnouncement>>) {
     for announcement in announcements.read() {
         info!("📢 Server announcement (priority {}): {}", 
               announcement.priority, announcement.text);
