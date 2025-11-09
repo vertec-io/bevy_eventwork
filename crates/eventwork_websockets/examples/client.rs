@@ -353,8 +353,8 @@ fn setup_ui(mut commands: Commands) {
                 ))
                 .with_children(|parent_button_bar| {
                     parent_button_bar
-                        .spawn((
-                            Button,
+                        .spawn(Button)
+                        .insert((
                             Node {
                                 width: Val::Percent(50.0),
                                 height: Val::Percent(100.0),
@@ -362,8 +362,8 @@ fn setup_ui(mut commands: Commands) {
                                 justify_content: JustifyContent::Center,
                                 ..default()
                             },
+                            MessageButton,
                         ))
-                        .insert(MessageButton)
                         .with_children(|button| {
                             button.spawn((
                                 Text::new("Send Message!"),
@@ -374,8 +374,8 @@ fn setup_ui(mut commands: Commands) {
                         });
 
                     parent_button_bar
-                        .spawn((
-                            Button,
+                        .spawn(Button)
+                        .insert((
                             Node {
                                 width: Val::Percent(50.0),
                                 height: Val::Percent(100.0),
@@ -383,8 +383,8 @@ fn setup_ui(mut commands: Commands) {
                                 justify_content: JustifyContent::Center,
                                 ..default()
                             },
+                            ConnectButton,
                         ))
-                        .insert(ConnectButton)
                         .with_children(|button| {
                             button.spawn((
                                 Text::new("Connect to server"),

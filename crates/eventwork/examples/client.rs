@@ -428,8 +428,8 @@ fn setup_ui(mut commands: Commands) {
                 ))
                 .with_children(|parent_button_bar| {
                     parent_button_bar
-                        .spawn((
-                            Button,
+                        .spawn(Button)
+                        .insert((
                             Node {
                                 width: Val::Percent(33.33),
                                 height: Val::Percent(100.0),
@@ -450,8 +450,8 @@ fn setup_ui(mut commands: Commands) {
                         ));
 
                     parent_button_bar
-                        .spawn((
-                            Button,
+                        .spawn(Button)
+                        .insert((
                             Node {
                                 width: Val::Percent(33.33),
                                 height: Val::Percent(100.0),
@@ -472,8 +472,8 @@ fn setup_ui(mut commands: Commands) {
                         ));
 
                     parent_button_bar
-                        .spawn((
-                            Button,
+                        .spawn(Button)
+                        .insert((
                             Node {
                                 width: Val::Percent(33.33),
                                 height: Val::Percent(100.0),
