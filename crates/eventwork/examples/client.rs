@@ -54,6 +54,9 @@ fn main() {
     app.init_resource::<GlobalChatSettings>();
     app.init_resource::<ServerConnection>();
 
+    // Set clear color to help debug rendering
+    app.insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)));
+
     app.add_systems(PostUpdate, handle_chat_area);
 
     app.run();
@@ -367,8 +370,12 @@ fn handle_chat_area(
         return;
     };
     let Ok(chat_area_entity) = chat_area_query.single() else {
+        warn!("handle_chat_area: Could not find chat area entity!");
         return;
     };
+
+    info!("handle_chat_area: Processing {} messages (read_index: {})",
+          messages.messages.len(), *read_messages_index);
 
     for message_index in *read_messages_index..messages.messages.len() {
         let message = &messages.messages[message_index];
@@ -383,17 +390,22 @@ fn handle_chat_area(
             ))
             .id();
         commands.entity(chat_area_entity).add_children(&[new_message]);
+        info!("Added chat message: {:?}", new_message);
     }
 
     *read_messages_index = messages.messages.len();
 }
 
 fn setup_ui(mut commands: Commands) {
-    commands.spawn(Camera2d::default());
+    info!("=== SETUP_UI CALLED ===");
+
+    commands.spawn(Camera2d);
+    info!("Spawned Camera2d");
 
     commands.spawn((GameChatMessages::new(),));
+    info!("Spawned GameChatMessages");
 
-    commands
+    let root = commands
         .spawn((
             Node {
                 width: Val::Percent(100.0),
@@ -404,94 +416,109 @@ fn setup_ui(mut commands: Commands) {
             },
             Into::<BackgroundColor>::into(Color::WHITE),
         ))
-        .with_children(|parent| {
-            parent
+        .id();
+    info!("Spawned root UI node: {:?}", root);
+
+    commands.entity(root).with_children(|parent| {
+        let chat_area = parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(90.0),
+                    flex_direction: FlexDirection::Column,
+                    padding: UiRect::all(Val::Px(10.0)),
+                    overflow: Overflow::clip_y(),
+                    ..default()
+                },
+                ChatArea,
+            ))
+            .id();
+        info!("Spawned chat area: {:?}", chat_area);
+
+        parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(10.0),
+                    ..default()
+                },
+                Into::<BackgroundColor>::into(palettes::css::GRAY),
+            ))
+            .with_children(|parent_button_bar| {
+                info!("Creating buttons in button bar");
+            let btn1 = parent_button_bar
                 .spawn((
+                    Button,
                     Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(90.0),
-                        flex_direction: FlexDirection::Column,
-                        padding: UiRect::all(Val::Px(10.0)),
-                        overflow: Overflow::clip_y(),
+                        width: Val::Percent(33.33),
+                        height: Val::Percent(100.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
                         ..default()
                     },
-                    ChatArea,
-                ));
-            parent
-                .spawn((
-                    Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(10.0),
-                        ..default()
-                    },
-                    Into::<BackgroundColor>::into(palettes::css::GRAY),
+                    BackgroundColor(Color::srgb(0.2, 0.5, 0.8)),
+                    MessageButton,
                 ))
-                .with_children(|parent_button_bar| {
-                    parent_button_bar
-                        .spawn(Button)
-                        .insert((
-                            Node {
-                                width: Val::Percent(33.33),
-                                height: Val::Percent(100.0),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.2, 0.5, 0.8)),
-                            MessageButton,
-                        ))
-                        .with_child((
-                            Text::new("Send Message!"),
-                            TextFont {
-                                font_size: 30.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(0.0, 0.0, 0.0)),
-                        ));
+                .with_child((
+                    Text::new("Send Message!"),
+                    TextFont {
+                        font_size: 30.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                ))
+                .id();
+            info!("Spawned MessageButton: {:?}", btn1);
 
-                    parent_button_bar
-                        .spawn(Button)
-                        .insert((
-                            Node {
-                                width: Val::Percent(33.33),
-                                height: Val::Percent(100.0),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.8, 0.5, 0.2)),
-                            OutboundButton,
-                        ))
-                        .with_child((
-                            Text::new("Send Outbound!"),
-                            TextFont {
-                                font_size: 30.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(0.0, 0.0, 0.0)),
-                        ));
+            let btn2 = parent_button_bar
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Percent(33.33),
+                        height: Val::Percent(100.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.8, 0.5, 0.2)),
+                    OutboundButton,
+                ))
+                .with_child((
+                    Text::new("Send Outbound!"),
+                    TextFont {
+                        font_size: 30.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                ))
+                .id();
+            info!("Spawned OutboundButton: {:?}", btn2);
 
-                    parent_button_bar
-                        .spawn(Button)
-                        .insert((
-                            Node {
-                                width: Val::Percent(33.33),
-                                height: Val::Percent(100.0),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.2, 0.8, 0.3)),
-                            ConnectButton,
-                        ))
-                        .with_child((
-                            Text::new("Connect to server"),
-                            TextFont {
-                                font_size: 30.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(0.0, 0.0, 0.0)),
-                        ));
-                });
+            let btn3 = parent_button_bar
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Percent(33.33),
+                        height: Val::Percent(100.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.2, 0.8, 0.3)),
+                    ConnectButton,
+                ))
+                .with_child((
+                    Text::new("Connect to server"),
+                    TextFont {
+                        font_size: 30.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.0, 0.0, 0.0)),
+                ))
+                .id();
+            info!("Spawned ConnectButton: {:?}", btn3);
         });
+    });
+
+    info!("=== SETUP_UI COMPLETE ===");
 }
