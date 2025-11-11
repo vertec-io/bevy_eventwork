@@ -51,14 +51,14 @@ fn main() {
 }
 
 fn handle_world_updates(
-    mut chunk_updates: EventReader<NetworkData<WorldUpdate>>,
+    mut chunk_updates: MessageReader<NetworkData<WorldUpdate>>,
 ) {
     for chunk in chunk_updates.read() {
         info!("Got chunk update!");
     }
 }
 
-fn handle_connection_events(mut network_events: EventReader<NetworkEvent>,) {
+fn handle_connection_events(mut network_events: MessageReader<NetworkEvent>,) {
     for event in network_events.read() {
         match event {
             &NetworkEvent::Connected(_) => info!("Connected to server!"),
@@ -106,7 +106,7 @@ fn main() {
 }
 
 fn handle_world_updates(
-    mut chunk_updates: EventReader<NetworkData<UserInput>>,
+    mut chunk_updates: MessageReader<NetworkData<UserInput>>,
 ) {
     for chunk in chunk_updates.read() {
         info!("Got chunk update!");
@@ -115,7 +115,7 @@ fn handle_world_updates(
 
 fn handle_connection_events(
     net: Res<Network<TcpProvider>>,
-    mut network_events: EventReader<NetworkEvent>,
+    mut network_events: MessageReader<NetworkEvent>,
 ) {
     for event in network_events.read() {
         match event {

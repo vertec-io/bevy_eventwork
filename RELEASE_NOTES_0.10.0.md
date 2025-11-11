@@ -170,7 +170,7 @@ fn setup(mut app: App) {
     app.register_network_message::<PlayerPosition, TcpProvider>();
 }
 
-fn handle_messages(mut messages: EventReader<NetworkData<ChatMessage>>) {
+fn handle_messages(mut messages: MessageReader<NetworkData<ChatMessage>>) {
     for msg in messages.read() {
         println!("{}: {}", msg.user, msg.message);
     }

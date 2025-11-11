@@ -62,7 +62,7 @@ struct NetworkTaskPool(TaskPool);
 
 fn handle_incoming_messages(
     mut messages: Query<&mut GameChatMessages>,
-    mut new_messages: EventReader<NetworkData<shared::NewChatMessage>>,
+    mut new_messages: MessageReader<NetworkData<shared::NewChatMessage>>,
 ) {
     let mut messages = messages.get_single_mut().unwrap();
 
@@ -72,7 +72,7 @@ fn handle_incoming_messages(
 }
 
 fn handle_network_events(
-    mut new_network_events: EventReader<NetworkEvent>,
+    mut new_network_events: MessageReader<NetworkEvent>,
     connect_query: Query<&Children, With<ConnectButton>>,
     mut text_query: Query<&mut Text>,
     mut messages: Query<&mut GameChatMessages>,

@@ -42,6 +42,7 @@ channel = "nightly"
 
 | eventwork_websockets | eventwork | Bevy | Rust |
 | :------------------: | :-------: | :--: | :--: |
+| 1.1.1 | 1.1.1 | 0.17 | 1.88 (nightly) |
 | 1.1.0 | 1.1.0 | 0.17 | 1.88 (nightly) |
 | 0.2.0 | 0.9.0 | 0.16 | 1.85 |
 

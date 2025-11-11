@@ -238,5 +238,5 @@ All documentation in this directory is provided under the same license as bevy_e
 
 **Last Updated**: November 9, 2025  
 **Bevy Version**: 0.17.2  
-**bevy_eventwork Version**: 1.1.0
+**bevy_eventwork Version**: 1.1.1
 

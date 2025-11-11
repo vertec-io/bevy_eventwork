@@ -48,7 +48,7 @@ fn send_messages(
 
 ## Option B: Outbound Messages (Scheduled) 🎯
 
-Use `OutboundMessage` events with `EventWriter` for precise control over when messages are sent. This allows you to schedule network operations in specific system sets.
+Use `OutboundMessage` events with `MessageWriter` for precise control over when messages are sent. This allows you to schedule network operations in specific system sets.
 
 ### Example
 
@@ -64,9 +64,9 @@ fn setup_networking(app: &mut App) {
     app.register_outbound_message::<ChatMessage, TcpProvider, _>(PostUpdate);
 }
 
-// Step 2: Send messages using EventWriter
+// Step 2: Send messages using MessageWriter
 fn send_messages(
-    mut outbound: EventWriter<OutboundMessage<ChatMessage>>,
+    mut outbound: MessageWriter<OutboundMessage<ChatMessage>>,
     connection_id: ConnectionId,
 ) {
     let message = ChatMessage {
@@ -75,13 +75,13 @@ fn send_messages(
     };
 
     // Broadcast to all connections (default behavior)
-    outbound.send(OutboundMessage::new(
+    outbound.write(OutboundMessage::new(
         ChatMessage::type_name().to_string(),
         message.clone(),
     ));
 
     // Or target a specific connection
-    outbound.send(
+    outbound.write(
         OutboundMessage::new(
             ChatMessage::type_name().to_string(),
             message,
@@ -103,7 +103,7 @@ fn send_messages(
 ### How It Works
 
 1. You register the message type with `register_outbound_message()`, specifying a system set
-2. You send `OutboundMessage` events using `EventWriter` in your systems
+2. You send `OutboundMessage` events using `MessageWriter` in your systems
 3. The `relay_outbound_notifications` system runs in your specified system set
 4. Messages are sent over the network during that system set's execution
 5. This gives you fine-grained control over when network I/O happens
@@ -127,15 +127,15 @@ fn setup(app: &mut App) {
 }
 
 // Now all these messages will be batched and sent together
-fn update_player(mut outbound: EventWriter<OutboundMessage<PlayerPosition>>) {
-    outbound.send(OutboundMessage::new(
+fn update_player(mut outbound: MessageWriter<OutboundMessage<PlayerPosition>>) {
+    outbound.write(OutboundMessage::new(
         PlayerPosition::type_name().to_string(),
         PlayerPosition { x: 1.0, y: 2.0, z: 3.0 },
     ));
 }
 
-fn handle_action(mut outbound: EventWriter<OutboundMessage<PlayerAction>>) {
-    outbound.send(OutboundMessage::new(
+fn handle_action(mut outbound: MessageWriter<OutboundMessage<PlayerAction>>) {
+    outbound.write(OutboundMessage::new(
         PlayerAction::type_name().to_string(),
         PlayerAction::Jump,
     ));
@@ -146,7 +146,7 @@ fn handle_action(mut outbound: EventWriter<OutboundMessage<PlayerAction>>) {
 
 ## Comparison Table
 
-| Feature | Direct Sending (`net.send()`) | Outbound Messages (`EventWriter`) |
+| Feature | Direct Sending (`net.send()`) | Outbound Messages (`MessageWriter`) |
 |---------|-------------------------------|-----------------------------------|
 | **Simplicity** | ✅ Very simple | ⚠️ More setup required |
 | **Timing** | Immediate | Scheduled in system set |
@@ -170,7 +170,7 @@ fn handle_action(mut outbound: EventWriter<OutboundMessage<PlayerAction>>) {
 
 ### For Advanced Applications
 
-**Use Outbound Messages** (`EventWriter<OutboundMessage<T>>`) for:
+**Use Outbound Messages** (`MessageWriter<OutboundMessage<T>>`) for:
 - Multiplayer games with complex state synchronization
 - Applications that need deterministic network timing
 - Systems that batch multiple message types together
@@ -185,7 +185,7 @@ You can use both approaches in the same application! For example:
 ```rust
 fn handle_chat(
     net: Res<Network<TcpProvider>>,
-    mut chat_events: EventReader<ChatEvent>,
+    mut chat_events: MessageReader<ChatEvent>,
 ) {
     for event in chat_events.read() {
         // Chat is urgent - send immediately
@@ -197,12 +197,12 @@ fn handle_chat(
 }
 
 fn sync_positions(
-    mut outbound: EventWriter<OutboundMessage<PlayerPosition>>,
+    mut outbound: MessageWriter<OutboundMessage<PlayerPosition>>,
     players: Query<(&Transform, &PlayerId)>,
 ) {
     for (transform, player_id) in players.iter() {
         // Position updates are batched in PostUpdate
-        outbound.send(OutboundMessage::new(
+        outbound.write(OutboundMessage::new(
             PlayerPosition::type_name().to_string(),
             PlayerPosition {
                 id: player_id.0,
@@ -239,8 +239,8 @@ app.register_outbound_message::<PlayerPosition, TcpProvider, _>(PostUpdate);  //
 
 ```rust
 // BAD: Sending without registration
-fn send_message(mut outbound: EventWriter<OutboundMessage<MyMessage>>) {
-    outbound.send(OutboundMessage::new(...));  // Won't work!
+fn send_message(mut outbound: MessageWriter<OutboundMessage<MyMessage>>) {
+    outbound.write(OutboundMessage::new(...));  // Won't work!
 }
 ```
 
@@ -252,8 +252,8 @@ fn setup(app: &mut App) {
     app.register_outbound_message::<MyMessage, TcpProvider, _>(PostUpdate);
 }
 
-fn send_message(mut outbound: EventWriter<OutboundMessage<MyMessage>>) {
-    outbound.send(OutboundMessage::new(...));  // Works!
+fn send_message(mut outbound: MessageWriter<OutboundMessage<MyMessage>>) {
+    outbound.write(OutboundMessage::new(...));  // Works!
 }
 ```
 

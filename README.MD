@@ -170,7 +170,7 @@ fn main() {
 use eventwork::NetworkData;
 
 fn handle_chat_messages(
-    mut messages: EventReader<NetworkData<ChatMessage>>,
+    mut messages: MessageReader<NetworkData<ChatMessage>>,
 ) {
     for message in messages.read() {
         // Access fields directly via Deref
@@ -200,7 +200,7 @@ fn send_chat_message(
 }
 ```
 
-> 📚 **Advanced:** Eventwork also supports `OutboundMessage` with `EventWriter` for precise control over network scheduling. See **[SENDING_MESSAGES.md](./SENDING_MESSAGES.md)** for the complete guide on both approaches.
+> 📚 **Advanced:** Eventwork also supports `OutboundMessage` with `MessageWriter` for precise control over network scheduling. See **[SENDING_MESSAGES.md](./SENDING_MESSAGES.md)** for the complete guide on both approaches.
 
 ## Examples
 
@@ -253,11 +253,11 @@ All eventwork crates are versioned together for simplicity:
 
 | Crate | Version | Bevy | Status |
 | :---: | :-----: | :--: | :----: |
-| `eventwork` | 1.1.0 | 0.17 | ✅ Current |
-| `eventwork_common` | 1.1.0 | 0.17 | ✅ Current |
-| `eventwork_websockets` | 1.1.0 | 0.17 | ✅ Current |
-| `eventwork_macros` | 1.1.0 | 0.17 | ✅ Current |
-| `eventwork_memory` | 1.1.0 | 0.17 | ✅ Current |
+| `eventwork` | 1.1.1 | 0.17 | ✅ Current |
+| `eventwork_common` | 1.1.1 | 0.17 | ✅ Current |
+| `eventwork_websockets` | 1.1.1 | 0.17 | ✅ Current |
+| `eventwork_macros` | 1.1.1 | 0.17 | ✅ Current |
+| `eventwork_memory` | 1.1.1 | 0.17 | ✅ Current |
 
 **Always use matching versions** of all eventwork crates to avoid compatibility issues.
 

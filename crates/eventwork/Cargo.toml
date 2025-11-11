@@ -1,6 +1,6 @@
 [package]
 name = "eventwork"
-version = "1.1.0"
+version = "1.1.1"
 authors = [
     "James <jamescarterbell@gmail.com>",
     "Neikos <neikos@neikos.email>",
@@ -60,7 +60,7 @@ futures-lite = "2.0.0"
 # Used for logging
 tracing = "0.1"
 
-eventwork_common = { path = "../eventwork_common", version = "1.1.0" }
+eventwork_common = { path = "../eventwork_common", version = "1.1.1" }
 
 [dev-dependencies]
 # Examples need UI features, but these don't affect library users

@@ -37,7 +37,7 @@ pub fn client_register_network_messages(app: &mut App) {
     // it is prepared to handle them. Otherwise, an error occurs.
     app.register_network_message::<NewChatMessage, TcpProvider>();
 
-    // Register outbound message that the client will send using EventWriter
+    // Register outbound message that the client will send using MessageWriter
     // This will process outbound messages in the OutboundMessageSet system set
     app.register_outbound_message::<OutboundTestMessage, TcpProvider, _>(OutboundMessageSet);
 }

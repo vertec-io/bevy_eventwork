@@ -65,7 +65,7 @@ fn setup_networking(
 }
 
 fn handle_network_events(
-    mut network_events: EventReader<NetworkEvent>,
+    mut network_events: MessageReader<NetworkEvent>,
 ) {
     for event in network_events.read() {
         match event {

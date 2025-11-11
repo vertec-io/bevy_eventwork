@@ -133,9 +133,9 @@ fn cleanup_network_resources(
 pub fn handle_new_connection_events(
     mut commands: Commands,
     net: Res<Network<WebSocketProvider>>,
-    mut network_events: EventReader<NetworkEvent>,
+    mut network_events: MessageReader<NetworkEvent>,
     mut clients: Query<(Entity, &mut Client, Option<&SubConnections>)>,
-    mut connection_details_writer: EventWriter<OutboundMessage<ConnectionDetails>>,
+    mut connection_details_writer: MessageWriter<OutboundMessage<ConnectionDetails>>,
 ) {
     for event in network_events.read() {
         match event {
@@ -152,7 +152,7 @@ pub fn handle_new_connection_events(
                 let _ = net.send_message(*conn_id, client);
 
                 // Send initial connection details
-                connection_details_writer.send(
+                connection_details_writer.write(
                     new_server_message(ConnectionDetails {
                         connection_id: Some(*conn_id),
                         sub_connections_ids: vec![],
@@ -183,7 +183,7 @@ pub fn handle_new_connection_events(
 
 fn handle_associate_sub_connection_request(
     mut commands: Commands,
-    mut requests: EventReader<NetworkData<AssociateSubConnectionRequest>>,
+    mut requests: MessageReader<NetworkData<AssociateSubConnectionRequest>>,
     mut clients: Query<(Entity, &mut Client, Option<&mut SubConnections>)>,
 ){
     for request in requests.read() {

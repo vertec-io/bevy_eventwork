@@ -6,6 +6,7 @@ Memory leak detection and prevention tools for the eventwork networking library.
 
 | eventwork_memory | eventwork | Bevy | Rust |
 | :--------------: | :-------: | :--: | :--: |
+| 1.1.1 | 1.1.1 | 0.17 | 1.88 (nightly) |
 | 1.1.0 | 1.1.0 | 0.17 | 1.88 (nightly) |
 | 1.0.0 | 1.0.0 | 0.16 | 1.85 |
 

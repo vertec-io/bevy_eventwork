@@ -119,14 +119,14 @@ Both approaches use the same pattern for receiving:
 
 ```rust
 fn handle_messages(
-    mut messages: EventReader<NetworkData<ChatMessage>>,
+    mut messages: MessageReader<NetworkData<ChatMessage>>,
 ) {
     for msg in messages.read() {
         println!("From {}: {}", msg.source(), msg.username);
-        
+
         // Access message data via Deref
         let username = &msg.username;
-        
+
         // Or clone the inner message
         let message = (**msg).clone();
     }
@@ -153,7 +153,7 @@ fn send_message(net: Res<Network<TcpProvider>>) {
 ### Connection Events
 
 ```rust
-fn handle_connections(mut events: EventReader<NetworkEvent>) {
+fn handle_connections(mut events: MessageReader<NetworkEvent>) {
     for event in events.read() {
         match event {
             NetworkEvent::Connected(conn_id) => {

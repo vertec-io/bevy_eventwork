@@ -2420,7 +2420,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-channel 2.5.0",
  "async-net",
@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_common"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "bincode",
  "codee",
@@ -2449,7 +2449,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_macros"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2458,7 +2458,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_memory"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-channel 2.5.0",
  "bevy",
@@ -2475,7 +2475,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_websockets"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-channel 2.5.0",
  "async-net",
