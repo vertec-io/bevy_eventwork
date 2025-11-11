@@ -280,11 +280,16 @@ mod native_websocket {
 
                     let stream: WsStream<TcpStream> = match stream {
                         Some(stream) => {
-                            if let Ok(stream) = async_tungstenite::accept_async(stream).await
-                            {
-                                WsStream::new(stream)
-                            } else {
-                                return None;
+                            info!("🔌 [ACCEPT] TCP connection accepted, attempting WebSocket handshake...");
+                            match async_tungstenite::accept_async(stream).await {
+                                Ok(stream) => {
+                                    info!("🔌 [ACCEPT] WebSocket handshake successful!");
+                                    WsStream::new(stream)
+                                }
+                                Err(e) => {
+                                    error!("🔌 [ACCEPT] WebSocket handshake failed: {:?}", e);
+                                    return None;
+                                }
                             }
                         }
 
