@@ -23,8 +23,3 @@ pub struct NewChatMessage {
     pub name: String,
     pub message: String,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct OutboundTestMessage {
-    pub content: String,
-}

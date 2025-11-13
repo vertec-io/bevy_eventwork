@@ -33,15 +33,11 @@ fn main() {
     app.insert_resource(WsNetworkSettings::default());
 
     // Register messages for BOTH providers
-    // TCP messages
+    // These are the core chat messages that both TCP and WebSocket clients send/receive
     app.register_network_message::<shared_types::UserChatMessage, TcpProvider>();
     app.register_network_message::<shared_types::NewChatMessage, TcpProvider>();
-    app.register_network_message::<shared_types::OutboundTestMessage, TcpProvider>();
-
-    // WebSocket messages
     app.register_network_message::<shared_types::UserChatMessage, WebSocketProvider>();
     app.register_network_message::<shared_types::NewChatMessage, WebSocketProvider>();
-    app.register_network_message::<shared_types::OutboundTestMessage, WebSocketProvider>();
 
     // Unified connection registry
     app.init_resource::<UnifiedConnectionRegistry>();
