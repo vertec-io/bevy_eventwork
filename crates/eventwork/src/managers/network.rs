@@ -64,6 +64,12 @@ impl<NP: NetworkProvider> Network<NP> {
         !self.established_connections.is_empty()
     }
 
+    /// Returns true if a specific connection exists
+    #[inline(always)]
+    pub fn has_connection(&self, conn_id: ConnectionId) -> bool {
+        self.established_connections.contains_key(&conn_id)
+    }
+
     /// Check if a message type is registered
     ///
     /// This is primarily useful for testing and debugging.

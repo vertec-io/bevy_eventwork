@@ -20,6 +20,9 @@ name = "client"
 [[example]]
 name = "server"
 
+[[example]]
+name = "hybrid_server"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -60,3 +63,5 @@ bevy = { workspace = true, features = ["bevy_ui", "bevy_text", "bevy_render", "b
 serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.108" }
 async-net = "2.0.0"
+# For hybrid_server example - enable TCP support
+eventwork = { path = "../eventwork", features = ["tcp"] }
