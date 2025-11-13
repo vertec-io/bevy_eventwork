@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-codee = "0.2.0"  # Using 0.2.0 for compatibility with leptos-use 0.14
+codee = "0.3.3"  # Latest version with bug fixes and improvements
 eventwork_macros = { path = "../eventwork_macros" }
 serde = { version = "1.0.190", features = ["derive"] }
 bincode.workspace = true

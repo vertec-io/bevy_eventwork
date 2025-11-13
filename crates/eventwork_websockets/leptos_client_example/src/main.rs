@@ -2,8 +2,10 @@ use leptos::prelude::*;
 use leptos::ev::SubmitEvent;
 use leptos_use::{
     core::ConnectionReadyState, use_websocket_with_options, UseWebSocketOptions,
-    UseWebSocketReturn,
+    UseWebSocketReturn, DummyEncoder,
 };
+// Import reactive traits for .get(), .with(), .update() methods
+use reactive_graph::traits::{Get, With, Update};
 
 // Include the shared types from the examples directory
 // This ensures type names match between client and server
@@ -36,7 +38,7 @@ fn App() -> impl IntoView {
         open,
         close,
         ..
-    } = use_websocket_with_options::<UserChatMessage, NewChatMessage, EventworkBincodeSingleMsgCodec>(
+    } = use_websocket_with_options::<UserChatMessage, NewChatMessage, EventworkBincodeSingleMsgCodec, (), DummyEncoder>(
         "ws://127.0.0.1:8081",
         UseWebSocketOptions::default()
             .immediate(false)
