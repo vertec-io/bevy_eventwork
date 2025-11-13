@@ -482,7 +482,7 @@ pub trait AppNetworkMessage {
     /// This will:
     /// - Add a new event type of [`OutboundMessage<T>`]
     /// - Register the type for sending/broadcasting over the wire
-    fn register_outbound_message<T: EventworkMessage + Clone, NP: NetworkProvider, S: SystemSet>(
+    fn register_outbound_message<T: EventworkMessage + Clone, NP: NetworkProvider, S: SystemSet + Clone>(
         &mut self,
         system_set: S,
     ) -> &mut Self;
@@ -532,7 +532,7 @@ impl AppNetworkMessage for App {
         register_message_internal::<T, NP>(self)
     }
 
-    fn register_outbound_message<T: EventworkMessage + Clone, NP: NetworkProvider, S: SystemSet>(
+    fn register_outbound_message<T: EventworkMessage + Clone, NP: NetworkProvider, S: SystemSet + Clone>(
         &mut self,
         system_set: S,
     ) -> &mut Self {
@@ -562,9 +562,17 @@ impl AppNetworkMessage for App {
 
         self.add_message::<OutboundMessage<T>>();
 
+        // Use the appropriate relay system based on feature flags
+        #[cfg(feature = "outbound_immediate")]
         self.add_systems(
             Update,
-            relay_outbound_notifications::<T, NP>.in_set(system_set),
+            crate::managers::outbound_immediate::relay_outbound_immediate::<T, NP>.in_set(system_set.clone()),
+        );
+
+        #[cfg(feature = "outbound_scheduled")]
+        self.add_systems(
+            Update,
+            crate::managers::outbound_scheduled::relay_outbound_scheduled::<T, NP>.in_set(system_set.clone()),
         );
 
         self
@@ -656,54 +664,12 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
         net_res.last_messages.insert(name, newest_message.clone());
     }
 
-    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
+    let provider_name = NP::PROVIDER_NAME;
+    events.write_batch(messages.drain(..).filter_map(move |(source, msg)| {
         bincode::deserialize::<T>(&msg)
             .ok()
-            .map(|inner| NetworkData { source, inner })
+            .map(|inner| NetworkData { source, inner, provider_name })
     }));
-}
-
-/// Relays outbound notifications to the appropriate clients.
-///
-/// This system reads outbound messages from the `OutboundMessage<T>` event and
-/// sends them either to a specific client or broadcasts them to all connected clients
-/// using the provided `Network<NP>` resource.
-///
-/// # Type Parameters
-///
-/// * `T` - The type of the network message that implements the `NetworkMessage` trait.
-/// * `NP` - The type of the network provider that implements the `NetworkProvider` trait.
-///
-/// # Parameters
-///
-/// * `outbound_messages` - A `MessageReader` that reads `OutboundMessage<T>` events,
-///   which contain the messages to be sent to clients.
-/// * `net` - A `Res<Network<NP>>` resource that provides access to the network
-///   for sending and broadcasting messages.
-///
-/// # Behavior
-///
-/// The function iterates over all outbound messages:
-/// - If the message is designated for a specific client (`for_client` is `Some(client)`),
-///   it attempts to send the message to that client using `send_message`.
-/// - If the message is intended for all clients (`for_client` is `None`), it broadcasts
-///   the message using `broadcast`.
-pub fn relay_outbound_notifications<T: EventworkMessage + Clone, NP: NetworkProvider>(
-    mut outbound_messages: MessageReader<OutboundMessage<T>>,
-    net: Res<Network<NP>>,
-) {
-    for notification in outbound_messages.read() {
-        match &notification.for_client {
-            Some(client) => {
-                if let Err(e) = net.send(*client, notification.message.clone()) {
-                    error!("Failed to send {} to client {}: {:?}", T::type_name(), client.id, e);
-                }
-            }
-            None => {
-                net.broadcast(notification.message.clone());
-            }
-        }
-    }
 }
 
 /// System that handles requests from clients for the most recent message of a specific type.
@@ -760,7 +726,8 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
         None => return,
     };
 
-    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
+    let provider_name = NP::PROVIDER_NAME;
+    events.write_batch(messages.drain(..).filter_map(move |(source, msg)| {
         match bincode::deserialize::<TargetedMessage<T>>(&msg) {
             Ok(inner) => {
                 #[cfg(feature = "debug_messages")]
@@ -768,7 +735,7 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
                     "Successfully deserialized message for target: {}",
                     inner.target_id
                 );
-                Some(NetworkData { source, inner })
+                Some(NetworkData { source, inner, provider_name })
             }
             Err(_e) => {
                 #[cfg(feature = "debug_messages")]
@@ -828,9 +795,10 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
     );
 
     // Drain the message buffer and send events
-    events.write_batch(messages.drain(..).filter_map(|(source, msg)| {
+    let provider_name = NP::PROVIDER_NAME;
+    events.write_batch(messages.drain(..).filter_map(move |(source, msg)| {
         bincode::deserialize::<PreviousMessage<T>>(&msg)
             .ok()
-            .map(|inner| NetworkData { source, inner })
+            .map(|inner| NetworkData { source, inner, provider_name })
     }));
 }

@@ -20,11 +20,14 @@ resolver = "2"
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["tcp", "cache_messages"]
+default = ["tcp", "cache_messages", "outbound_immediate"]
 tcp = ["async-net"]
 cache_messages = []
 dynamic_linking = ["bevy/dynamic_linking"]
 debug_messages = []
+# Outbound message handling strategies
+outbound_immediate = []  # Direct broadcast - messages sent immediately when OutboundMessage is written
+outbound_scheduled = []  # Two-stage relay - messages collected and sent in a deterministic system set
 
 [[example]]
 name = "client"

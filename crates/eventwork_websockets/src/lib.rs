@@ -36,6 +36,8 @@ mod native_websocket {
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
     impl NetworkProvider for NativeWesocketProvider {
+        const PROVIDER_NAME: &'static str = "WebSocket";
+
         type NetworkSettings = NetworkSettings;
 
         type Socket = WsStream<TcpStream>;
@@ -333,6 +335,8 @@ mod wasm_websocket {
 
     #[async_trait(?Send)]
     impl NetworkProvider for WasmWebSocketProvider {
+        const PROVIDER_NAME: &'static str = "WebSocket";
+
         type NetworkSettings = NetworkSettings;
 
         type Socket = (WsMeta, WsStream);

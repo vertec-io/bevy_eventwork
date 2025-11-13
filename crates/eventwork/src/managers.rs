@@ -16,6 +16,14 @@ pub mod network;
 /// Contains logic for making requests with expected responses
 pub mod network_request;
 
+/// Immediate outbound message handling - messages sent immediately when written
+#[cfg(feature = "outbound_immediate")]
+pub mod outbound_immediate;
+
+/// Scheduled outbound message handling - messages collected and sent in a deterministic system set
+#[cfg(feature = "outbound_scheduled")]
+pub mod outbound_scheduled;
+
 /// An instance of a Network that uses the provided [`NetworkProvider`] to drive itself.
 ///
 /// You can use this resource to interact with the network in Bevy systems.
@@ -49,6 +57,10 @@ pub struct Network<NP: NetworkProvider> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait NetworkProvider: 'static + Send + Sync {
+    /// The name of this provider (e.g., "TcpProvider", "WebSocketProvider")
+    /// This is used to identify which protocol a message came from
+    const PROVIDER_NAME: &'static str;
+
     /// This is to configure particular protocols
     type NetworkSettings: Resource + Clone;
 

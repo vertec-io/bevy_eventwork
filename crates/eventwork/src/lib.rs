@@ -195,6 +195,10 @@ pub enum NetworkEvent {
 pub struct NetworkData<T> {
     source: ConnectionId,
     inner: T,
+    /// The name of the provider that received this message (e.g., "TcpProvider", "WebSocketProvider")
+    /// This allows game logic to determine which protocol the message came from without
+    /// needing direct access to Network resources
+    provider_name: &'static str,
 }
 
 impl<T> Deref for NetworkData<T> {
@@ -211,12 +215,27 @@ impl<T> NetworkData<T> {
         Self {
             source: *source,
             inner,
+            provider_name: "Unknown",
+        }
+    }
+
+    /// Create NetworkData with a specific provider name
+    pub fn with_provider(source: &ConnectionId, inner: T, provider_name: &'static str) -> NetworkData<T> {
+        Self {
+            source: *source,
+            inner,
+            provider_name,
         }
     }
 
     /// The source of this network data
     pub fn source(&self) -> &ConnectionId {
         &self.source
+    }
+
+    /// The name of the provider that received this message
+    pub fn provider_name(&self) -> &'static str {
+        self.provider_name
     }
 
     /// Get the inner data out of it

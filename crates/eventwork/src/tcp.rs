@@ -21,6 +21,8 @@ pub struct TcpProvider;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl NetworkProvider for TcpProvider {
+    const PROVIDER_NAME: &'static str = "TCP";
+
     type NetworkSettings = NetworkSettings;
 
     type Socket = TcpStream;
