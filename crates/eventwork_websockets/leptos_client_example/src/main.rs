@@ -10,9 +10,8 @@ use leptos_use::{
 #[path = "../../examples/shared_types.rs"]
 mod shared_types;
 
-mod codec;
-
-use codec::EventworkBincodeCodec;
+// Use the official codec from eventwork_common instead of a custom implementation
+use eventwork_common::codec::EventworkBincodeSingleMsgCodec;
 use shared_types::{NewChatMessage, UserChatMessage};
 
 fn main() {
@@ -37,7 +36,7 @@ fn App() -> impl IntoView {
         open,
         close,
         ..
-    } = use_websocket_with_options::<UserChatMessage, NewChatMessage, EventworkBincodeCodec>(
+    } = use_websocket_with_options::<UserChatMessage, NewChatMessage, EventworkBincodeSingleMsgCodec>(
         "ws://127.0.0.1:8081",
         UseWebSocketOptions::default()
             .immediate(false)
