@@ -403,7 +403,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_common"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "bincode",
  "codee 0.3.3",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "eventwork_macros"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
