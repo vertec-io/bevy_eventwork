@@ -4,7 +4,9 @@
 
 The `hybrid_server` example demonstrates how to run **both TCP and WebSocket protocols simultaneously** in a single Bevy server, allowing clients from either protocol to connect and share a common chat room.
 
-This example showcases the **scheduled outbound message pattern**, which provides complete decoupling of game logic from network infrastructure.
+This example showcases **two different architectural patterns** using feature flags:
+- **Scheduled Pattern** (default) - Decoupled, deterministic message handling
+- **Immediate Pattern** - Direct, simple message handling
 
 ## Architecture
 
@@ -13,14 +15,16 @@ The hybrid server uses Bevy's resource system to maintain two separate `Network<
 - `Network<TcpProvider>` - Handles TCP connections on port **3030**
 - `Network<WebSocketProvider>` - Handles WebSocket connections on port **8081**
 
-Both networks are registered with the same message types, and a **two-stage relay system** handles message broadcasting.
+Both networks are registered with the same message types, and the message handling approach depends on which feature flag is enabled.
 
-## Scheduled Outbound Message Pattern
+## Pattern 1: Scheduled (Default) - Decoupled Architecture
 
-This example uses the **`outbound_scheduled`** feature flag, which implements a two-stage message relay system:
+The **scheduled pattern** uses the built-in `register_outbound_message` method to create a two-stage relay system that completely decouples game logic from network infrastructure.
 
-### Stage 1: Game Logic (GameLogic SystemSet)
-Game logic systems read incoming messages and write `OutboundMessage<T>` events. They have **zero dependencies** on `Network` resources.
+### How It Works
+
+**Stage 1: Game Logic (GameLogic SystemSet)**
+Game logic reads incoming messages and writes `OutboundMessage<T>` events. It has **zero dependencies** on `Network` resources.
 
 ```rust
 fn handle_messages(
@@ -37,7 +41,7 @@ fn handle_messages(
             message: message.message.clone(),
         };
 
-        // Write outbound - relay system handles the rest!
+        // Write outbound - the built-in relay system handles broadcasting!
         outbound.write(OutboundMessage {
             name: "chat".to_string(),
             message: broadcast_message,
@@ -47,31 +51,17 @@ fn handle_messages(
 }
 ```
 
-### Stage 2: Network Relay (NetworkRelay SystemSet)
-The relay system runs **after** game logic and broadcasts all queued messages to the actual network providers.
+**Stage 2: Built-in Relay (NetworkRelay SystemSet)**
+The framework automatically sets up relay systems for each provider when you call `register_outbound_message`:
 
 ```rust
-fn relay_hybrid_outbound(
-    mut outbound_messages: MessageReader<OutboundMessage<NewChatMessage>>,
-    tcp_net: Res<Network<TcpProvider>>,
-    ws_net: Res<Network<WebSocketProvider>>,
-) {
-    for notification in outbound_messages.read() {
-        match &notification.for_client {
-            Some(client) => {
-                // Send to specific client on both providers
-                tcp_net.send(*client, notification.message.clone()).ok();
-                ws_net.send(*client, notification.message.clone()).ok();
-            }
-            None => {
-                // Broadcast to all clients on both providers
-                tcp_net.broadcast(notification.message.clone());
-                ws_net.broadcast(notification.message.clone());
-            }
-        }
-    }
-}
+// Register outbound messages for BOTH providers
+// This automatically sets up relay_outbound systems for each provider
+app.register_outbound_message::<NewChatMessage, TcpProvider, _>(NetworkRelay.clone());
+app.register_outbound_message::<NewChatMessage, WebSocketProvider, _>(NetworkRelay.clone());
 ```
+
+Each relay system reads `OutboundMessage<T>` events and broadcasts them via its respective `Network<T>` resource.
 
 ### System Set Ordering
 
@@ -87,31 +77,90 @@ This ensures:
 - ✅ Messages are sent at a deterministic point in the frame
 - ✅ Can use `.apply_deferred()` before NetworkRelay to sync world state
 
+### Benefits
+
+✅ **Complete Decoupling**: Game logic has zero dependencies on `Network` resources
+✅ **Determinism**: All messages sent at the same point in the frame
+✅ **Testability**: Game logic can be tested without network infrastructure
+✅ **Flexibility**: Easy to add new protocols without changing game logic
+✅ **Uses Framework Correctly**: Leverages built-in `register_outbound_message` method
+
+## Pattern 2: Immediate - Direct Control
+
+The **immediate pattern** gives you direct control by having game logic directly broadcast to both network providers.
+
+### How It Works
+
+Game logic directly uses `Network<TcpProvider>` and `Network<WebSocketProvider>` resources:
+
+```rust
+fn handle_messages(
+    mut new_messages: MessageReader<NetworkData<UserChatMessage>>,
+    tcp_net: Res<Network<TcpProvider>>,
+    ws_net: Res<Network<WebSocketProvider>>,
+) {
+    for message in new_messages.read() {
+        let provider = message.provider_name();
+
+        let broadcast_message = NewChatMessage {
+            name: format!("{}-{}", provider, message.source()),
+            message: message.message.clone(),
+        };
+
+        // Immediate pattern: Directly broadcast to both networks
+        tcp_net.broadcast(broadcast_message.clone());
+        ws_net.broadcast(broadcast_message);
+    }
+}
+```
+
+### Benefits
+
+✅ **Simple and Direct**: No intermediate events or relay systems
+✅ **Maximum Control**: You decide exactly when and how to send messages
+✅ **Easy to Understand**: Straightforward message flow
+✅ **Good for Prototyping**: Quick to implement and iterate
+
+## Switching Between Patterns
+
+Use feature flags to select which pattern to use:
+
+### Scheduled Pattern (Default)
+```bash
+cargo run --example hybrid_server --package eventwork_websockets
+```
+
+### Immediate Pattern
+```bash
+cargo run --example hybrid_server --package eventwork_websockets --features immediate
+```
+
+The server will log which pattern is active:
+- "🚀 Starting hybrid server with SCHEDULED message pattern"
+- "🚀 Starting hybrid server with IMMEDIATE message pattern"
+
 ## Provider Identification
 
-The `NetworkData<T>` type includes a `provider_name` field that identifies which protocol the message came from:
+Both patterns use the `provider_name` field in `NetworkData<T>` to identify which protocol a message came from:
 
 ```rust
 let provider = message.provider_name();  // "TCP" or "WebSocket"
 ```
 
-This allows game logic to determine the protocol **without** needing access to `Network` resources, achieving complete decoupling.
-
-## How It Works
-
-1. **Dual Plugin Registration**: Both `EventworkPlugin<TcpProvider>` and `EventworkPlugin<WebSocketProvider>` are added to the same Bevy app
-2. **Message Registration**: All message types are registered for both providers
-3. **Unified Connection Tracking**: Connection events are handled for both protocols
-4. **Two-Stage Message Relay**:
-   - Game logic writes `OutboundMessage<T>` events (GameLogic set)
-   - Relay system broadcasts to all providers (NetworkRelay set)
+This allows game logic to determine the protocol **without** needing access to `Network` resources, achieving complete decoupling (especially important in the scheduled pattern).
 
 ## Running the Example
 
 ### Start the Hybrid Server
 
+**Scheduled Pattern (Default):**
 ```bash
 cargo run --example hybrid_server --package eventwork_websockets
+```
+
+**Immediate Pattern:**
+```bash
+cargo run --example hybrid_server --package eventwork_websockets --features immediate
 ```
 
 The server will listen on:
@@ -140,42 +189,53 @@ trunk serve --port 8082
 
 ## Message Flow
 
-When a client sends a message:
+### Scheduled Pattern
+1. Message received by appropriate `Network<T>` resource
+2. Message written to Bevy's global `MessageWriter<NetworkData<UserChatMessage>>` with provider name
+3. Game logic reads message and writes `OutboundMessage<NewChatMessage>` (GameLogic set)
+4. Built-in relay systems (one per provider) read outbound messages and broadcast (NetworkRelay set)
 
-1. The message is received by the appropriate `Network<T>` resource
-2. The message is written to Bevy's global `MessageWriter<NetworkData<UserChatMessage>>` with the provider name
-3. Game logic reads the message and writes an `OutboundMessage<NewChatMessage>` (GameLogic set)
-4. The relay system reads all outbound messages and broadcasts them to both TCP and WebSocket clients (NetworkRelay set)
+### Immediate Pattern
+1. Message received by appropriate `Network<T>` resource
+2. Message written to Bevy's global `MessageWriter<NetworkData<UserChatMessage>>` with provider name
+3. Game logic reads message and directly broadcasts to both `Network<TcpProvider>` and `Network<WebSocketProvider>`
 
-This creates a unified chat room where TCP and WebSocket clients can communicate seamlessly!
-
-## Benefits of the Scheduled Pattern
-
-✅ **Complete Decoupling**: Game logic has zero dependencies on `Network` resources
-✅ **Provider Identification**: Can determine TCP vs WebSocket using `message.provider_name()`
-✅ **Determinism**: All messages sent at the same point in the frame
-✅ **Testability**: Game logic can be tested without network infrastructure
-✅ **Flexibility**: Easy to add new protocols without changing game logic
-✅ **Batching**: Can apply `.apply_deferred()` before relay to sync world state
-
-## Alternative: Immediate Pattern
-
-The `outbound_immediate` feature flag (default) provides a simpler approach where messages are sent immediately when `OutboundMessage<T>` is written. This is useful for:
-- Simple applications that don't need deterministic timing
-- Prototyping and quick development
-- Cases where you want messages sent as soon as possible
-
-To use the immediate pattern, change the feature flag in `Cargo.toml`:
-```toml
-eventwork = { path = "../eventwork", features = ["tcp", "outbound_immediate"], default-features = false }
-```
+Both patterns create a unified chat room where TCP and WebSocket clients can communicate seamlessly!
 
 ## Code Structure
 
+The example is split into three files:
+
+### `hybrid_server.rs` (Main File)
+- Uses feature flags to select which plugin to load
 - `setup_networking()` - Starts both TCP and WebSocket servers
-- `handle_connection_events()` - Unified handler for connections/disconnections from both protocols
-- `handle_messages()` - Game logic that reads incoming messages and writes outbound messages (GameLogic set)
-- `relay_hybrid_outbound()` - Relay system that broadcasts outbound messages to both providers (NetworkRelay set)
+- Registers incoming messages for both providers
+
+### `scheduled_messages.rs` (Scheduled Pattern Plugin)
+- `ScheduledMsgPlugin` - Sets up system sets and registers outbound messages
+- `handle_connection_events()` - Unified connection handler
+- `handle_messages()` - Game logic that writes `OutboundMessage<T>` events
+- Uses built-in `relay_outbound` systems (registered via `register_outbound_message`)
+
+### `immediate_messages.rs` (Immediate Pattern Plugin)
+- `ImmediateMsgPlugin` - Sets up systems
+- `handle_connection_events()` - Unified connection handler
+- `handle_messages()` - Game logic that directly broadcasts to both networks
+
+## Which Pattern Should You Use?
+
+### Use **Scheduled Pattern** if you want:
+- ✅ Complete decoupling of game logic from network infrastructure
+- ✅ Deterministic message timing (all messages sent at same point in frame)
+- ✅ Easy testing (game logic has no network dependencies)
+- ✅ Production-ready architecture
+- ✅ Ability to use `.apply_deferred()` before sending messages
+
+### Use **Immediate Pattern** if you want:
+- ✅ Simple, straightforward code
+- ✅ Maximum control over when messages are sent
+- ✅ Quick prototyping
+- ✅ Direct access to network resources
 
 ## Summary of Benefits
 
@@ -183,33 +243,62 @@ eventwork = { path = "../eventwork", features = ["tcp", "outbound_immediate"], d
 ✅ **Unified Chat Room**: All clients see messages from all other clients regardless of protocol
 ✅ **Zero Code Duplication**: Message types are defined once and work for both protocols
 ✅ **Hybrid Schema Hash**: Cross-protocol communication works even with different module paths
-✅ **Complete Decoupling**: Game logic has no dependencies on network infrastructure
 ✅ **Provider Identification**: Determine protocol using `message.provider_name()`
-✅ **Deterministic Messaging**: All messages sent at the same point in the frame
+✅ **Two Architectural Patterns**: Choose between scheduled (decoupled) or immediate (direct) patterns
 ✅ **Scalable**: Can easily add more protocols (e.g., UDP, QUIC) using the same pattern
 
 ## Example Output
 
+### Scheduled Pattern
 ```
+🚀 Starting hybrid server with SCHEDULED message pattern
 📡 TCP server listening on 127.0.0.1:3030
 🌐 WebSocket server listening on 127.0.0.1:8081
 🚀 Hybrid server started! Accepting both TCP and WebSocket connections.
 
-📡 TCP client connected: Connection with ID=1
 🌐 WebSocket client connected: Connection with ID=1
+🌐 WebSocket connection added: Connection with ID=1 (Total TCP: 0, WS: 1)
+🌐 Received WebSocket message from Connection with ID=1: Hello from WebSocket!
 
-📡 Received TCP message from 1: Hello from TCP!
-🌐 Received WebSocket message from 1: Hello from WebSocket!
+📡 TCP client connected: Connection with ID=1
+📡 TCP connection added: Connection with ID=1 (Total TCP: 1, WS: 1)
+📡 Received TCP message from Connection with ID=1: Hello from TCP!
+```
+
+### Immediate Pattern
+```
+🚀 Starting hybrid server with IMMEDIATE message pattern
+📡 TCP server listening on 127.0.0.1:3030
+🌐 WebSocket server listening on 127.0.0.1:8081
+🚀 Hybrid server started! Accepting both TCP and WebSocket connections.
+
+🌐 WebSocket client connected: Connection with ID=1
+🌐 WebSocket connection added: Connection with ID=1 (Total TCP: 0, WS: 1)
+🌐 Received WebSocket message from Connection with ID=1: Hello from WebSocket!
+
+📡 TCP client connected: Connection with ID=1
+📡 TCP connection added: Connection with ID=1 (Total TCP: 1, WS: 1)
+📡 Received TCP message from Connection with ID=1: Hello from TCP!
 ```
 
 ## Conclusion
 
-The hybrid server demonstrates that **bevy_eventwork's architecture is flexible enough to support multiple protocols simultaneously** with a clean, decoupled design. The scheduled outbound message pattern provides:
+The hybrid server demonstrates that **bevy_eventwork's architecture is flexible enough to support multiple protocols simultaneously** with clean, maintainable designs.
 
+The example showcases **two different architectural approaches**:
+
+### Scheduled Pattern (Recommended for Production)
 - **Clean separation** between game logic and network infrastructure
 - **Deterministic behavior** with predictable message timing
 - **Easy testing** since game logic has no network dependencies
+- **Uses framework correctly** by leveraging built-in `register_outbound_message`
 - **Scalability** to add new protocols without changing existing code
 
-This pattern is ideal for production applications that need robust, maintainable networking code!
+### Immediate Pattern (Good for Prototyping)
+- **Simple and direct** code that's easy to understand
+- **Maximum control** over message sending
+- **Quick to implement** for rapid prototyping
+- **Straightforward** message flow
+
+Both patterns are production-ready and fully tested with cross-protocol communication!
 

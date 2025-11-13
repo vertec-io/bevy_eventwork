@@ -16,14 +16,6 @@ pub mod network;
 /// Contains logic for making requests with expected responses
 pub mod network_request;
 
-/// Immediate outbound message handling - messages sent immediately when written
-#[cfg(feature = "outbound_immediate")]
-pub mod outbound_immediate;
-
-/// Scheduled outbound message handling - messages collected and sent in a deterministic system set
-#[cfg(feature = "outbound_scheduled")]
-pub mod outbound_scheduled;
-
 /// An instance of a Network that uses the provided [`NetworkProvider`] to drive itself.
 ///
 /// You can use this resource to interact with the network in Bevy systems.

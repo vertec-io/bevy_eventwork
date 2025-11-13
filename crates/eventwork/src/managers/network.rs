@@ -561,19 +561,7 @@ impl AppNetworkMessage for App {
         }
 
         self.add_message::<OutboundMessage<T>>();
-
-        // Use the appropriate relay system based on feature flags
-        #[cfg(feature = "outbound_immediate")]
-        self.add_systems(
-            Update,
-            crate::managers::outbound_immediate::relay_outbound_immediate::<T, NP>.in_set(system_set.clone()),
-        );
-
-        #[cfg(feature = "outbound_scheduled")]
-        self.add_systems(
-            Update,
-            crate::managers::outbound_scheduled::relay_outbound_scheduled::<T, NP>.in_set(system_set.clone()),
-        );
+        self.add_systems(Update, relay_outbound::<T, NP>.in_set(system_set.clone()));
 
         self
     }
@@ -801,4 +789,34 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
             .ok()
             .map(|inner| NetworkData { source, inner, provider_name })
     }));
+}
+
+/// Relay system for outbound messages.
+///
+/// This system reads `OutboundMessage<T>` events and sends them via the network provider.
+/// It can either send to a specific client or broadcast to all clients.
+///
+/// # Type Parameters
+/// * `T` - The type of the message being sent
+/// * `NP` - The network provider type
+///
+/// # Arguments
+/// * `outbound_messages` - Message reader for `OutboundMessage<T>` events
+/// * `net` - The network resource for sending messages
+pub(crate) fn relay_outbound<T: EventworkMessage + Clone, NP: NetworkProvider>(
+    mut outbound_messages: MessageReader<OutboundMessage<T>>,
+    net: Res<Network<NP>>,
+) {
+    for notification in outbound_messages.read() {
+        match &notification.for_client {
+            Some(client) => {
+                if let Err(e) = net.send(*client, notification.message.clone()) {
+                    error!("Failed to send {} to client {}: {:?}", T::type_name(), client.id, e);
+                }
+            }
+            None => {
+                net.broadcast(notification.message.clone());
+            }
+        }
+    }
 }
