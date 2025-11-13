@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <button id="connect">Connect</button>
+    <button id="send">Send Test Message</button>
+    <button id="sendBinary">Send Binary Message</button>
+    <div id="log"></div>
+
+    <script>
+        let ws = null;
+        const log = document.getElementById('log');
+
+        function addLog(message) {
+            const p = document.createElement('p');
+            p.textContent = new Date().toISOString() + ': ' + message;
+            log.appendChild(p);
+            console.log(message);
+        }
+
+        document.getElementById('connect').addEventListener('click', () => {
+            if (ws) {
+                addLog('Already connected');
+                return;
+            }
+
+            ws = new WebSocket('ws://127.0.0.1:8081');
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                addLog('Connected to WebSocket server');
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data instanceof ArrayBuffer) {
+                    const bytes = new Uint8Array(event.data);
+                    addLog('Received binary message: ' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
+                } else {
+                    addLog('Received text message: ' + event.data);
+                }
+            };
+
+            ws.onerror = (error) => {
+                addLog('WebSocket error: ' + error);
+            };
+
+            ws.onclose = () => {
+                addLog('Disconnected from WebSocket server');
+                ws = null;
+            };
+        });
+
+        document.getElementById('send').addEventListener('click', () => {
+            if (!ws) {
+                addLog('Not connected');
+                return;
+            }
+
+            const message = { message: "Hello from browser!" };
+            const json = JSON.stringify(message);
+            addLog('Sending text message: ' + json);
+            ws.send(json);
+        });
+
+        document.getElementById('sendBinary').addEventListener('click', async () => {
+            if (!ws) {
+                addLog('Not connected');
+                return;
+            }
+
+            // Manually create a bincode-encoded UserChatMessage
+            // UserChatMessage { message: String }
+            // bincode format for this struct:
+            // - length of string as u64 (8 bytes, little-endian)
+            // - string bytes (UTF-8)
+            
+            const message = "Hello from binary!";
+            const encoder = new TextEncoder();
+            const messageBytes = encoder.encode(message);
+            
+            // Create bincode format: length (u64 LE) + data
+            const buffer = new ArrayBuffer(8 + messageBytes.length);
+            const view = new DataView(buffer);
+            
+            // Write length as u64 little-endian
+            view.setBigUint64(0, BigInt(messageBytes.length), true);
+            
+            // Write string bytes
+            const uint8View = new Uint8Array(buffer);
+            uint8View.set(messageBytes, 8);
+            
+            addLog('Sending binary message: ' + Array.from(uint8View).map(b => b.toString(16).padStart(2, '0')).join(' '));
+            ws.send(buffer);
+        });
+    </script>
+</body>
+</html>
+

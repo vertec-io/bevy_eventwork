@@ -26,7 +26,12 @@ pub mod network_request;
 /// - Send broadcasts to all connected clients using [`Network::broadcast`]
 #[derive(Resource)]
 pub struct Network<NP: NetworkProvider> {
+    /// Primary message registry - lookup by full type name (fast path)
     recv_message_map: Arc<DashMap<&'static str, Vec<(ConnectionId, Vec<u8>)>>>,
+    /// Secondary message registry - lookup by schema hash (fallback for refactored modules)
+    recv_message_map_by_hash: Arc<DashMap<u64, Vec<(ConnectionId, Vec<u8>)>>>,
+    /// Maps schema hash to type name for collision detection and error messages
+    hash_to_typename: Arc<DashMap<u64, &'static str>>,
     #[cfg(feature = "cache_messages")]
     last_messages: Arc<DashMap<&'static str, Vec<u8>>>,
     established_connections: Arc<DashMap<ConnectionId, Connection>>,

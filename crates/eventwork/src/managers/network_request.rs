@@ -327,7 +327,8 @@ impl<T: RequestMessage> Request<T> {
     /// Consume the request and automatically send the response back to the client.
     pub fn respond(self, response: T::ResponseMessage) -> Result<(), NetworkError> {
         let packet = NetworkPacket {
-            kind: ResponseInternal::<T::ResponseMessage>::type_name().to_string(),
+            type_name: ResponseInternal::<T::ResponseMessage>::type_name().to_string(),
+            schema_hash: ResponseInternal::<T::ResponseMessage>::schema_hash(),
             data: bincode::serialize(&ResponseInternal {
                 response_id: self.request_id,
                 response,

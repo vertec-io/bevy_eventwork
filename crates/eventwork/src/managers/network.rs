@@ -43,6 +43,8 @@ impl<NP: NetworkProvider> Network<NP> {
     pub(crate) fn new(_provider: NP) -> Self {
         Self {
             recv_message_map: Arc::new(DashMap::new()),
+            recv_message_map_by_hash: Arc::new(DashMap::new()),
+            hash_to_typename: Arc::new(DashMap::new()),
             #[cfg(feature = "cache_messages")]
             last_messages: Arc::new(DashMap::new()),
             established_connections: Arc::new(DashMap::new()),
@@ -184,7 +186,8 @@ impl<NP: NetworkProvider> Network<NP> {
         };
 
         let packet = NetworkPacket {
-            kind: T::type_name().to_string(),
+            type_name: T::type_name().to_string(),
+            schema_hash: T::schema_hash(),
             data: bincode::serialize(&message).map_err(|_| NetworkError::Serialization)?,
         };
 
@@ -212,7 +215,42 @@ impl<NP: NetworkProvider> Network<NP> {
         let serialized_message = bincode::serialize(&message).expect("Couldn't serialize message!");
         for connection in self.established_connections.iter() {
             let packet = NetworkPacket {
-                kind: T::type_name().to_string(),
+                type_name: T::type_name().to_string(),
+                schema_hash: T::schema_hash(),
+                data: serialized_message.clone(),
+            };
+
+            match connection.send_message.try_send(packet) {
+                Ok(_) => (),
+                Err(err) => {
+                    warn!("Could not send to client because: {}", err);
+                }
+            }
+        }
+    }
+
+    /// Broadcast a message to all connected clients except the specified one
+    ///
+    /// This is useful for chat applications where you want to send a message to all
+    /// clients except the sender (who already sees their own message optimistically).
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// // Broadcast to everyone except the sender
+    /// net.broadcast_except(sender_id, ChatMessage { ... });
+    /// ```
+    pub fn broadcast_except<T: EventworkMessage + Clone>(&self, except: ConnectionId, message: T) {
+        let serialized_message = bincode::serialize(&message).expect("Couldn't serialize message!");
+        for connection in self.established_connections.iter() {
+            // Skip the excluded connection
+            if *connection.key() == except {
+                continue;
+            }
+
+            let packet = NetworkPacket {
+                type_name: T::type_name().to_string(),
+                schema_hash: T::schema_hash(),
                 data: serialized_message.clone(),
             };
 
@@ -274,6 +312,7 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
 
         let (read_half, write_half) = NP::split(new_conn);
         let recv_message_map = server.recv_message_map.clone();
+        let hash_to_typename = server.hash_to_typename.clone();
         let read_network_settings = network_settings.clone();
         let write_network_settings = network_settings.clone();
         let disconnected_connections = server.disconnected_connections.sender.clone();
@@ -297,18 +336,34 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
                     }, &runtime.0)),
                     map_receive_task: Box::new(run_async(async move{
                         while let Ok(packet) = incoming_rx.recv().await{
-                            match recv_message_map.get_mut(&packet.kind[..]) {
-                                Some(mut packets) => {
+                            // Hybrid lookup: try type_name first (fast path), then schema_hash (fallback)
+                            if let Some(mut packets) = recv_message_map.get_mut(&packet.type_name[..]) {
+                                #[cfg(feature = "debug_messages")]
+                                {
+                                    println!("Received message '{}' (matched by type_name)", packet.type_name);
+                                }
+                                packets.push((conn_id, packet.data));
+                            } else if let Some(registered_typename) = hash_to_typename.get(&packet.schema_hash) {
+                                // Schema hash matched! Get the registered type name and push to that queue
+                                let typename_key = *registered_typename.value();
+                                drop(registered_typename); // Release the read lock
+
+                                if let Some(mut packets) = recv_message_map.get_mut(typename_key) {
                                     #[cfg(feature = "debug_messages")]
                                     {
-                                        println!("Received a message of type: {:?}", packet.kind);
+                                        println!("Received message '{}' (matched by schema_hash: 0x{:016x}, registered as: {})",
+                                                 packet.type_name, packet.schema_hash, typename_key);
                                     }
-                                    packets.push((conn_id, packet.data))
-                                },
-                                None => {
-                                    println!("Eventwork could not find a registration for message type: {:?}", packet.kind);
-                                    error!("Could not find existing entries for message kinds: {:?}", packet);
+                                    packets.push((conn_id, packet.data));
+                                } else {
+                                    error!("Schema hash matched but type_name not found in recv_message_map! Hash: 0x{:016x}, registered typename: {}",
+                                           packet.schema_hash, typename_key);
                                 }
+                            } else {
+                                println!("Eventwork could not find a registration for message type: '{}' with schema hash: 0x{:016x}",
+                                         packet.type_name, packet.schema_hash);
+                                error!("Could not find existing entries for message type: '{}' (hash: 0x{:016x})",
+                                       packet.type_name, packet.schema_hash);
                             }
                         }
                     }, &runtime.0)),
@@ -339,16 +394,36 @@ fn register_message_internal<T: EventworkMessage, NP: NetworkProvider>(app: &mut
         .expect("Could not find `Network`. Be sure to include the `EventworkPlugin` before registering messages.");
 
     let message_name = T::type_name();
+    let schema_hash = T::schema_hash();
+    let short_name = T::short_name();
 
-    debug!("Registered network message: {}", message_name);
+    debug!("Registered network message: {} (short: {}, hash: 0x{:016x})",
+           message_name, short_name, schema_hash);
 
+    // Check for duplicate registration by type_name
     assert!(
         !server.recv_message_map.contains_key(message_name),
         "Duplicate registration of message: {}",
         message_name
     );
 
+    // Check for schema hash collision with different type
+    if let Some(existing_typename) = server.hash_to_typename.get(&schema_hash) {
+        let existing = *existing_typename.value();
+        if existing != message_name {
+            panic!(
+                "Schema hash collision! Both '{}' and '{}' have the same short name '{}' (hash: 0x{:016x}). \
+                 Please rename one of these types to avoid collision.",
+                existing, message_name, short_name, schema_hash
+            );
+        }
+    }
+
+    // Register in both maps
     server.recv_message_map.insert(message_name, Vec::new());
+    server.recv_message_map_by_hash.insert(schema_hash, Vec::new());
+    server.hash_to_typename.insert(schema_hash, message_name);
+
     app.add_message::<NetworkData<T>>();
     app.add_systems(PreUpdate, register_message::<T, NP>)
 }
@@ -652,7 +727,8 @@ fn handle_previous_message_requests<T: EventworkMessage + Clone, NP: NetworkProv
         let type_name = T::type_name();
         if let Some(last_message) = server.last_messages.get(type_name) {
             let packet = NetworkPacket {
-                kind: String::from(type_name),
+                type_name: String::from(type_name),
+                schema_hash: T::schema_hash(),
                 data: last_message.clone(),
             };
 

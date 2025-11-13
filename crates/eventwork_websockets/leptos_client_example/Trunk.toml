@@ -1,0 +1,17 @@
+[[hooks]]
+stage = "build"
+command = "sh"
+command_arguments = ["-c", "echo 'Building Leptos WebSocket Client...'"]
+
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+ignore = ["dist"]
+
+[serve]
+address = "127.0.0.1"
+port = 8080
+open = false
+

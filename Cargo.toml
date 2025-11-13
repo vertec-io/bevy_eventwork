@@ -7,16 +7,15 @@ members = [
     "crates/eventwork_memory",
     "crates/eventwork_macros",
 ]
+exclude = [
+    "crates/eventwork_websockets/leptos_client_example",
+]
 
 [workspace.package]
 rust-version = "1.88.0"
 edition = "2024"
 
-exclude = [
-    "crates/eventwork_websockets/examples",
-    "crates/eventwork_websockets/src/wasm_client_example",
-    "crates/eventwork/examples"
-    ]
+
 
 [workspace.dependencies]
 bevy = { version = "0.17", default-features = false, features = ["multi_threaded", "bevy_log"] }

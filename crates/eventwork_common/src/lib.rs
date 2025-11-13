@@ -17,17 +17,27 @@ pub use eventwork_macros::SubscribeById;
 
 #[derive(Serialize, Deserialize)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire
+///
+/// The packet contains both a human-readable type name (for debugging) and
+/// a schema hash (for matching). The system tries to match by type_name first,
+/// then falls back to schema_hash for resilience against module refactoring.
 pub struct NetworkPacket {
-    /// Typically the NetworkMessage::NAME
-    pub kind: String,
-    /// The serialized message from bincode
+    /// Full type name including module path (for debugging)
+    /// Example: "my_crate::messages::PlayerPosition"
+    pub type_name: String,
+    /// Schema hash computed from short type name (for matching)
+    /// This provides stability across module refactoring
+    pub schema_hash: u64,
+    /// The serialized message data from bincode
     pub data: Vec<u8>,
 }
 
 impl Debug for NetworkPacket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NetworkPacket")
-            .field("kind", &self.kind)
+            .field("type_name", &self.type_name)
+            .field("schema_hash", &format_args!("0x{:016x}", self.schema_hash))
+            .field("data_len", &self.data.len())
             .finish()
     }
 }

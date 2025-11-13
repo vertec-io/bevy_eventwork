@@ -73,15 +73,23 @@ fn handle_connection_events(
     mut network_events: MessageReader<NetworkEvent>,
 ) {
     for event in network_events.read() {
-        if let NetworkEvent::Connected(conn_id) = event {
-            commands.spawn((Player(*conn_id),));
+        match event {
+            NetworkEvent::Connected(conn_id) => {
+                info!("New player connected: {}", conn_id);
+                commands.spawn((Player(*conn_id),));
 
-            // Broadcasting sends the message to all connected players! (Including the just connected one in this case)
-            net.broadcast(shared::NewChatMessage {
-                name: String::from("SERVER"),
-                message: format!("New user connected; {}", conn_id),
-            });
-            info!("New player connected: {}", conn_id);
+                // Broadcasting sends the message to all connected players! (Including the just connected one in this case)
+                net.broadcast(shared::NewChatMessage {
+                    name: String::from("SERVER"),
+                    message: format!("New user connected; {}", conn_id),
+                });
+            }
+            NetworkEvent::Disconnected(conn_id) => {
+                info!("Player disconnected: {}", conn_id);
+            }
+            NetworkEvent::Error(err) => {
+                error!("Network error: {:?}", err);
+            }
         }
     }
 }
@@ -96,7 +104,8 @@ fn handle_messages(
 
         info!("Received message from user: {}", message.message);
 
-        net.broadcast(shared::NewChatMessage {
+        // Broadcast to everyone EXCEPT the sender (who already sees their own message)
+        net.broadcast_except(*user, shared::NewChatMessage {
             name: format!("{}", user),
             message: message.message.clone(),
         });

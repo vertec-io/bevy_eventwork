@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-/// Network message with automatic type name generation
+/// Network message with automatic type name generation and schema hashing
 ///
 /// This trait is automatically implemented for all types that are
 /// `Serialize + DeserializeOwned + Send + Sync + 'static`.
@@ -10,6 +10,9 @@ use std::fmt::Debug;
 /// The type name is generated from `std::any::type_name()` and cached
 /// for performance. The first access incurs a ~500ns cost, subsequent
 /// accesses are ~50-100ns.
+///
+/// The schema hash is computed from the short type name (without module path)
+/// to provide a stable identifier that survives module refactoring.
 ///
 /// ## Example
 ///
@@ -28,10 +31,12 @@ use std::fmt::Debug;
 /// // Use with app.register_network_message::<PlayerPosition, Provider>();
 /// ```
 pub trait EventworkMessage: Serialize + DeserializeOwned + Send + Sync + 'static {
-    /// Returns the type name for this message type.
+    /// Returns the full type name for this message type (includes module path).
     ///
     /// The name is generated from `std::any::type_name()` and cached
     /// in a global static for performance.
+    ///
+    /// Example: `"my_crate::messages::PlayerPosition"`
     fn type_name() -> &'static str {
         use std::any::{TypeId, type_name};
         use std::collections::HashMap;
@@ -60,6 +65,84 @@ pub trait EventworkMessage: Serialize + DeserializeOwned + Send + Sync + 'static
         }
 
         static_name
+    }
+
+    /// Returns the short type name (just the struct name, no module path).
+    ///
+    /// This is used for schema hashing to provide stability across module refactoring.
+    ///
+    /// Example: `"PlayerPosition"` (from `"my_crate::messages::PlayerPosition"`)
+    fn short_name() -> &'static str {
+        use std::any::TypeId;
+        use std::collections::HashMap;
+        use std::sync::{Mutex, OnceLock};
+
+        static CACHE: OnceLock<Mutex<HashMap<TypeId, &'static str>>> = OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+        let type_id = TypeId::of::<Self>();
+
+        // Fast path: check cache without holding lock long
+        {
+            let cache_guard = cache.lock().unwrap();
+            if let Some(&name) = cache_guard.get(&type_id) {
+                return name;
+            }
+        }
+
+        // Slow path: extract short name from full type name
+        let full_name = Self::type_name();
+        let short = full_name.rsplit("::").next().unwrap_or(full_name);
+        let static_name = Box::leak(short.to_string().into_boxed_str());
+
+        {
+            let mut cache_guard = cache.lock().unwrap();
+            cache_guard.insert(type_id, static_name);
+        }
+
+        static_name
+    }
+
+    /// Returns a hash of the message schema.
+    ///
+    /// The hash is computed from the short type name (without module path).
+    /// This provides a stable identifier that survives module refactoring
+    /// while still being unique enough to avoid most collisions.
+    ///
+    /// Note: If two types have the same short name (e.g., `foo::Message` and
+    /// `bar::Message`), they will have the same schema hash. This is intentional
+    /// and will be caught during registration if both are used in the same binary.
+    fn schema_hash() -> u64 {
+        use std::any::TypeId;
+        use std::collections::HashMap;
+        use std::hash::{Hash, Hasher};
+        use std::sync::{Mutex, OnceLock};
+
+        static CACHE: OnceLock<Mutex<HashMap<TypeId, u64>>> = OnceLock::new();
+        let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+        let type_id = TypeId::of::<Self>();
+
+        // Fast path: check cache without holding lock long
+        {
+            let cache_guard = cache.lock().unwrap();
+            if let Some(&hash) = cache_guard.get(&type_id) {
+                return hash;
+            }
+        }
+
+        // Slow path: compute hash from short name
+        let short = Self::short_name();
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        short.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        {
+            let mut cache_guard = cache.lock().unwrap();
+            cache_guard.insert(type_id, hash);
+        }
+
+        hash
     }
 }
 
@@ -349,5 +432,75 @@ mod tests {
         // EventworkMessage uses type_name() automatically
         let name = AutoMsg::type_name();
         assert!(name.contains("AutoMsg"));
+    }
+
+    #[test]
+    fn test_short_name() {
+        #[derive(Serialize, Deserialize)]
+        struct MyMessage {
+            data: String
+        }
+
+        let short = MyMessage::short_name();
+        let full = MyMessage::type_name();
+
+        // Short name should be just the struct name
+        assert_eq!(short, "MyMessage");
+        // Full name should contain module path
+        assert!(full.contains("MyMessage"));
+        assert!(full.len() > short.len());
+    }
+
+    #[test]
+    fn test_schema_hash() {
+        #[derive(Serialize, Deserialize)]
+        struct MessageA {
+            data: String
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct MessageB {
+            data: String
+        }
+
+        let hash_a1 = MessageA::schema_hash();
+        let hash_a2 = MessageA::schema_hash();
+        let hash_b = MessageB::schema_hash();
+
+        // Same type should have same hash (cached)
+        assert_eq!(hash_a1, hash_a2);
+        // Different types should have different hashes
+        assert_ne!(hash_a1, hash_b);
+    }
+
+    #[test]
+    fn test_schema_hash_stability() {
+        // Simulate types from different modules with same name
+        mod module1 {
+            use serde::{Serialize, Deserialize};
+            #[derive(Serialize, Deserialize)]
+            pub struct UserMessage {
+                pub message: String
+            }
+        }
+
+        mod module2 {
+            use serde::{Serialize, Deserialize};
+            #[derive(Serialize, Deserialize)]
+            pub struct UserMessage {
+                pub user_id: u32
+            }
+        }
+
+        // Both should have the same hash (same short name)
+        let hash1 = module1::UserMessage::schema_hash();
+        let hash2 = module2::UserMessage::schema_hash();
+
+        assert_eq!(hash1, hash2, "Types with same short name should have same schema hash");
+
+        // But different full type names
+        let name1 = module1::UserMessage::type_name();
+        let name2 = module2::UserMessage::type_name();
+        assert_ne!(name1, name2, "Types should have different full type names");
     }
 }

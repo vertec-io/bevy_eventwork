@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use eventwork_websockets::WebSocketProvider;
-use serde::{Deserialize, Serialize};
 
 /////////////////////////////////////////////////////////////////////
 // In this example the client sends `UserChatMessage`s to the server,
@@ -15,16 +14,11 @@ use serde::{Deserialize, Serialize};
 // send and receive
 /////////////////////////////////////////////////////////////////////
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct UserChatMessage {
-    pub message: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewChatMessage {
-    pub name: String,
-    pub message: String,
-}
+// Import shared types from shared_types.rs
+// This ensures consistent type names across all clients and servers
+#[path = "shared_types.rs"]
+mod shared_types;
+pub use shared_types::{UserChatMessage, NewChatMessage};
 
 #[allow(unused)]
 pub fn client_register_network_messages(app: &mut App) {
