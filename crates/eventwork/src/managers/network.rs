@@ -64,6 +64,12 @@ impl<NP: NetworkProvider> Network<NP> {
         !self.established_connections.is_empty()
     }
 
+    /// Returns the number of active connections
+    #[inline(always)]
+    pub fn connection_count(&self) -> usize {
+        self.established_connections.len()
+    }
+
     /// Returns true if a specific connection exists
     #[inline(always)]
     pub fn has_connection(&self, conn_id: ConnectionId) -> bool {

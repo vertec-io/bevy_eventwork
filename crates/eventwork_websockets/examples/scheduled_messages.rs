@@ -53,75 +53,35 @@ struct GameLogic;
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 struct NetworkRelay;
 
-/// Resource to track connections from both protocols
-#[derive(Resource, Default)]
-pub struct UnifiedConnectionRegistry {
-    pub tcp_connections: Vec<eventwork_common::ConnectionId>,
-    pub ws_connections: Vec<eventwork_common::ConnectionId>,
-}
-
-impl UnifiedConnectionRegistry {
-    pub fn add_tcp(&mut self, id: eventwork_common::ConnectionId) {
-        if !self.tcp_connections.contains(&id) {
-            self.tcp_connections.push(id);
-        }
-        info!("📡 TCP connection added: {} (Total TCP: {}, WS: {})", id, self.tcp_connections.len(), self.ws_connections.len());
-    }
-
-    pub fn add_ws(&mut self, id: eventwork_common::ConnectionId) {
-        if !self.ws_connections.contains(&id) {
-            self.ws_connections.push(id);
-        }
-        info!("🌐 WebSocket connection added: {} (Total TCP: {}, WS: {})", id, self.tcp_connections.len(), self.ws_connections.len());
-    }
-
-    pub fn remove_tcp(&mut self, id: eventwork_common::ConnectionId) {
-        self.tcp_connections.retain(|&x| x != id);
-        info!("📡 TCP connection removed: {} (Total TCP: {}, WS: {})", id, self.tcp_connections.len(), self.ws_connections.len());
-    }
-
-    pub fn remove_ws(&mut self, id: eventwork_common::ConnectionId) {
-        self.ws_connections.retain(|&x| x != id);
-        info!("🌐 WebSocket connection removed: {} (Total TCP: {}, WS: {})", id, self.tcp_connections.len(), self.ws_connections.len());
-    }
-}
-
 /// Unified connection event handler that processes events from BOTH TCP and WebSocket networks.
 fn handle_connection_events(
     tcp_net: Res<Network<TcpProvider>>,
     ws_net: Res<Network<WebSocketProvider>>,
     mut network_events: MessageReader<NetworkEvent>,
-    mut registry: ResMut<UnifiedConnectionRegistry>,
 ) {
     for event in network_events.read() {
         match event {
             NetworkEvent::Connected(conn_id) => {
                 // Determine which network this connection belongs to
-                let is_tcp = tcp_net.has_connection(*conn_id);
+                // Check WebSocket first since it's more specific
                 let is_ws = ws_net.has_connection(*conn_id);
+                let is_tcp = tcp_net.has_connection(*conn_id);
 
-                if is_tcp {
-                    info!("📡 TCP client connected: {}", conn_id);
-                    registry.add_tcp(*conn_id);
-                } else if is_ws {
-                    info!("🌐 WebSocket client connected: {}", conn_id);
-                    registry.add_ws(*conn_id);
+                if is_ws {
+                    info!("🌐 WebSocket client connected: {} (Total TCP: {}, WS: {})",
+                        conn_id, tcp_net.connection_count(), ws_net.connection_count());
+                } else if is_tcp {
+                    info!("📡 TCP client connected: {} (Total TCP: {}, WS: {})",
+                        conn_id, tcp_net.connection_count(), ws_net.connection_count());
                 } else {
                     warn!("Connection event for unknown connection: {}", conn_id);
                 }
             }
             NetworkEvent::Disconnected(conn_id) => {
-                // Check which registry has this connection
-                let was_tcp = registry.tcp_connections.contains(conn_id);
-                let was_ws = registry.ws_connections.contains(conn_id);
-
-                if was_tcp {
-                    info!("📡 TCP client disconnected: {}", conn_id);
-                    registry.remove_tcp(*conn_id);
-                } else if was_ws {
-                    info!("🌐 WebSocket client disconnected: {}", conn_id);
-                    registry.remove_ws(*conn_id);
-                }
+                // After disconnection, the connection is already removed from the Network resource,
+                // so we can't use has_connection(). We'll just log the disconnect without protocol prefix.
+                info!("Client disconnected: {} (Total TCP: {}, WS: {})",
+                    conn_id, tcp_net.connection_count(), ws_net.connection_count());
             }
             NetworkEvent::Error(err) => {
                 error!("Network error: {}", err);

@@ -38,12 +38,12 @@ mod shared_types;
 #[cfg(feature = "immediate")]
 mod immediate_messages;
 #[cfg(feature = "immediate")]
-use immediate_messages::{ImmediateMsgPlugin, UnifiedConnectionRegistry};
+use immediate_messages::ImmediateMsgPlugin;
 
 #[cfg(not(feature = "immediate"))]  // Default to scheduled
 mod scheduled_messages;
 #[cfg(not(feature = "immediate"))]
-use scheduled_messages::{ScheduledMsgPlugin, UnifiedConnectionRegistry};
+use scheduled_messages::ScheduledMsgPlugin;
 
 fn main() {
     let mut app = App::new();
@@ -73,9 +73,6 @@ fn main() {
     // Register incoming messages (what clients send to server)
     app.register_network_message::<shared_types::UserChatMessage, TcpProvider>();
     app.register_network_message::<shared_types::UserChatMessage, WebSocketProvider>();
-
-    // Unified connection registry
-    app.init_resource::<UnifiedConnectionRegistry>();
 
     // Add the appropriate message handling plugin based on feature flags
     #[cfg(feature = "immediate")]
