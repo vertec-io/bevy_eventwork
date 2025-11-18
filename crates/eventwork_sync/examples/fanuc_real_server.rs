@@ -7,11 +7,13 @@ use bevy_tokio_tasks::{TokioTasksPlugin, TokioTasksRuntime};
 use eventwork::{EventworkRuntime, Network};
 use eventwork_sync::{AppEventworkSyncExt, EventworkSyncPlugin};
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
-use fanuc_real_shared::{RobotPosition, RobotStatus, JointAngles, RobotInfo, MotionCommand};
+use fanuc_real_shared::{RobotPosition, RobotStatus, JointAngles, RobotInfo, MotionCommand, JogCommand, JogAxis, JogDirection};
 use fanuc_rmi::{
     drivers::{FanucDriver, FanucDriverConfig},
     dto,
     packets::PacketPriority,
+    SpeedType,
+    TermType,
 };
 use tokio::sync::broadcast;
 
@@ -45,10 +47,12 @@ fn main() {
     app.sync_component::<RobotStatus>(None);
     app.sync_component::<JointAngles>(None);
     app.sync_component::<RobotInfo>(None);
+    // MotionCommand contains dto::Instruction which is WASM-compatible (DTO feature has no tokio/mio)
     app.sync_component::<MotionCommand>(None);
+    app.sync_component::<JogCommand>(None);
 
     app.add_systems(Startup, (setup_robot, setup_networking, setup_driver));
-    app.add_systems(Update, (process_motion_commands, update_robot_state, poll_robot_status));
+    app.add_systems(Update, (process_jog_commands, process_motion_commands, update_robot_state, poll_robot_status));
 
     app.run();
 }
@@ -143,6 +147,70 @@ fn setup_driver(runtime: ResMut<TokioTasksRuntime>) {
     });
 }
 
+/// Process JogCommand entities and convert them to MotionCommand entities
+fn process_jog_commands(
+    mut commands: Commands,
+    jog_query: Query<(Entity, &JogCommand)>,
+) {
+    for (jog_entity, jog_cmd) in &jog_query {
+        // Calculate the distance based on direction
+        let distance = if jog_cmd.direction == JogDirection::Positive {
+            jog_cmd.distance
+        } else {
+            -jog_cmd.distance
+        };
+
+        // Create a position delta for the jog
+        let mut position_delta = dto::Position {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 0.0,
+            p: 0.0,
+            r: 0.0,
+            ext1: 0.0,
+            ext2: 0.0,
+            ext3: 0.0,
+        };
+
+        match jog_cmd.axis {
+            JogAxis::X => position_delta.x = distance,
+            JogAxis::Y => position_delta.y = distance,
+            JogAxis::Z => position_delta.z = distance,
+            JogAxis::W => position_delta.w = distance,
+            JogAxis::P => position_delta.p = distance,
+            JogAxis::R => position_delta.r = distance,
+        }
+
+        // Create a LinearRelative instruction for incremental motion
+        let instruction = dto::Instruction::FrcLinearRelative(dto::FrcLinearRelative {
+            sequence_id: 0, // Will be assigned by driver
+            configuration: dto::Configuration {
+                front: 1,
+                up: 1,
+                left: 1,
+                turn4: 0,
+                turn5: 0,
+                turn6: 0,
+            },
+            position: position_delta,
+            speed_type: SpeedType::MMSec.into(),
+            speed: jog_cmd.speed as f64,
+            term_type: TermType::FINE.into(),
+            term_value: 0,
+        });
+
+        // Spawn a MotionCommand entity
+        commands.spawn(MotionCommand { instruction });
+
+        // Remove the processed jog command
+        commands.entity(jog_entity).despawn();
+
+        info!("Processed jog command: {:?} {:?} {}mm at {}mm/s",
+            jog_cmd.axis, jog_cmd.direction, jog_cmd.distance, jog_cmd.speed);
+    }
+}
+
 fn process_motion_commands(
     mut commands: Commands,
     driver: Option<Res<DriverHandle>>,
@@ -187,6 +255,13 @@ fn update_robot_state(
                 // Update robot position
                 if let Ok((mut position, _, _)) = robot_query.single_mut() {
                     *position = pos_response.pos.into();
+
+                    // Debug: Check serialization
+                    let test_bytes = bincode::serde::encode_to_vec(&*position, bincode::config::standard()).unwrap();
+                    info!("RobotPosition serialized size: {} bytes", test_bytes.len());
+                    info!("RobotPosition bytes: {:?}", &test_bytes[..test_bytes.len().min(40)]);
+                    info!("RobotPosition value: {:?}", position);
+
                     debug!("Updated position: X:{:.2} Y:{:.2} Z:{:.2}",
                         position.x, position.y, position.z);
                 }
@@ -210,6 +285,11 @@ fn update_robot_state(
                 // Update joint angles
                 if let Ok((_, _, mut joints)) = robot_query.single_mut() {
                     *joints = joint_response.joint_angles.into();
+
+                    // Debug: Check serialization
+                    let test_bytes = bincode::serde::encode_to_vec(&*joints, bincode::config::standard()).unwrap();
+                    info!("JointAngles serialized size: {} bytes, value: {:?}", test_bytes.len(), joints);
+
                     debug!("Updated joint angles");
                 }
             }

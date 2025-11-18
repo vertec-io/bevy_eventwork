@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use bevy::prelude::*;
 
-// Re-export FANUC types for convenience on server
-#[cfg(feature = "server")]
+// Re-export FANUC DTO types (WASM-compatible, no tokio/mio dependencies)
 pub use fanuc_rmi::dto;
 
 /// Robot cartesian position (mirrors fanuc_rmi::dto::Position)
@@ -184,9 +183,40 @@ impl Default for RobotInfo {
     }
 }
 
-/// Motion command to be sent to the robot (server-only)
-#[cfg(feature = "server")]
-#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// Axis for jogging
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JogAxis {
+    X,
+    Y,
+    Z,
+    W,
+    P,
+    R,
+}
+
+/// Direction for jogging
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JogDirection {
+    Positive,
+    Negative,
+}
+
+/// Client-side jog command (can be sent from WASM client)
+#[cfg_attr(feature = "server", derive(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct JogCommand {
+    pub axis: JogAxis,
+    pub direction: JogDirection,
+    /// Distance to jog in mm (for linear axes) or degrees (for rotational axes)
+    pub distance: f32,
+    /// Speed in mm/s (for linear axes) or deg/s (for rotational axes)
+    pub speed: f32,
+}
+
+/// Motion command to be sent to the robot
+/// This wraps the actual FANUC instruction (dto::Instruction is WASM-compatible)
+#[cfg_attr(feature = "server", derive(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MotionCommand {
     pub instruction: dto::Instruction,
 }

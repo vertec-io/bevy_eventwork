@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-server = ["dep:bevy", "dep:fanuc_rmi"]
+server = ["dep:bevy"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"], optional = true }
+# fanuc_rmi with DTO feature is WASM-compatible (no tokio/mio dependencies)
+fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"], default-features = false }
 bevy = { workspace = true, optional = true }
 

@@ -348,6 +348,8 @@ pub mod ui {
         // Connection + debug state
         let (last_incoming, set_last_incoming) = signal(String::new());
         let (last_error, set_last_error) = signal(Option::<String>::None);
+        let (message_expanded, set_message_expanded) = signal(false);
+        let (message_flash, set_message_flash) = signal(false);
 
         // Live entity/component view built from incoming SyncBatch items.
         let entities = RwSignal::new(HashMap::<u64, HashMap<String, JsonValue>>::new());
@@ -435,6 +437,7 @@ pub mod ui {
             let sync = sync;
             let entities = entities;
             let set_last_incoming = set_last_incoming;
+            let set_message_flash = set_message_flash;
             let registry = registry.clone();
             Effect::new(move |_| {
                 message.with(|msg| {
@@ -442,6 +445,13 @@ pub mod ui {
                         if let Ok(json) = serde_json::to_string_pretty(msg) {
                             set_last_incoming.set(json);
                         }
+
+                        // Trigger flash animation
+                        set_message_flash.set(true);
+                        set_timeout(move || {
+                            set_message_flash.set(false);
+                        }, std::time::Duration::from_millis(300));
+
                         sync.get().handle_server_message(msg);
                         if let SyncServerMessage::SyncBatch(batch) = msg {
                             entities.update(|map| {
@@ -912,11 +922,38 @@ pub mod ui {
                                 <div class="mt-1 text-red-400">{move || last_error.get().unwrap_or_default()}</div>
                             </Show>
                         </div>
-                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex-1 flex flex-col min-w-0">
-                            <h2 class="text-sm font-semibold text-slate-100 mb-1">"Last server message"</h2>
-                            <pre class="flex-1 overflow-auto text-[10px] font-mono bg-slate-950/60 border border-slate-800 rounded p-2 whitespace-pre-wrap break-all">
-                                {move || last_incoming.get()}
-                            </pre>
+                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex flex-col min-w-0">
+                            <button
+                                class="flex items-center justify-between w-full text-left group"
+                                on:click=move |_| set_message_expanded.update(|v| *v = !*v)
+                            >
+                                <div class="flex items-center gap-2">
+                                    <h2 class="text-sm font-semibold text-slate-100">"Server Messages"</h2>
+                                    <div
+                                        class=move || {
+                                            let base = "w-2 h-2 rounded-full transition-all duration-300";
+                                            if message_flash.get() {
+                                                format!("{base} bg-green-400 shadow-lg shadow-green-400/50")
+                                            } else {
+                                                format!("{base} bg-slate-700")
+                                            }
+                                        }
+                                    ></div>
+                                </div>
+                                <span class="text-slate-400 text-xs group-hover:text-slate-300 transition-colors">
+                                    {move || if message_expanded.get() { "▼" } else { "▶" }}
+                                </span>
+                            </button>
+                            <Show
+                                when=move || message_expanded.get()
+                                fallback=|| view! { <></> }
+                            >
+                                <div class="mt-2 max-h-64 overflow-auto">
+                                    <pre class="text-[10px] font-mono bg-slate-950/60 border border-slate-800 rounded p-2 whitespace-pre-wrap break-all">
+                                        {move || last_incoming.get()}
+                                    </pre>
+                                </div>
+                            </Show>
                         </div>
                     </section>
                 </main>

@@ -108,8 +108,21 @@ impl ComponentTypeRegistry {
         let deserializer = self.deserializers.get(type_name)
             .ok_or_else(|| DeserializeError::TypeNotRegistered(type_name.to_string()))?;
 
+        // Debug logging for RobotPosition
+        #[cfg(target_arch = "wasm32")]
+        if type_name == "RobotPosition" {
+            web_sys::console::log_1(&format!("[ClientRegistry] Deserializing RobotPosition: {} bytes", bytes.len()).into());
+            web_sys::console::log_1(&format!("[ClientRegistry] RobotPosition bytes: {:?}", &bytes[..bytes.len().min(40)]).into());
+        }
+
         deserializer(bytes)
-            .map_err(|e| DeserializeError::BincodeError(format!("{:?}", e)))
+            .map_err(|e| {
+                #[cfg(target_arch = "wasm32")]
+                if type_name == "RobotPosition" {
+                    web_sys::console::error_1(&format!("[ClientRegistry] RobotPosition deserialization error: {:?}", e).into());
+                }
+                DeserializeError::BincodeError(format!("{:?}", e))
+            })
     }
 
     /// Serialize component data by type name.

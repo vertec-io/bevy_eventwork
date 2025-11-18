@@ -6,6 +6,7 @@ use eventwork_sync::{
     SyncServerMessage,
     SyncItem,
     SubscriptionRequest,
+    SerializableEntity,
 };
 use eventwork_common::{codec::EventworkBincodeCodec, NetworkPacket};
 use leptos::prelude::*;
@@ -14,7 +15,7 @@ use reactive_graph::traits::Get;
 use std::sync::Arc;
 
 // Import shared component types
-use fanuc_real_shared::{RobotPosition, RobotStatus, JointAngles, RobotInfo};
+use fanuc_real_shared::{RobotPosition, RobotStatus, JointAngles, RobotInfo, JogCommand, JogAxis, JogDirection, MotionCommand};
 
 fn main() {
     console_error_panic_hook::set_once();
@@ -35,6 +36,9 @@ fn App() -> impl IntoView {
     registry.register::<RobotStatus>();
     registry.register::<JointAngles>();
     registry.register::<RobotInfo>();
+    registry.register::<JogCommand>();
+    // MotionCommand contains dto::Instruction which is WASM-compatible (DTO feature has no tokio/mio)
+    registry.register::<MotionCommand>();
 
     let on_connect = move |_| {
         let url_owned = format!("ws://{}:{}", host.get(), port.get());
@@ -218,6 +222,7 @@ fn App() -> impl IntoView {
                                             <div class="max-w-4xl mx-auto space-y-6">
                                                 <RobotStatusDisplay />
                                                 <PositionDisplay />
+                                                <JogControls />
                                             </div>
                                         </div>
                                         <div class="w-1/2 border-l border-slate-800">
@@ -303,6 +308,109 @@ fn PositionDisplay() -> impl IntoView {
                     <div class="font-mono text-emerald-400">{move || format!("{:.2}", robot_position.get().map(|p| p.r).unwrap_or(0.0))}</div>
                 </div>
             </div>
+        </div>
+    }
+}
+
+#[component]
+fn JogControls() -> impl IntoView {
+    let client = use_context::<Arc<SyncClient>>()
+        .expect("SyncClient should be provided");
+
+    view! {
+        <div class="bg-slate-900 rounded-lg border border-slate-800 p-4">
+            <h2 class="text-sm font-semibold mb-3">"Jog Controls"</h2>
+            <div class="space-y-4">
+                <div>
+                    <div class="text-xs text-slate-400 mb-2">"Cartesian (mm)"</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <JogButton axis=JogAxis::X client=client.clone() />
+                        <JogButton axis=JogAxis::Y client=client.clone() />
+                        <JogButton axis=JogAxis::Z client=client.clone() />
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-400 mb-2">"Orientation (deg)"</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <JogButton axis=JogAxis::W client=client.clone() />
+                        <JogButton axis=JogAxis::P client=client.clone() />
+                        <JogButton axis=JogAxis::R client=client.clone() />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn JogButton(axis: JogAxis, client: Arc<SyncClient>) -> impl IntoView {
+    let axis_str = match axis {
+        JogAxis::X => "X",
+        JogAxis::Y => "Y",
+        JogAxis::Z => "Z",
+        JogAxis::W => "W",
+        JogAxis::P => "P",
+        JogAxis::R => "R",
+    };
+
+    // Clone for each closure
+    let client_pos = client.clone();
+    let client_neg = client.clone();
+
+    let on_jog_positive = move |_| {
+        log::info!("Jog {} positive", axis_str);
+
+        let jog_cmd = JogCommand {
+            axis,
+            direction: JogDirection::Positive,
+            distance: 10.0,  // 10mm or 10 degrees
+            speed: 50.0,     // 50mm/s or 50deg/s
+        };
+
+        // Convert to JSON and send mutation
+        if let Ok(value) = serde_json::to_value(&jog_cmd) {
+            client_pos.mutate(
+                SerializableEntity::DANGLING,
+                "JogCommand",
+                value,
+            );
+        }
+    };
+
+    let on_jog_negative = move |_| {
+        log::info!("Jog {} negative", axis_str);
+
+        let jog_cmd = JogCommand {
+            axis,
+            direction: JogDirection::Negative,
+            distance: 10.0,  // 10mm or 10 degrees
+            speed: 50.0,     // 50mm/s or 50deg/s
+        };
+
+        // Convert to JSON and send mutation
+        if let Ok(value) = serde_json::to_value(&jog_cmd) {
+            client_neg.mutate(
+                SerializableEntity::DANGLING,
+                "JogCommand",
+                value,
+            );
+        }
+    };
+
+    view! {
+        <div class="flex flex-col gap-1">
+            <button
+                class="px-2 py-1.5 rounded bg-emerald-600 text-xs font-medium hover:bg-emerald-500 transition"
+                on:click=on_jog_positive
+            >
+                {format!("{}+", axis_str)}
+            </button>
+            <button
+                class="px-2 py-1.5 rounded bg-red-600 text-xs font-medium hover:bg-red-500 transition"
+                on:click=on_jog_negative
+            >
+                {format!("{}-", axis_str)}
+            </button>
         </div>
     }
 }
