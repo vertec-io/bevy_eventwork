@@ -15,13 +15,18 @@
 //!   [`ServerOnlyMutationAuthorizer`] for "server-only" mutation deployments.
 
 mod messages;
+#[cfg(feature = "runtime")]
 mod registry;
 #[cfg(feature = "runtime")]
 mod subscription;
 #[cfg(feature = "runtime")]
 mod systems;
 
+// Client-side type registry (not behind runtime feature - available for all clients)
+pub mod client_registry;
+
 pub use messages::*;
+#[cfg(feature = "runtime")]
 pub use registry::*;
 #[cfg(feature = "runtime")]
 pub use subscription::*;

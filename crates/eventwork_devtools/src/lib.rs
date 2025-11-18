@@ -11,10 +11,8 @@ use eventwork_sync::{
     SerializableEntity,
     SyncClientMessage,
     SyncServerMessage,
+    client_registry::ComponentTypeRegistry,
 };
-
-pub mod type_registry;
-pub use type_registry::{ComponentTypeRegistry, DeserializeError, SerializeError};
 
 /// Client-side state for driving `Mutate` requests and tracking
 /// `MutationResponse` messages from an `eventwork_sync` server.

@@ -5,7 +5,7 @@ use bevy::tasks::{TaskPool, TaskPoolBuilder};
 use eventwork::{EventworkRuntime, Network, NetworkEvent};
 use eventwork_sync::{AppEventworkSyncExt, EventworkSyncPlugin};
 use eventwork_websockets::{NetworkSettings, WebSocketProvider};
-use serde::{Deserialize, Serialize};
+use demo_shared::{DemoCounter, DemoFlag, ParentEntity, ChildEntities};
 
 /// Simple ECS server used by the devtools demo client.
 ///
@@ -27,47 +27,70 @@ fn main() {
     app.add_plugins(EventworkSyncPlugin::<WebSocketProvider>::default());
 
     // Register demo components for synchronization.
-    // The fully-qualified type paths are used by the DevTools UI:
-    //   - "devtools_demo_server::DemoCounter"
-    //   - "devtools_demo_server::DemoFlag"
     app.sync_component::<DemoCounter>(None);
     app.sync_component::<DemoFlag>(None);
 
+    // Register serializable hierarchy components
+    app.sync_component::<ParentEntity>(None);
+    app.sync_component::<ChildEntities>(None);
+
     app.add_systems(Startup, (setup_world, setup_networking));
-    app.add_systems(Update, tick_counters);
+    app.add_systems(Update, (tick_counters, sync_hierarchy));
 
     app.run();
 }
 
-#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone)]
-#[reflect(Component)]
-struct DemoCounter {
-    pub value: i32,
-}
-
-#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone)]
-#[reflect(Component)]
-struct DemoFlag {
-    pub label: String,
-    pub enabled: bool,
-}
-
 fn setup_world(mut commands: Commands) {
-    commands.spawn((
-        Name::new("Alpha"),
+    // Create a root entity with children to demonstrate hierarchy
+    let parent = commands.spawn((
+        Name::new("RootEntity"),
         DemoCounter { value: 0 },
         DemoFlag {
-            label: "Alpha".to_string(),
+            label: "Root".to_string(),
             enabled: true,
         },
-    ));
+    )).id();
 
-    commands.spawn((
-        Name::new("Beta"),
+    // Create child entities
+    let child1 = commands.spawn((
+        Name::new("Child1"),
         DemoCounter { value: 10 },
         DemoFlag {
-            label: "Beta".to_string(),
+            label: "First Child".to_string(),
+            enabled: true,
+        },
+    )).id();
+
+    let child2 = commands.spawn((
+        Name::new("Child2"),
+        DemoCounter { value: 20 },
+        DemoFlag {
+            label: "Second Child".to_string(),
             enabled: false,
+        },
+    )).id();
+
+    // Create a grandchild
+    let grandchild = commands.spawn((
+        Name::new("Grandchild"),
+        DemoCounter { value: 30 },
+        DemoFlag {
+            label: "Grandchild".to_string(),
+            enabled: true,
+        },
+    )).id();
+
+    // Set up the hierarchy
+    commands.entity(parent).add_children(&[child1, child2]);
+    commands.entity(child1).add_children(&[grandchild]);
+
+    // Also create a standalone entity (no parent)
+    commands.spawn((
+        Name::new("Standalone"),
+        DemoCounter { value: 100 },
+        DemoFlag {
+            label: "Standalone".to_string(),
+            enabled: true,
         },
     ));
 }
@@ -115,3 +138,26 @@ fn tick_counters(time: Res<Time>, mut elapsed: Local<f32>, mut query: Query<&mut
     }
 }
 
+/// System that syncs Bevy's ChildOf/Children components to our serializable versions.
+/// This allows the devtools to display the entity hierarchy.
+fn sync_hierarchy(
+    mut commands: Commands,
+    // Query entities with ChildOf component
+    child_query: Query<(Entity, &ChildOf), Changed<ChildOf>>,
+    // Query entities with Children component
+    parent_query: Query<(Entity, &Children), Changed<Children>>,
+) {
+    // Sync ChildOf -> ParentEntity
+    for (entity, child_of) in &child_query {
+        commands.entity(entity).insert(ParentEntity {
+            parent_bits: child_of.parent().to_bits(),
+        });
+    }
+
+    // Sync Children -> ChildEntities
+    for (entity, children) in &parent_query {
+        commands.entity(entity).insert(ChildEntities {
+            children_bits: children.iter().map(|e| e.to_bits()).collect(),
+        });
+    }
+}

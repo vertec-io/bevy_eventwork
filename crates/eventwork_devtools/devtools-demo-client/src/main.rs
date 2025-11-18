@@ -1,9 +1,10 @@
-use eventwork_devtools::{ComponentTypeRegistry, DevTools};
+use eventwork_devtools::DevTools;
+use eventwork_sync::client_registry::ComponentTypeRegistry;
 use leptos::prelude::*;
 use reactive_graph::traits::Get;
 
 // Import shared component types
-use demo_shared::{DemoCounter, DemoFlag};
+use demo_shared::{DemoCounter, DemoFlag, ParentEntity, ChildEntities};
 
 fn main() {
     console_error_panic_hook::set_once();
@@ -22,6 +23,8 @@ fn App() -> impl IntoView {
     let mut registry = ComponentTypeRegistry::new();
     registry.register::<DemoCounter>();
     registry.register::<DemoFlag>();
+    registry.register::<ParentEntity>();
+    registry.register::<ChildEntities>();
 
     let on_connect = move |_| {
         let url_owned = format!("ws://{}:{}", host.get(), port.get());

@@ -1,8 +1,13 @@
-//! Client-side type registry for deserializing component data.
+//! Client-side type registry for deserializing and serializing component data.
 //!
 //! This module provides a registry that maps component type names to
-//! deserializer functions. This allows the DevTools UI to deserialize
-//! arbitrary component data without knowing the concrete types at compile time.
+//! deserializer and serializer functions. This allows client applications
+//! (web UI, native tools, etc.) to work with arbitrary component data
+//! without knowing the concrete types at compile time.
+//!
+//! This is NOT needed on the server side - the server uses Bevy's type registry
+//! and reflection system. This is specifically for clients that need to
+//! deserialize component data for display or serialize mutations to send back.
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
@@ -14,6 +19,24 @@ pub type DeserializeFn = fn(&[u8]) -> Result<serde_json::Value, bincode::error::
 pub type SerializeFn = fn(&serde_json::Value) -> Result<Vec<u8>, bincode::error::EncodeError>;
 
 /// Registry mapping component type names to deserializer and serializer functions.
+///
+/// This is the client-side equivalent of Bevy's type registry. It allows clients
+/// to work with component data in a type-safe way without compile-time knowledge
+/// of all component types.
+///
+/// # Example
+/// ```ignore
+/// use eventwork_sync::client_registry::ComponentTypeRegistry;
+///
+/// let mut registry = ComponentTypeRegistry::new();
+/// registry.register::<MyComponent>();
+///
+/// // Deserialize component data from server
+/// let json_value = registry.deserialize_by_name("MyComponent", &bytes)?;
+///
+/// // Serialize mutation to send to server
+/// let bytes = registry.serialize_by_name("MyComponent", &json_value)?;
+/// ```
 #[derive(Clone)]
 pub struct ComponentTypeRegistry {
     deserializers: HashMap<String, DeserializeFn>,
@@ -35,6 +58,9 @@ impl ComponentTypeRegistry {
     /// - Deserialize: bincode bytes → concrete type T → serde_json::Value for display
     /// - Serialize: serde_json::Value → concrete type T → bincode bytes for mutations
     ///
+    /// The type name used for registration is the short name (struct name only,
+    /// no module path) to match the server-side behavior.
+    ///
     /// # Example
     /// ```ignore
     /// let mut registry = ComponentTypeRegistry::new();
@@ -45,7 +71,7 @@ impl ComponentTypeRegistry {
         T: Serialize + for<'de> Deserialize<'de> + std::fmt::Debug + 'static,
     {
         // Use short type name (just the struct name, no module path) for stability
-        // This matches what eventwork uses for schema hashing
+        // This matches what eventwork_sync uses on the server side
         let full_type_name = std::any::type_name::<T>();
         let type_name = full_type_name.rsplit("::").next().unwrap_or(full_type_name).to_string();
 
@@ -60,16 +86,10 @@ impl ComponentTypeRegistry {
         let serializer: SerializeFn = |json_value: &serde_json::Value| {
             // Convert JSON to concrete type T
             let value: T = serde_json::from_value(json_value.clone())
-                .map_err(|e| {
-                    leptos::logging::error!("[TypeRegistry] JSON to type conversion failed: {:?}", e);
-                    bincode::error::EncodeError::OtherString("JSON to type conversion failed".into())
-                })?;
+                .map_err(|_| bincode::error::EncodeError::OtherString("JSON to type conversion failed".into()))?;
 
             // Serialize to bincode bytes
-            let bytes = bincode::serde::encode_to_vec(&value, bincode::config::standard())?;
-            leptos::logging::log!("[TypeRegistry] Serialized {:?} to {} bytes: {:?}",
-                std::any::type_name::<T>(), bytes.len(), bytes);
-            Ok(bytes)
+            bincode::serde::encode_to_vec(&value, bincode::config::standard())
         };
 
         self.deserializers.insert(type_name.clone(), deserializer);

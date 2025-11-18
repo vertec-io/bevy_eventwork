@@ -1,3 +1,4 @@
+#[cfg(feature = "runtime")]
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -10,12 +11,14 @@ pub struct SerializableEntity {
     pub bits: u64,
 }
 
+#[cfg(feature = "runtime")]
 impl From<Entity> for SerializableEntity {
     fn from(e: Entity) -> Self {
         Self { bits: e.to_bits() }
     }
 }
 
+#[cfg(feature = "runtime")]
 impl SerializableEntity {
     pub fn to_entity(self) -> Entity {
         Entity::from_bits(self.bits)

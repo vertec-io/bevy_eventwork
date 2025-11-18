@@ -11,17 +11,17 @@ default = ["runtime"]
 # `runtime` pulls in the full eventwork dependency graph (async-net, etc.) for
 # Bevy server applications. Frontend crates (like `eventwork_devtools`) can
 # disable default features to avoid non-wasm-compatible dependencies while
-# still reusing the wire-level message types.
-runtime = ["dep:eventwork"]
+# still reusing the wire-level message types and client_registry.
+runtime = ["dep:eventwork", "dep:bevy", "dep:eventwork_common", "dep:thiserror"]
 
 [dependencies]
-bevy = { workspace = true }
+bevy = { workspace = true, optional = true }
 bincode = { workspace = true }
 eventwork = { path = "../eventwork", optional = true }
-eventwork_common = { path = "../eventwork_common" }
+eventwork_common = { path = "../eventwork_common", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-thiserror = "1.0"
+thiserror = { version = "1.0", optional = true }
 
 [dev-dependencies]
 # For integration-style tests and examples using a miniature Bevy app

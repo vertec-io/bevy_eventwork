@@ -28,3 +28,22 @@ pub struct DemoFlag {
     pub enabled: bool,
 }
 
+/// Serializable representation of an entity's parent.
+/// This mirrors Bevy's ChildOf component but is serializable for sync.
+#[cfg_attr(feature = "server", derive(Component, Reflect))]
+#[cfg_attr(feature = "server", reflect(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ParentEntity {
+    /// The entity bits of the parent entity.
+    pub parent_bits: u64,
+}
+
+/// Serializable representation of an entity's children.
+/// This mirrors Bevy's Children component but is serializable for sync.
+#[cfg_attr(feature = "server", derive(Component, Reflect))]
+#[cfg_attr(feature = "server", reflect(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ChildEntities {
+    /// The entity bits of all child entities.
+    pub children_bits: Vec<u64>,
+}
