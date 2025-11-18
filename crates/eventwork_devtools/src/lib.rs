@@ -26,6 +26,10 @@ pub struct DevtoolsSync {
 // Re-export MutationState from eventwork_sync for convenience
 pub use eventwork_sync::client_sync::MutationState;
 
+// Re-export DevTools UI components for WASM targets
+#[cfg(target_arch = "wasm32")]
+pub use ui::{DevTools, DevToolsMode};
+
 /// General-purpose sync hook for wiring the eventwork_sync wire protocol
 /// into an arbitrary transport (typically a WebSocket using eventwork's
 /// binary codec).
@@ -987,10 +991,10 @@ pub mod ui {
             DevToolsMode::Widget => {
                 // Floating widget mode
                 let open_in_new_tab = move |_| {
-                    // Open DevTools in a new tab/window
+                    // Open DevTools in a new tab/window with ?devtools=1 query param
                     if let Some(window) = leptos::web_sys::window() {
                         let _ = window.open_with_url_and_target(
-                            &format!("{}?devtools=1", window.location().pathname().unwrap_or_default()),
+                            "?devtools=1",
                             "_blank"
                         );
                     }
@@ -1026,10 +1030,14 @@ pub mod ui {
                         >
                             <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                                 <div class="relative w-[95vw] h-[90vh] max-w-[1800px] rounded-2xl shadow-2xl overflow-hidden border border-white/10">
-                                    // Close and "Open in New Tab" buttons
-                                    <div class="absolute top-3 right-3 z-10 flex gap-2">
+                                    // Render the full DevTools UI inside the modal
+                                    // Call DevTools recursively with Embedded mode
+                                    <DevTools ws_url=ws_url registry=registry.clone() mode=DevToolsMode::Embedded />
+
+                                    // Action buttons at bottom-left (away from Connect button)
+                                    <div class="absolute bottom-4 left-4 z-10 flex gap-2">
                                         <button
-                                            class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-white/10 flex items-center gap-1.5"
+                                            class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-white/10 flex items-center gap-1.5 shadow-lg"
                                             on:click=open_in_new_tab
                                         >
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1038,15 +1046,12 @@ pub mod ui {
                                             "Open in New Tab"
                                         </button>
                                         <button
-                                            class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                                            class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-white/10 shadow-lg"
                                             on:click=move |_| set_widget_expanded.set(false)
                                         >
                                             "✕ Close"
                                         </button>
                                     </div>
-                                    // Render the full DevTools UI inside the modal
-                                    // Call DevTools recursively with Embedded mode
-                                    <DevTools ws_url=ws_url registry=registry.clone() mode=DevToolsMode::Embedded />
                                 </div>
                             </div>
                         </Show>
@@ -1056,6 +1061,3 @@ pub mod ui {
         }
     }
 }
-
-#[cfg(target_arch = "wasm32")]
-pub use ui::DevTools;

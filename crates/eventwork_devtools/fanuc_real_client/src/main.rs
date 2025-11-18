@@ -1,4 +1,4 @@
-use eventwork_devtools::DevTools;
+use eventwork_devtools::{DevTools, DevToolsMode};
 use eventwork_sync::{
     client_registry::ComponentTypeRegistry,
     client_sync::SyncClient,
@@ -25,7 +25,34 @@ fn main() {
 }
 
 #[component]
-fn App() -> impl IntoView {
+fn App() -> AnyView {
+    // Check if we're in devtools-only mode
+    let is_devtools_only = leptos::web_sys::window()
+        .and_then(|w| w.location().search().ok())
+        .map(|search| search.contains("devtools=1"))
+        .unwrap_or(false);
+
+    if is_devtools_only {
+        // Render only DevTools in embedded mode
+        let mut registry = ComponentTypeRegistry::new();
+        registry.register::<RobotPosition>();
+        registry.register::<RobotStatus>();
+        registry.register::<JointAngles>();
+        registry.register::<RobotInfo>();
+        registry.register::<JogCommand>();
+        registry.register::<MotionCommand>();
+
+        // Use default WebSocket URL for devtools-only mode
+        let ws_url = "ws://127.0.0.1:8082";
+
+        return view! {
+            <div class="min-h-screen w-screen bg-slate-950">
+                <DevTools ws_url=ws_url registry=registry mode=DevToolsMode::Embedded />
+            </div>
+        }.into_any();
+    }
+
+    // Normal app mode
     let (host, set_host) = signal("127.0.0.1".to_string());
     let (port, set_port) = signal("8082".to_string());
     let (ws_url, set_ws_url) = signal(None::<&'static str>);
@@ -235,7 +262,7 @@ fn App() -> impl IntoView {
                 </Show>
             </main>
         </div>
-    }
+    }.into_any()
 }
 
 #[component]
