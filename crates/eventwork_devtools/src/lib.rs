@@ -581,6 +581,10 @@ pub mod ui {
         // View mode: true = tree view, false = flat view
         let tree_view_mode = RwSignal::new(true);
 
+        // Track which entities are expanded in tree view (entity_id -> is_expanded)
+        // Default to expanded for all entities
+        let expanded_entities = RwSignal::new(HashMap::<u64, bool>::new());
+
         let sorted_entities = move || {
             let mut v: Vec<_> = entities.get().into_iter().collect();
             v.sort_by_key(|(id, _)| *id);
@@ -663,6 +667,34 @@ pub mod ui {
                                     >
                                         {move || if tree_view_mode.get() { "Tree View" } else { "Flat View" }}
                                     </button>
+                                    <Show when=move || tree_view_mode.get()>
+                                        <button
+                                            class="px-2 py-1 text-[10px] rounded border border-white/10 bg-slate-800/50 hover:bg-slate-700/50 transition-colors"
+                                            on:click=move |_| {
+                                                let (_, children_map) = entity_tree();
+
+                                                // Check if all entities with children are expanded
+                                                let all_expanded = expanded_entities.with(|map| {
+                                                    children_map.keys().all(|id| map.get(id).copied().unwrap_or(true))
+                                                });
+
+                                                // Toggle all
+                                                expanded_entities.update(|map| {
+                                                    for entity_id in children_map.keys() {
+                                                        map.insert(*entity_id, !all_expanded);
+                                                    }
+                                                });
+                                            }
+                                        >
+                                            {move || {
+                                                let (_, children_map) = entity_tree();
+                                                let all_expanded = expanded_entities.with(|map| {
+                                                    children_map.keys().all(|id| map.get(id).copied().unwrap_or(true))
+                                                });
+                                                if all_expanded { "Collapse All" } else { "Expand All" }
+                                            }}
+                                        </button>
+                                    </Show>
                                     <span class="text-[11px] text-slate-400">
                                         {move || format!("{} entities", entities.get().len())}
                                     </span>
@@ -715,10 +747,11 @@ pub mod ui {
                                     />
                                         }
                                     >
-                                        // Tree view - render entities hierarchically
+                                        // Tree view - render entities hierarchically with accordion
                                         {move || {
                                             let (roots, children_map) = entity_tree();
                                             let all_entities = entities.get();
+                                            let expanded = expanded_entities;
 
                                             // Recursive function to render entity and its children
                                             fn render_entity_tree(
@@ -727,53 +760,90 @@ pub mod ui {
                                                 children_map: &HashMap<u64, Vec<u64>>,
                                                 all_entities: &HashMap<u64, HashMap<String, JsonValue>>,
                                                 selected_entity: RwSignal<Option<u64>>,
+                                                expanded_entities: RwSignal<HashMap<u64, bool>>,
                                                 depth: usize,
                                             ) -> Vec<AnyView> {
                                                 let mut views = Vec::new();
                                                 let label = entity_label(entity_id, components);
-                                                let indent_px = depth * 16;
+                                                let has_children = children_map.contains_key(&entity_id);
 
-                                                // Render this entity
+                                                // Check if this entity is expanded (default to true)
+                                                let is_expanded = expanded_entities.with(|map| {
+                                                    map.get(&entity_id).copied().unwrap_or(true)
+                                                });
+
+                                                // Render this entity with expand/collapse icon if it has children
                                                 let entity_view = view! {
-                                                    <button
-                                                        class=move || {
-                                                            let is_selected = selected_entity.get() == Some(entity_id);
-                                                            let base = "w-full text-left px-2 py-1.5 rounded-md border transition-colors";
-                                                            if is_selected {
-                                                                format!("{base} bg-slate-800/80 border-slate-600 text-slate-50")
-                                                            } else {
-                                                                format!("{base} bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-800/70")
+                                                    <div class="flex items-center gap-1">
+                                                        {if has_children {
+                                                            view! {
+                                                                <button
+                                                                    class="flex-shrink-0 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+                                                                    on:click=move |e| {
+                                                                        e.stop_propagation();
+                                                                        expanded_entities.update(|map| {
+                                                                            let current = map.get(&entity_id).copied().unwrap_or(true);
+                                                                            map.insert(entity_id, !current);
+                                                                        });
+                                                                    }
+                                                                >
+                                                                    <span class="text-[10px]">
+                                                                        {move || if expanded_entities.with(|map| map.get(&entity_id).copied().unwrap_or(true)) { "▼" } else { "▶" }}
+                                                                    </span>
+                                                                </button>
+                                                            }.into_any()
+                                                        } else {
+                                                            view! {
+                                                                <div class="w-4"></div>
+                                                            }.into_any()
+                                                        }}
+                                                        <button
+                                                            class=move || {
+                                                                let is_selected = selected_entity.get() == Some(entity_id);
+                                                                let base = "flex-1 text-left px-2 py-1.5 rounded-md border transition-colors";
+                                                                if is_selected {
+                                                                    format!("{base} bg-indigo-600/80 border-indigo-500 text-slate-50")
+                                                                } else {
+                                                                    format!("{base} bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-800/70")
+                                                                }
                                                             }
-                                                        }
-                                                        style=move || format!("margin-left: {}px", indent_px)
-                                                        on:click=move |_| selected_entity.set(Some(entity_id))
-                                                    >
-                                                        <div class="flex items-center justify-between gap-2">
-                                                            <span class="truncate text-[11px] font-medium">{label}</span>
-                                                            <span class="text-[10px] text-slate-400">
-                                                                {format!("{} comps", components.len())}
-                                                            </span>
-                                                        </div>
-                                                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">
-                                                            "#"{entity_id}
-                                                        </div>
-                                                    </button>
+                                                            on:click=move |_| selected_entity.set(Some(entity_id))
+                                                        >
+                                                            <div class="flex items-center justify-between gap-2">
+                                                                <span class="truncate text-[11px] font-medium">{label}</span>
+                                                                <span class="text-[10px] text-slate-400">
+                                                                    {format!("{} comps", components.len())}
+                                                                </span>
+                                                            </div>
+                                                            <div class="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                                "#"{entity_id}
+                                                            </div>
+                                                        </button>
+                                                    </div>
                                                 }.into_any();
                                                 views.push(entity_view);
 
-                                                // Render children recursively
-                                                if let Some(children) = children_map.get(&entity_id) {
-                                                    for child_id in children {
-                                                        if let Some(child_components) = all_entities.get(child_id) {
-                                                            let child_views = render_entity_tree(
-                                                                *child_id,
-                                                                child_components,
-                                                                children_map,
-                                                                all_entities,
-                                                                selected_entity,
-                                                                depth + 1,
-                                                            );
-                                                            views.extend(child_views);
+                                                // Render children recursively only if expanded
+                                                if is_expanded {
+                                                    if let Some(children) = children_map.get(&entity_id) {
+                                                        for child_id in children {
+                                                            if let Some(child_components) = all_entities.get(child_id) {
+                                                                // Wrap children in a container with left margin for indentation
+                                                                let child_views = view! {
+                                                                    <div class="ml-4">
+                                                                        {render_entity_tree(
+                                                                            *child_id,
+                                                                            child_components,
+                                                                            children_map,
+                                                                            all_entities,
+                                                                            selected_entity,
+                                                                            expanded_entities,
+                                                                            depth + 1,
+                                                                        )}
+                                                                    </div>
+                                                                }.into_any();
+                                                                views.push(child_views);
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -791,6 +861,7 @@ pub mod ui {
                                                         &children_map,
                                                         &all_entities,
                                                         selected_entity,
+                                                        expanded,
                                                         0,
                                                     );
                                                     all_views.extend(tree_views);
