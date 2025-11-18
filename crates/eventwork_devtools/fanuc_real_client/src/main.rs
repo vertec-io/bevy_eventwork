@@ -56,6 +56,7 @@ fn App() -> AnyView {
     let (host, set_host) = signal("127.0.0.1".to_string());
     let (port, set_port) = signal("8082".to_string());
     let (ws_url, set_ws_url) = signal(None::<&'static str>);
+    let (is_connected, set_is_connected) = signal(false);
 
     // Create type registry and register component types
     let mut registry = ComponentTypeRegistry::new();
@@ -71,6 +72,11 @@ fn App() -> AnyView {
         let url_owned = format!("ws://{}:{}", host.get(), port.get());
         let ws_url_static: &'static str = Box::leak(url_owned.into_boxed_str());
         set_ws_url.set(Some(ws_url_static));
+    };
+
+    let on_disconnect = move |_| {
+        set_ws_url.set(None);
+        set_is_connected.set(false);
     };
 
     view! {
@@ -95,12 +101,24 @@ fn App() -> AnyView {
                         on:input=move |ev| set_port.set(event_target_value(&ev))
                         placeholder="Port"
                     />
-                    <button
-                        class="px-3 py-1.5 rounded bg-emerald-500 text-xs font-medium text-slate-950 hover:bg-emerald-400 transition"
-                        on:click=on_connect
+                    <Show
+                        when=move || !is_connected.get()
+                        fallback=move || view! {
+                            <button
+                                class="px-3 py-1.5 rounded bg-red-500 text-xs font-medium text-slate-950 hover:bg-red-400 transition"
+                                on:click=on_disconnect
+                            >
+                                "Disconnect"
+                            </button>
+                        }
                     >
-                        "Connect"
-                    </button>
+                        <button
+                            class="px-3 py-1.5 rounded bg-emerald-500 text-xs font-medium text-slate-950 hover:bg-emerald-400 transition"
+                            on:click=on_connect
+                        >
+                            "Connect"
+                        </button>
+                    </Show>
                 </div>
             </header>
 
@@ -183,6 +201,7 @@ fn App() -> AnyView {
                                     let client = client.clone();
                                     Effect::new(move |_| {
                                         if ready_state.get() == ConnectionReadyState::Open {
+                                            set_is_connected.set(true);
                                             // Subscribe to RobotPosition
                                             client.send_raw(SyncClientMessage::Subscription(SubscriptionRequest {
                                                 subscription_id: 1,
@@ -195,6 +214,8 @@ fn App() -> AnyView {
                                                 component_type: "RobotStatus".to_string(),
                                                 entity: None,
                                             }));
+                                        } else {
+                                            set_is_connected.set(false);
                                         }
                                     });
                                 }

@@ -397,7 +397,7 @@ pub mod ui {
             >(
                 ws_url,
                 UseWebSocketOptions::default()
-                    .immediate(false)
+                    .immediate(true)  // Auto-connect immediately
                     .on_open(move |_| {
                         console::log_1(&"[DevTools] WebSocket opened!".into());
                         set_last_error.set(None);
@@ -978,8 +978,8 @@ pub mod ui {
                                 when=move || message_expanded.get()
                                 fallback=|| view! { <></> }
                             >
-                                <div class="mt-2 flex-1 overflow-y-auto min-h-0">
-                                    <pre class="text-[10px] font-mono bg-slate-950/60 border border-slate-800 rounded p-2 whitespace-pre-wrap break-all">
+                                <div class="mt-2 flex-1 overflow-y-auto min-h-0 h-full">
+                                    <pre class="text-[10px] font-mono bg-slate-950/60 border border-slate-800 rounded p-2 whitespace-pre-wrap break-all h-full">
                                         {move || last_incoming.get()}
                                     </pre>
                                 </div>
