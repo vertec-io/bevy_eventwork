@@ -1,12 +1,10 @@
 use bevy::prelude::*;
 use serde::Serialize;
-use serde_json::Value as JsonValue;
 
 use eventwork::{managers::Network, managers::NetworkProvider};
 
 use crate::messages::{
     MutationResponse,
-    MutationStatus,
     SyncBatch,
     SyncClientMessage,
     SyncItem,
@@ -279,7 +277,7 @@ pub fn process_snapshot_queue<NP: NetworkProvider>(world: &mut World) {
 /// Register the typed observation system for a given component type T.
 pub fn register_component_system<T>(app: &mut App)
 where
-    T: Component + Reflect + Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
+    T: Component + Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
 {
     // We add a Changed<T>-based system that fires late in the frame (Observe
     // set) and emits ComponentChangeEvent instances.
@@ -294,7 +292,7 @@ fn observe_component_changes<T>(
     query: Query<(Entity, &T), Changed<T>>,
     mut writer: MessageWriter<ComponentChangeEvent>,
 ) where
-    T: Component + Reflect + Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
+    T: Component + Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static,
 {
     // Use short type name (just the struct name, no module path) for stability
     // This ensures client and server use the same type identifier

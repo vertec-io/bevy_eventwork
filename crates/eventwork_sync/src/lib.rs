@@ -69,14 +69,14 @@ pub trait AppEventworkSyncExt {
     /// This is the only call most applications need to make per component type.
     fn sync_component<T>(&mut self, config: Option<ComponentSyncConfig>) -> &mut Self
     where
-        T: Component + Reflect + bevy::reflect::GetTypeRegistration + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug;
+        T: Component + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug;
 }
 
 #[cfg(feature = "runtime")]
 impl AppEventworkSyncExt for App {
     fn sync_component<T>(&mut self, config: Option<ComponentSyncConfig>) -> &mut Self
     where
-        T: Component + Reflect + bevy::reflect::GetTypeRegistration + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug,
+        T: Component + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug,
     {
         registry::register_component::<T>(self, config);
         self

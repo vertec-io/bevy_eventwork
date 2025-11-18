@@ -1,7 +1,4 @@
 use bevy::prelude::*;
-use bevy::reflect::GetTypeRegistration;
-
-use serde_json::Value as JsonValue;
 use std::sync::Arc;
 
 use crate::messages::{MutationStatus, SerializableEntity};
@@ -283,11 +280,8 @@ where
 #[cfg(feature = "runtime")]
 pub fn register_component<T>(app: &mut App, config: Option<ComponentSyncConfig>)
 where
-    T: Component + Reflect + GetTypeRegistration + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug,
+    T: Component + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug,
 {
-    // Ensure type is in Bevy's type registry for reflection-based tooling.
-    app.register_type::<T>();
-
     // Register in SyncRegistry
     {
         let mut registry = app.world_mut().get_resource_or_insert_with(SyncRegistry::default);

@@ -19,8 +19,7 @@ pub mod state {
     use super::*;
 
     /// Cartesian position and orientation of the robot end effector
-    #[cfg_attr(feature = "server", derive(Component, Reflect))]
-    #[cfg_attr(feature = "server", reflect(Component))]
+    #[cfg_attr(feature = "server", derive(Component))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub struct RobotPosition {
         /// X coordinate in mm
@@ -51,8 +50,7 @@ pub mod state {
     }
 
     /// Robot operational status
-    #[cfg_attr(feature = "server", derive(Component, Reflect))]
-    #[cfg_attr(feature = "server", reflect(Component))]
+    #[cfg_attr(feature = "server", derive(Component))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub struct RobotStatus {
         /// Servos are powered and ready
@@ -77,8 +75,7 @@ pub mod state {
     }
 
     /// Joint angles in degrees
-    #[cfg_attr(feature = "server", derive(Component, Reflect))]
-    #[cfg_attr(feature = "server", reflect(Component))]
+    #[cfg_attr(feature = "server", derive(Component))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub struct JointAngles {
         pub j1: f32,
@@ -103,8 +100,7 @@ pub mod state {
     }
 
     /// Robot identification
-    #[cfg_attr(feature = "server", derive(Component, Reflect))]
-    #[cfg_attr(feature = "server", reflect(Component))]
+    #[cfg_attr(feature = "server", derive(Component))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub struct RobotInfo {
         pub name: String,
@@ -126,8 +122,7 @@ pub mod commands {
     use super::*;
 
     /// Jog command for incremental movement
-    #[cfg_attr(feature = "server", derive(Component, Reflect))]
-    #[cfg_attr(feature = "server", reflect(Component))]
+    #[cfg_attr(feature = "server", derive(Component))]
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub struct JogCommand {
         pub axis: RobotAxis,
@@ -143,7 +138,6 @@ pub mod commands {
 pub mod axis {
     use super::*;
 
-    #[cfg_attr(feature = "server", derive(Reflect))]
     #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
     pub enum RobotAxis {
         X,
@@ -154,7 +148,6 @@ pub mod axis {
         R,
     }
 
-    #[cfg_attr(feature = "server", derive(Reflect))]
     #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
     pub enum JogDirection {
         Positive,
