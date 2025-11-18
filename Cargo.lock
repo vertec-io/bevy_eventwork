@@ -504,6 +504,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-tokio-tasks"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "987123d29c3f2d6f1c1a4255adf65394f0ac460b1b6d1753a0a1c56128f71f53"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "tokio",
+]
+
+[[package]]
 name = "bevy_a11y"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2775,16 +2786,20 @@ name = "eventwork_sync"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy-tokio-tasks",
  "bincode",
  "demo_shared",
  "eventwork",
  "eventwork_common",
  "eventwork_websockets",
+ "fanuc_real_shared",
+ "fanuc_rmi",
  "fanuc_shared",
  "log",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

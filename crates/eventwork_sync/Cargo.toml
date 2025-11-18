@@ -30,6 +30,10 @@ bincode = { workspace = true }
 eventwork_websockets = { path = "../eventwork_websockets" }
 demo_shared = { path = "../demo_shared", features = ["server"] }
 fanuc_shared = { path = "../fanuc_shared", features = ["server"] }
+fanuc_real_shared = { path = "../fanuc_real_shared", features = ["server"] }
+fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"] }
+bevy-tokio-tasks = "0.17"
+tokio = { version = "1.48", features = ["full"] }
 
 
 
@@ -40,3 +44,7 @@ path = "examples/devtools-demo-server.rs"
 [[example]]
 name = "fanuc_server"
 path = "examples/fanuc_server.rs"
+
+[[example]]
+name = "fanuc_real_server"
+path = "examples/fanuc_real_server.rs"
