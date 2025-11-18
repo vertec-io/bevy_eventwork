@@ -578,10 +578,47 @@ pub mod ui {
             ConnectionReadyState::Closed => "Closed",
         };
 
+        // View mode: true = tree view, false = flat view
+        let tree_view_mode = RwSignal::new(true);
+
         let sorted_entities = move || {
             let mut v: Vec<_> = entities.get().into_iter().collect();
             v.sort_by_key(|(id, _)| *id);
             v
+        };
+
+        // Build tree structure from ParentEntity and ChildEntities components
+        let entity_tree = move || {
+            let all_entities = entities.get();
+            let mut roots = Vec::new();
+            let mut children_map: HashMap<u64, Vec<u64>> = HashMap::new();
+
+            // First pass: collect all parent-child relationships
+            for (entity_id, components) in &all_entities {
+                // Check if this entity has a ParentEntity component
+                if let Some(JsonValue::Object(parent_comp)) = components.get("ParentEntity") {
+                    if let Some(JsonValue::Number(parent_bits)) = parent_comp.get("parent_bits") {
+                        if let Some(parent_id) = parent_bits.as_u64() {
+                            children_map.entry(parent_id).or_default().push(*entity_id);
+                        }
+                    }
+                }
+            }
+
+            // Second pass: find root entities (those without ParentEntity)
+            for (entity_id, components) in &all_entities {
+                if !components.contains_key("ParentEntity") {
+                    roots.push(*entity_id);
+                }
+            }
+
+            // Sort roots and children for consistent ordering
+            roots.sort();
+            for children in children_map.values_mut() {
+                children.sort();
+            }
+
+            (roots, children_map)
         };
 
         let selected = move || {
@@ -619,9 +656,17 @@ pub mod ui {
                         <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex flex-col min-h-0">
                             <div class="flex items-center justify-between mb-2">
                                 <h2 class="text-sm font-semibold text-slate-100">"World"</h2>
-                                <span class="text-[11px] text-slate-400">
-                                    {move || format!("{} entities", entities.get().len())}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        class="px-2 py-1 text-[10px] rounded border border-white/10 bg-slate-800/50 hover:bg-slate-700/50 transition-colors"
+                                        on:click=move |_| tree_view_mode.update(|mode| *mode = !*mode)
+                                    >
+                                        {move || if tree_view_mode.get() { "Tree View" } else { "Flat View" }}
+                                    </button>
+                                    <span class="text-[11px] text-slate-400">
+                                        {move || format!("{} entities", entities.get().len())}
+                                    </span>
+                                </div>
                             </div>
                             <div class="flex-1 overflow-y-auto space-y-1 text-xs">
                                 <Show
@@ -632,15 +677,19 @@ pub mod ui {
                                         </div>
                                     }
                                 >
-                                    <For
-                                        each=sorted_entities
-                                        key=|(id, _)| *id
-                                        children=move |(id, components): (u64, HashMap<String, JsonValue>)| {
-                                            let label = entity_label(id, &components);
-                                            let selected_entity = selected_entity;
-                                            view! {
-                                                <button
-                                                    class=move || {
+                                    <Show
+                                        when=move || tree_view_mode.get()
+                                        fallback=move || view! {
+                                            // Flat view
+                                            <For
+                                                each=sorted_entities
+                                                key=|(id, _)| *id
+                                                children=move |(id, components): (u64, HashMap<String, JsonValue>)| {
+                                                    let label = entity_label(id, &components);
+                                                    let selected_entity = selected_entity;
+                                                    view! {
+                                                        <button
+                                                            class=move || {
                                                         let is_selected = selected_entity.get() == Some(id);
                                                         let base = "w-full text-left px-2 py-1.5 rounded-md border transition-colors";
                                                         if is_selected {
@@ -664,6 +713,93 @@ pub mod ui {
                                             }
                                         }
                                     />
+                                        }
+                                    >
+                                        // Tree view - render entities hierarchically
+                                        {move || {
+                                            let (roots, children_map) = entity_tree();
+                                            let all_entities = entities.get();
+
+                                            // Recursive function to render entity and its children
+                                            fn render_entity_tree(
+                                                entity_id: u64,
+                                                components: &HashMap<String, JsonValue>,
+                                                children_map: &HashMap<u64, Vec<u64>>,
+                                                all_entities: &HashMap<u64, HashMap<String, JsonValue>>,
+                                                selected_entity: RwSignal<Option<u64>>,
+                                                depth: usize,
+                                            ) -> Vec<AnyView> {
+                                                let mut views = Vec::new();
+                                                let label = entity_label(entity_id, components);
+                                                let indent_px = depth * 16;
+
+                                                // Render this entity
+                                                let entity_view = view! {
+                                                    <button
+                                                        class=move || {
+                                                            let is_selected = selected_entity.get() == Some(entity_id);
+                                                            let base = "w-full text-left px-2 py-1.5 rounded-md border transition-colors";
+                                                            if is_selected {
+                                                                format!("{base} bg-slate-800/80 border-slate-600 text-slate-50")
+                                                            } else {
+                                                                format!("{base} bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-800/70")
+                                                            }
+                                                        }
+                                                        style=move || format!("margin-left: {}px", indent_px)
+                                                        on:click=move |_| selected_entity.set(Some(entity_id))
+                                                    >
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <span class="truncate text-[11px] font-medium">{label}</span>
+                                                            <span class="text-[10px] text-slate-400">
+                                                                {format!("{} comps", components.len())}
+                                                            </span>
+                                                        </div>
+                                                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                            "#"{entity_id}
+                                                        </div>
+                                                    </button>
+                                                }.into_any();
+                                                views.push(entity_view);
+
+                                                // Render children recursively
+                                                if let Some(children) = children_map.get(&entity_id) {
+                                                    for child_id in children {
+                                                        if let Some(child_components) = all_entities.get(child_id) {
+                                                            let child_views = render_entity_tree(
+                                                                *child_id,
+                                                                child_components,
+                                                                children_map,
+                                                                all_entities,
+                                                                selected_entity,
+                                                                depth + 1,
+                                                            );
+                                                            views.extend(child_views);
+                                                        }
+                                                    }
+                                                }
+
+                                                views
+                                            }
+
+                                            // Render all root entities and their trees
+                                            let mut all_views = Vec::new();
+                                            for root_id in roots {
+                                                if let Some(root_components) = all_entities.get(&root_id) {
+                                                    let tree_views = render_entity_tree(
+                                                        root_id,
+                                                        root_components,
+                                                        &children_map,
+                                                        &all_entities,
+                                                        selected_entity,
+                                                        0,
+                                                    );
+                                                    all_views.extend(tree_views);
+                                                }
+                                            }
+
+                                            all_views
+                                        }}
+                                    </Show>
                                 </Show>
                             </div>
                         </div>
