@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use eventwork::{managers::NetworkProvider, managers::Network, NetworkData, NetworkEvent};
 
 use crate::messages::{SyncClientMessage, SyncServerMessage, SyncBatch, SyncItem};
-use crate::registry::{ComponentChangeEvent, MutationQueue, QueuedMutation, SnapshotQueue, SnapshotRequest, SubscriptionEntry, SubscriptionManager};
+use crate::registry::{ComponentChangeEvent, EntityDespawnEvent, MutationQueue, QueuedMutation, SnapshotQueue, SnapshotRequest, SubscriptionEntry, SubscriptionManager};
 
 /// System that reads incoming SyncClientMessage messages and updates the
 /// SubscriptionManager / dispatches actions accordingly.
@@ -101,10 +101,11 @@ pub fn handle_client_messages<NP: NetworkProvider>(
     }
 }
 
-/// System that takes aggregated ComponentChangeEvent items and routes them to
-/// all interested subscribers as a SyncServerMessage::SyncBatch.
+/// System that takes aggregated ComponentChangeEvent and EntityDespawnEvent items
+/// and routes them to all interested subscribers as a SyncServerMessage::SyncBatch.
 pub fn broadcast_component_changes<NP: NetworkProvider>(
-    mut events: MessageReader<ComponentChangeEvent>,
+    mut component_events: MessageReader<ComponentChangeEvent>,
+    mut despawn_events: MessageReader<EntityDespawnEvent>,
     subscriptions: Option<Res<SubscriptionManager>>,
     net: Option<Res<Network<NP>>>,
 ) {
@@ -114,7 +115,7 @@ pub fn broadcast_component_changes<NP: NetworkProvider>(
         return;
     };
 
-    if events.is_empty() {
+    if component_events.is_empty() && despawn_events.is_empty() {
         return;
     }
 
@@ -124,7 +125,8 @@ pub fn broadcast_component_changes<NP: NetworkProvider>(
     let mut per_connection: std::collections::HashMap<eventwork_common::ConnectionId, Vec<SyncItem>> =
         std::collections::HashMap::new();
 
-    for change in events.read() {
+    // Process component changes
+    for change in component_events.read() {
         for sub in &subscriptions.subscriptions {
             if sub.component_type != "*" && sub.component_type != change.component_type {
                 continue;
@@ -143,6 +145,26 @@ pub fn broadcast_component_changes<NP: NetworkProvider>(
                     entity: change.entity,
                     component_type: change.component_type.clone(),
                     value: change.value.clone(),
+                });
+        }
+    }
+
+    // Process entity despawns
+    for despawn in despawn_events.read() {
+        for sub in &subscriptions.subscriptions {
+            // Entity despawns match all subscriptions for that entity
+            if let Some(entity) = sub.entity {
+                if entity != despawn.entity {
+                    continue;
+                }
+            }
+
+            per_connection
+                .entry(sub.connection_id)
+                .or_default()
+                .push(SyncItem::EntityRemoved {
+                    subscription_id: sub.subscription_id,
+                    entity: despawn.entity,
                 });
         }
     }

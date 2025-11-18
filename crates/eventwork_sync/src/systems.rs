@@ -12,6 +12,7 @@ use crate::messages::{
 };
 use crate::registry::{
     ComponentChangeEvent,
+    EntityDespawnEvent,
     MutationAuthContext,
     MutationAuthorizerResource,
     MutationQueue,
@@ -38,7 +39,8 @@ pub(crate) fn install<NP: NetworkProvider>(app: &mut App) {
     app.init_resource::<SubscriptionManager>()
         .init_resource::<MutationQueue>()
         .init_resource::<SnapshotQueue>()
-        .add_message::<ComponentChangeEvent>();
+        .add_message::<ComponentChangeEvent>()
+        .add_message::<EntityDespawnEvent>();
 
     // Verify resources were initialized
     let world = app.world();
@@ -285,6 +287,13 @@ where
         Update,
         observe_component_changes::<T>.in_set(EventworkSyncSystems::Observe),
     );
+
+    // Also add a system to observe entity despawns for this component type.
+    // This will emit EntityDespawnEvent when entities with this component are despawned.
+    app.add_systems(
+        Update,
+        observe_entity_despawns::<T>.in_set(EventworkSyncSystems::Observe),
+    );
 }
 
 /// Observe Changed<T> and convert into generic ComponentChangeEvent instances.
@@ -307,6 +316,21 @@ fn observe_component_changes<T>(
             entity: crate::messages::SerializableEntity::from(entity),
             component_type: type_name.clone(),
             value: bytes,
+        });
+    }
+}
+
+/// Observe entity despawns and emit EntityDespawnEvent instances.
+/// This system tracks ALL entity despawns, regardless of component type.
+fn observe_entity_despawns<T>(
+    mut removed: RemovedComponents<T>,
+    mut writer: MessageWriter<EntityDespawnEvent>,
+) where
+    T: Component + Send + Sync + 'static,
+{
+    for entity in removed.read() {
+        writer.write(EntityDespawnEvent {
+            entity: crate::messages::SerializableEntity::from(entity),
         });
     }
 }

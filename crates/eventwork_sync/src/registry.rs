@@ -223,6 +223,12 @@ pub struct ComponentChangeEvent {
     pub value: Vec<u8>,
 }
 
+/// Event emitted when an entity is despawned.
+#[derive(Debug, Clone, Message)]
+pub struct EntityDespawnEvent {
+    pub entity: SerializableEntity,
+}
+
 fn apply_typed_mutation<T>(world: &mut World, mutation: &QueuedMutation) -> MutationStatus
 where
     T: Component + serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + 'static + std::fmt::Debug,
