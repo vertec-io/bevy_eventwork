@@ -1,0 +1,36 @@
+[package]
+name = "eventwork_sync"
+version = "0.1.0"
+edition = "2024"
+authors = ["Augment Agent <noreply@example.com>"]
+description = "Reflection-driven synchronization middleware for Bevy ECS servers over eventwork."
+license = "MIT"
+
+[features]
+default = ["runtime"]
+# `runtime` pulls in the full eventwork dependency graph (async-net, etc.) for
+# Bevy server applications. Frontend crates (like `eventwork_devtools`) can
+# disable default features to avoid non-wasm-compatible dependencies while
+# still reusing the wire-level message types.
+runtime = ["dep:eventwork"]
+
+[dependencies]
+bevy = { workspace = true }
+bincode = { workspace = true }
+eventwork = { path = "../eventwork", optional = true }
+eventwork_common = { path = "../eventwork_common" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+# For integration-style tests and examples using a miniature Bevy app
+bincode = { workspace = true }
+eventwork_websockets = { path = "../eventwork_websockets" }
+demo_shared = { path = "../demo_shared", features = ["server"] }
+
+
+
+[[example]]
+name = "devtools-demo-server"
+path = "examples/devtools-demo-server.rs"

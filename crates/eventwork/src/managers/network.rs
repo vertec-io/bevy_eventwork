@@ -200,7 +200,8 @@ impl<NP: NetworkProvider> Network<NP> {
         let packet = NetworkPacket {
             type_name: T::type_name().to_string(),
             schema_hash: T::schema_hash(),
-            data: bincode::serialize(&message).map_err(|_| NetworkError::Serialization)?,
+            data: bincode::serde::encode_to_vec(&message, bincode::config::standard())
+                .map_err(|_| NetworkError::Serialization)?,
         };
 
         match connection.send_message.try_send(packet) {
@@ -224,7 +225,8 @@ impl<NP: NetworkProvider> Network<NP> {
     /// net.broadcast(GameStateUpdate { ... });
     /// ```
     pub fn broadcast<T: EventworkMessage + Clone>(&self, message: T) {
-        let serialized_message = bincode::serialize(&message).expect("Couldn't serialize message!");
+        let serialized_message = bincode::serde::encode_to_vec(&message, bincode::config::standard())
+            .expect("Couldn't serialize message!");
         for connection in self.established_connections.iter() {
             let packet = NetworkPacket {
                 type_name: T::type_name().to_string(),
@@ -253,7 +255,8 @@ impl<NP: NetworkProvider> Network<NP> {
     /// net.broadcast_except(sender_id, ChatMessage { ... });
     /// ```
     pub fn broadcast_except<T: EventworkMessage + Clone>(&self, except: ConnectionId, message: T) {
-        let serialized_message = bincode::serialize(&message).expect("Couldn't serialize message!");
+        let serialized_message = bincode::serde::encode_to_vec(&message, bincode::config::standard())
+            .expect("Couldn't serialize message!");
         for connection in self.established_connections.iter() {
             // Skip the excluded connection
             if *connection.key() == except {
@@ -659,10 +662,11 @@ pub(crate) fn register_message<T, NP: NetworkProvider>(
     }
 
     let provider_name = NP::PROVIDER_NAME;
+    let config = bincode::config::standard();
     events.write_batch(messages.drain(..).filter_map(move |(source, msg)| {
-        bincode::deserialize::<T>(&msg)
+        bincode::serde::decode_from_slice(&msg, config)
             .ok()
-            .map(|inner| NetworkData { source, inner, provider_name })
+            .map(|(inner, _)| NetworkData { source, inner, provider_name })
     }));
 }
 
@@ -721,9 +725,10 @@ pub fn register_targeted_message<T, NP: NetworkProvider>(
     };
 
     let provider_name = NP::PROVIDER_NAME;
+    let config = bincode::config::standard();
     events.write_batch(messages.drain(..).filter_map(move |(source, msg)| {
-        match bincode::deserialize::<TargetedMessage<T>>(&msg) {
-            Ok(inner) => {
+        match bincode::serde::decode_from_slice(&msg, config) {
+            Ok((inner, _)) => {
                 #[cfg(feature = "debug_messages")]
                 println!(
                     "Successfully deserialized message for target: {}",
@@ -790,10 +795,11 @@ pub(crate) fn register_previous_message<T, NP: NetworkProvider>(
 
     // Drain the message buffer and send events
     let provider_name = NP::PROVIDER_NAME;
+    let config = bincode::config::standard();
     events.write_batch(messages.drain(..).filter_map(move |(source, msg)| {
-        bincode::deserialize::<PreviousMessage<T>>(&msg)
+        bincode::serde::decode_from_slice(&msg, config)
             .ok()
-            .map(|inner| NetworkData { source, inner, provider_name })
+            .map(|(inner, _)| NetworkData { source, inner, provider_name })
     }));
 }
 

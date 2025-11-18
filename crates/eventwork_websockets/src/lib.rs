@@ -180,10 +180,11 @@ mod native_websocket {
                 }
                 info!("Message read");
 
-                let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
-                    Ok(packet) => packet,
+                let packet: NetworkPacket = match bincode::serde::decode_from_slice(&buffer[..length], bincode::config::standard()) {
+                    Ok((packet, _)) => packet,
                     Err(err) => {
-                        error!("Failed to decode network packet from: {}", err);
+                        error!("Failed to decode network packet: {:?}", err);
+                        error!("Buffer length: {}, first 32 bytes: {:?}", length, &buffer[..length.min(32)]);
                         break;
                     }
                 };
@@ -202,7 +203,7 @@ mod native_websocket {
             _settings: Self::NetworkSettings,
         ) {
             while let Ok(message) = messages.recv().await {
-                let encoded = match bincode::serialize(&message) {
+                let encoded = match bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet {:?}: {}", message, err);
@@ -459,10 +460,11 @@ mod wasm_websocket {
                 }
                 info!("Message read");
 
-                let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
-                    Ok(packet) => packet,
+                let packet: NetworkPacket = match bincode::serde::decode_from_slice(&buffer[..length], bincode::config::standard()) {
+                    Ok((packet, _)) => packet,
                     Err(err) => {
-                        error!("Failed to decode network packet from: {}", err);
+                        error!("Failed to decode network packet: {:?}", err);
+                        error!("Buffer length: {}, first 32 bytes: {:?}", length, &buffer[..length.min(32)]);
                         break;
                     }
                 };
@@ -481,7 +483,7 @@ mod wasm_websocket {
             _settings: Self::NetworkSettings,
         ) {
             while let Ok(message) = messages.recv().await {
-                let encoded = match bincode::serialize(&message) {
+                let encoded = match bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet {:?}: {}", message, err);

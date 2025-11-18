@@ -1,0 +1,180 @@
+use bevy::prelude::*;
+use eventwork::{managers::NetworkProvider, managers::Network, NetworkData, NetworkEvent};
+
+use crate::messages::{SyncClientMessage, SyncServerMessage, SyncBatch, SyncItem};
+use crate::registry::{ComponentChangeEvent, MutationQueue, QueuedMutation, SnapshotQueue, SnapshotRequest, SubscriptionEntry, SubscriptionManager};
+
+/// System that reads incoming SyncClientMessage messages and updates the
+/// SubscriptionManager / dispatches actions accordingly.
+pub fn handle_client_messages<NP: NetworkProvider>(
+    mut reader: MessageReader<NetworkData<SyncClientMessage>>,
+    subscriptions: Option<ResMut<SubscriptionManager>>,
+    mut mutations: Option<ResMut<MutationQueue>>,
+    snapshots: Option<ResMut<SnapshotQueue>>,
+    _net: Option<Res<Network<NP>>>,
+) {
+    // If the core sync resources are not yet available, this system should be
+    // a no-op rather than causing a hard panic. Subscriptions and snapshots are
+    // required; the mutation queue is treated as optional so that read-only
+    // inspection still works even if mutation support is not fully wired.
+    let Some(mut subscriptions) = subscriptions else {
+        trace!("[eventwork_sync] handle_client_messages: SubscriptionManager resource missing; system will be idle this frame");
+        return;
+    };
+    let Some(mut snapshots) = snapshots else {
+        trace!("[eventwork_sync] handle_client_messages: SnapshotQueue resource missing; system will be idle this frame");
+        return;
+    };
+
+    if reader.is_empty() {
+        trace!("[eventwork_sync] handle_client_messages: no client messages this frame");
+        return;
+    }
+
+    use crate::messages::SyncClientMessage as C;
+
+    for msg in reader.read() {
+        let source = *msg.source();
+        match &**msg {
+            C::Subscription(req) => {
+                info!(
+                    "[eventwork_sync] New subscription: conn={:?}, sub_id={}, component_type={}, entity={:?}",
+                    source,
+                    req.subscription_id,
+                    req.component_type,
+                    req.entity,
+                );
+
+                subscriptions.add_subscription(SubscriptionEntry {
+                    connection_id: source,
+                    subscription_id: req.subscription_id,
+                    component_type: req.component_type.clone(),
+                    entity: req.entity,
+                });
+
+                // Queue a snapshot request so the client receives an initial
+                // view of the current world state matching this subscription.
+                snapshots.pending.push(SnapshotRequest {
+                    connection_id: source,
+                    subscription_id: req.subscription_id,
+                    component_type: req.component_type.clone(),
+                    entity: req.entity,
+                });
+
+                info!(
+                    "[eventwork_sync] Queued snapshot request: conn={:?}, sub_id={}, component_type={}, entity={:?}",
+                    source,
+                    req.subscription_id,
+                    req.component_type,
+                    req.entity,
+                );
+            }
+            C::Unsubscribe(req) => {
+                subscriptions.remove_subscription(source, req.subscription_id);
+            }
+            C::Mutate(m) => {
+                // Queue the mutation for processing in a dedicated system so that
+                // we can apply it with proper reflection / auth in a later pass.
+                if let Some(mutations) = mutations.as_deref_mut() {
+                    mutations.pending.push(QueuedMutation {
+                        connection_id: source,
+                        request_id: m.request_id,
+                        entity: m.entity,
+                        component_type: m.component_type.clone(),
+                        value: m.value.clone(),
+                    });
+                } else {
+                    trace!(
+                        "[eventwork_sync] handle_client_messages: MutationQueue resource missing; incoming mutation will be ignored (conn={:?}, request_id={:?})",
+                        source,
+                        m.request_id
+                    );
+                }
+            }
+            C::Query(_q) => {
+                // Query handling is deferred to v1.1; for now, this is a no-op.
+            }
+            C::QueryCancel(_c) => {
+                // Likewise, query cancellation behavior will be implemented later.
+            }
+        }
+    }
+}
+
+/// System that takes aggregated ComponentChangeEvent items and routes them to
+/// all interested subscribers as a SyncServerMessage::SyncBatch.
+pub fn broadcast_component_changes<NP: NetworkProvider>(
+    mut events: MessageReader<ComponentChangeEvent>,
+    subscriptions: Option<Res<SubscriptionManager>>,
+    net: Option<Res<Network<NP>>>,
+) {
+    // If the required resources aren't available yet (for example, if the
+    // network has been torn down during shutdown), bail out quietly.
+    let (Some(subscriptions), Some(net)) = (subscriptions, net) else {
+        return;
+    };
+
+    if events.is_empty() {
+        return;
+    }
+
+    // For v1 we use a simple O(N*M) strategy: for each change, scan
+    // subscriptions. This is sufficient to validate the pipeline and can be
+    // optimized later.
+    let mut per_connection: std::collections::HashMap<eventwork_common::ConnectionId, Vec<SyncItem>> =
+        std::collections::HashMap::new();
+
+    for change in events.read() {
+        for sub in &subscriptions.subscriptions {
+            if sub.component_type != "*" && sub.component_type != change.component_type {
+                continue;
+            }
+            if let Some(entity) = sub.entity {
+                if entity != change.entity {
+                    continue;
+                }
+            }
+
+            per_connection
+                .entry(sub.connection_id)
+                .or_default()
+                .push(SyncItem::Update {
+                    subscription_id: sub.subscription_id,
+                    entity: change.entity,
+                    component_type: change.component_type.clone(),
+                    value: change.value.clone(),
+                });
+        }
+    }
+
+    // Send batches
+    for (connection_id, items) in per_connection {
+        if items.is_empty() {
+            continue;
+        }
+        let batch = SyncBatch { items };
+        // Use Eventwork's Network API to send directly to this connection.
+        let _ = net.send(connection_id, SyncServerMessage::SyncBatch(batch));
+    }
+}
+/// Cleanup subscriptions and pending mutations when connections disconnect.
+pub fn cleanup_disconnected(
+    mut events: MessageReader<NetworkEvent>,
+    subscriptions: Option<ResMut<SubscriptionManager>>,
+    mutations: Option<ResMut<MutationQueue>>,
+) {
+    let (Some(mut subscriptions), Some(mut mutations)) = (subscriptions, mutations) else {
+        return;
+    };
+
+    for event in events.read() {
+        if let NetworkEvent::Disconnected(connection_id) = event {
+            subscriptions.remove_all_for_connection(*connection_id);
+            mutations
+                .pending
+                .retain(|m| m.connection_id != *connection_id);
+        }
+    }
+}
+
+

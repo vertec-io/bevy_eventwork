@@ -1,0 +1,20 @@
+[package]
+name = "eventwork_devtools"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+exclude.workspace = true
+
+[dependencies]
+leptos = { version = "0.8.12", features = ["csr"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode.workspace = true
+# Disable eventwork_sync's `runtime` feature so that the devtools crate can
+# compile to wasm without pulling in non-wasm-compatible networking
+# dependencies (async-net/errno). We only need the wire-level message types
+# here.
+eventwork_sync = { path = "../eventwork_sync", default-features = false }
+reactive_graph = "0.2"
+leptos-use = "0.16.3"
+eventwork_common = { version = "1.1.2", path = "../eventwork_common" }

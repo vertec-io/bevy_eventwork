@@ -6,6 +6,7 @@ members = [
     "crates/eventwork_common",
     "crates/eventwork_memory",
     "crates/eventwork_macros",
+    "crates/eventwork_sync", "crates/eventwork_devtools",
 ]
 
 [workspace.package]
@@ -17,13 +18,14 @@ exclude = [
     "crates/eventwork_websockets/src/wasm_client_example",
     "crates/eventwork/examples",
     "crates/eventwork_websockets/leptos_client_example",
+    "crates/eventwork_devtools/devtools-demo-client",
 ]
 
 
 
 [workspace.dependencies]
 bevy = { version = "0.17", default-features = false, features = ["multi_threaded", "bevy_log"] }
-bincode = "1.3.3"
+bincode = { version = "2.0.1", features = ["serde"] }
 
 # Fast-compile config
 [profile.dev]

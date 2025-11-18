@@ -329,10 +329,13 @@ impl<T: RequestMessage> Request<T> {
         let packet = NetworkPacket {
             type_name: ResponseInternal::<T::ResponseMessage>::type_name().to_string(),
             schema_hash: ResponseInternal::<T::ResponseMessage>::schema_hash(),
-            data: bincode::serialize(&ResponseInternal {
-                response_id: self.request_id,
-                response,
-            })
+            data: bincode::serde::encode_to_vec(
+                &ResponseInternal {
+                    response_id: self.request_id,
+                    response,
+                },
+                bincode::config::standard()
+            )
             .map_err(|_| NetworkError::Serialization)?,
         };
 

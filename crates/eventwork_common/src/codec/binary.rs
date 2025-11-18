@@ -38,7 +38,7 @@ impl Encoder<NetworkPacket> for EventworkBincodeCodec {
     fn encode(val: &NetworkPacket) -> Result<Self::Encoded, Self::Error> {
         // The NetworkPacket is already created by the application layer
         // We just need to encode it with bincode and add the length prefix
-        let encoded_packet = bincode::serialize(val)
+        let encoded_packet = bincode::serde::encode_to_vec(val, bincode::config::standard())
             .map_err(|_| NetworkError::Serialization)?;
 
         let len = encoded_packet.len() as u64;
@@ -67,7 +67,8 @@ impl Decoder<NetworkPacket> for EventworkBincodeCodec {
 
         // Decode directly to NetworkPacket
         // The application layer will handle unwrapping and routing
-        bincode::deserialize(&val[8..])
+        bincode::serde::decode_from_slice(&val[8..], bincode::config::standard())
+            .map(|(packet, _)| packet)
             .map_err(|_| NetworkError::Serialization)
     }
 }
@@ -101,11 +102,12 @@ impl<T: EventworkMessage> Encoder<T> for EventworkBincodeSingleMsgCodec {
         let packet = NetworkPacket {
             type_name: T::type_name().to_string(),
             schema_hash: T::schema_hash(),
-            data: bincode::serialize(val).map_err(|_| NetworkError::Serialization)?,
+            data: bincode::serde::encode_to_vec(val, bincode::config::standard())
+                .map_err(|_| NetworkError::Serialization)?,
         };
 
         // Encode the NetworkPacket with bincode
-        let encoded_packet = bincode::serialize(&packet)
+        let encoded_packet = bincode::serde::encode_to_vec(&packet, bincode::config::standard())
             .map_err(|_| NetworkError::Serialization)?;
 
         // Prepend the 8-byte length prefix (REQUIRED for WebSocket protocol)
@@ -124,8 +126,19 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeSingleMsgCodec {
     type Encoded = [u8];
 
     fn decode(val: &Self::Encoded) -> Result<T, Self::Error> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            use web_sys::console;
+            console::log_1(&format!("[EventworkBincodeSingleMsgCodec::decode] Received {} bytes", val.len()).into());
+        }
+
         // Read the 8-byte length prefix
         if val.len() < 8 {
+            #[cfg(target_arch = "wasm32")]
+            {
+                use web_sys::console;
+                console::error_1(&format!("[EventworkBincodeSingleMsgCodec::decode] ERROR: Buffer too small ({}  bytes), need at least 8", val.len()).into());
+            }
             return Err(NetworkError::Serialization);
         }
 
@@ -134,13 +147,41 @@ impl<T: DeserializeOwned> Decoder<T> for EventworkBincodeSingleMsgCodec {
             .map_err(|_| NetworkError::Serialization)?;
         let _length = u64::from_le_bytes(length_bytes);
 
+        #[cfg(target_arch = "wasm32")]
+        {
+            use web_sys::console;
+            console::log_1(&format!("[EventworkBincodeSingleMsgCodec::decode] Length prefix: {}", _length).into());
+        }
+
         // Decode the NetworkPacket
-        let packet: NetworkPacket = bincode::deserialize(&val[8..])
-            .map_err(|_| NetworkError::Serialization)?;
+        let packet: NetworkPacket = bincode::serde::decode_from_slice(&val[8..], bincode::config::standard())
+            .map_err(|e| {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    use web_sys::console;
+                    console::error_1(&format!("[EventworkBincodeSingleMsgCodec::decode] ERROR: Failed to deserialize NetworkPacket: {:?}", e).into());
+                }
+                NetworkError::Serialization
+            })
+            .map(|(packet, _)| packet)?;
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use web_sys::console;
+            console::log_1(&format!("[EventworkBincodeSingleMsgCodec::decode] NetworkPacket decoded: type_name={}, schema_hash={}, data_len={}", packet.type_name, packet.schema_hash, packet.data.len()).into());
+        }
 
         // Decode the message from the packet's data
-        bincode::deserialize(&packet.data)
-            .map_err(|_| NetworkError::Serialization)
+        bincode::serde::decode_from_slice(&packet.data, bincode::config::standard())
+            .map_err(|e| {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    use web_sys::console;
+                    console::error_1(&format!("[EventworkBincodeSingleMsgCodec::decode] ERROR: Failed to deserialize message from packet data: {:?}", e).into());
+                }
+                NetworkError::Serialization
+            })
+            .map(|(msg, _)| msg)
     }
 }
 
