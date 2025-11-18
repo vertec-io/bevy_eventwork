@@ -186,7 +186,7 @@ fn update_robot_state(
             dto::ResponsePacket::CommandResponse(dto::CommandResponse::FrcReadCartesianPosition(pos_response)) => {
                 // Update robot position
                 if let Ok((mut position, _, _)) = robot_query.single_mut() {
-                    position.0 = pos_response.pos;
+                    *position = pos_response.pos.into();
                     debug!("Updated position: X:{:.2} Y:{:.2} Z:{:.2}",
                         position.x, position.y, position.z);
                 }
@@ -209,7 +209,7 @@ fn update_robot_state(
             dto::ResponsePacket::CommandResponse(dto::CommandResponse::FrcReadJointAngles(joint_response)) => {
                 // Update joint angles
                 if let Ok((_, _, mut joints)) = robot_query.single_mut() {
-                    joints.0 = joint_response.joint_angles;
+                    *joints = joint_response.joint_angles.into();
                     debug!("Updated joint angles");
                 }
             }
