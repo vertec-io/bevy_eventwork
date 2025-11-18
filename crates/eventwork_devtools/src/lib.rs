@@ -606,8 +606,8 @@ pub mod ui {
             DevToolsMode::Embedded => {
                 // Full-page embedded view (current behavior)
                 view! {
-            <div class="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 flex flex-col">
-                <header class="border-b border-white/5 bg-slate-900/80 backdrop-blur-sm shadow-sm px-4 py-3 flex items-center justify-between">
+            <div class="h-full w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 flex flex-col">
+                <header class="border-b border-white/5 bg-slate-900/80 backdrop-blur-sm shadow-sm px-4 py-3 flex items-center justify-between flex-shrink-0">
                     <div>
                         <h1 class="text-lg font-semibold tracking-tight">"Eventwork DevTools"</h1>
                         <p class="text-xs text-slate-400">"Realtime ECS inspector & mutation console"</p>
@@ -629,10 +629,10 @@ pub mod ui {
                     </div>
                 </header>
 
-                <main class="flex-1 overflow-hidden grid grid-cols-12 gap-4 p-4">
-                    <section class="col-span-3 flex flex-col gap-3">
-                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex flex-col min-h-0">
-                            <div class="flex items-center justify-between mb-2">
+                <main class="flex-1 overflow-hidden grid grid-cols-12 gap-4 p-4 min-h-0">
+                    <section class="col-span-3 flex flex-col gap-3 min-h-0">
+                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex flex-col min-h-0 h-full">
+                            <div class="flex items-center justify-between mb-2 flex-shrink-0">
                                 <h2 class="text-sm font-semibold text-slate-100">"World"</h2>
                                 <div class="flex items-center gap-2">
                                     <button
@@ -674,7 +674,7 @@ pub mod ui {
                                     </span>
                                 </div>
                             </div>
-                            <div class="flex-1 overflow-y-auto space-y-1 text-xs">
+                            <div class="flex-1 overflow-y-auto space-y-1 text-xs min-h-0">
                                 <Show
                                     when=move || !entities.get().is_empty()
                                     fallback=move || view! {
@@ -850,34 +850,35 @@ pub mod ui {
                         </div>
                     </section>
 
-                    <section class="col-span-6 rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-4 flex flex-col min-w-0">
-                        <h2 class="text-sm font-semibold text-slate-100 mb-2">"Inspector"</h2>
-                        <Show
-                            when=move || selected().is_some()
-                            fallback=move || view! {
-                                <div class="text-[11px] text-slate-500">
-                                    "Select an entity from the left to inspect and edit its components."
-                                </div>
-                            }
-                        >
-                            {move || {
-                                let Some((id, components)) = selected() else {
-                                    return ().into_view().into_any();
-                                };
+                    <section class="col-span-6 rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-4 flex flex-col min-h-0">
+                        <h2 class="text-sm font-semibold text-slate-100 mb-2 flex-shrink-0">"Inspector"</h2>
+                        <div class="flex-1 overflow-y-auto min-h-0">
+                            <Show
+                                when=move || selected().is_some()
+                                fallback=move || view! {
+                                    <div class="text-[11px] text-slate-500">
+                                        "Select an entity from the left to inspect and edit its components."
+                                    </div>
+                                }
+                            >
+                                {move || {
+                                    let Some((id, components)) = selected() else {
+                                        return ().into_view().into_any();
+                                    };
 
-                                let label = entity_label(id, &components);
-                                view! {
-                                    <div class="flex flex-col gap-3 text-xs">
-                                        <div class="flex items-center justify-between">
-                                            <div>
-                                                <div class="text-[11px] uppercase tracking-wide text-slate-500">"Entity"</div>
-                                                <div class="text-sm font-semibold text-slate-50">{label}</div>
+                                    let label = entity_label(id, &components);
+                                    view! {
+                                        <div class="flex flex-col gap-3 text-xs">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <div class="text-[11px] uppercase tracking-wide text-slate-500">"Entity"</div>
+                                                    <div class="text-sm font-semibold text-slate-50">{label}</div>
+                                                </div>
+                                                <div class="text-[10px] text-slate-500 font-mono">
+                                                    "#"{id}
+                                                </div>
                                             </div>
-                                            <div class="text-[10px] text-slate-500 font-mono">
-                                                "#"{id}
-                                            </div>
-                                        </div>
-                                        <div class="border-t border-slate-800 pt-3 space-y-3">
+                                            <div class="border-t border-slate-800 pt-3 space-y-3">
                                             <For
                                                 each=move || {
                                                     let mut v: Vec<(String, JsonValue)> = components
@@ -918,15 +919,16 @@ pub mod ui {
                                                     }
                                                 }
                                             />
+                                            </div>
                                         </div>
-                                    </div>
-                                }.into_any()
-                            }}
-                        </Show>
+                                    }.into_any()
+                                }}
+                            </Show>
+                        </div>
                     </section>
 
-                    <section class="col-span-3 flex flex-col gap-3">
-                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 text-xs space-y-1">
+                    <section class="col-span-3 flex flex-col gap-3 min-h-0">
+                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 text-xs space-y-1 flex-shrink-0">
                             <div class="flex items-center justify-between">
                                 <span class="font-semibold">"Status"</span>
                                 <span class="text-slate-400">{move || format!("{:?}", ready_state.get())}</span>
@@ -950,9 +952,9 @@ pub mod ui {
                                 <div class="mt-1 text-red-400">{move || last_error.get().unwrap_or_default()}</div>
                             </Show>
                         </div>
-                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex flex-col min-w-0">
+                        <div class="rounded-2xl border border-white/5 bg-slate-900/70 backdrop-blur-sm shadow-lg shadow-black/40 p-3 flex flex-col min-h-0 flex-1">
                             <button
-                                class="flex items-center justify-between w-full text-left group"
+                                class="flex items-center justify-between w-full text-left group flex-shrink-0"
                                 on:click=move |_| set_message_expanded.update(|v| *v = !*v)
                             >
                                 <div class="flex items-center gap-2">
@@ -976,7 +978,7 @@ pub mod ui {
                                 when=move || message_expanded.get()
                                 fallback=|| view! { <></> }
                             >
-                                <div class="mt-2 max-h-64 overflow-auto">
+                                <div class="mt-2 flex-1 overflow-y-auto min-h-0">
                                     <pre class="text-[10px] font-mono bg-slate-950/60 border border-slate-800 rounded p-2 whitespace-pre-wrap break-all">
                                         {move || last_incoming.get()}
                                     </pre>
