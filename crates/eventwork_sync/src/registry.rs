@@ -241,6 +241,14 @@ where
     bevy::log::info!("[apply_typed_mutation] Applying mutation: entity={:?}, type={}, value={:?}",
         mutation.entity, mutation.component_type, value);
 
+    // Check if this is a request to spawn a new entity
+    if mutation.entity == SerializableEntity::DANGLING {
+        // Spawn a new entity with the component
+        world.spawn(value);
+        bevy::log::info!("[apply_typed_mutation] Spawned new entity with component {}", mutation.component_type);
+        return MutationStatus::Ok;
+    }
+
     let entity = mutation.entity.to_entity();
     match world.get_entity_mut(entity) {
         Ok(mut entity_mut) => {

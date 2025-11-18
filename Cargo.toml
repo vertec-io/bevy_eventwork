@@ -6,7 +6,10 @@ members = [
     "crates/eventwork_common",
     "crates/eventwork_memory",
     "crates/eventwork_macros",
-    "crates/eventwork_sync", "crates/eventwork_devtools",
+    "crates/eventwork_sync",
+    "crates/eventwork_devtools",
+    "crates/demo_shared",
+    "crates/fanuc_shared",
 ]
 
 [workspace.package]

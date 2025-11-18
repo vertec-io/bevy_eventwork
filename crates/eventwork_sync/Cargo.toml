@@ -19,6 +19,7 @@ bevy = { workspace = true, optional = true }
 bincode = { workspace = true }
 eventwork = { path = "../eventwork", optional = true }
 eventwork_common = { path = "../eventwork_common", optional = true }
+log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = { version = "1.0", optional = true }
@@ -28,9 +29,14 @@ thiserror = { version = "1.0", optional = true }
 bincode = { workspace = true }
 eventwork_websockets = { path = "../eventwork_websockets" }
 demo_shared = { path = "../demo_shared", features = ["server"] }
+fanuc_shared = { path = "../fanuc_shared", features = ["server"] }
 
 
 
 [[example]]
 name = "devtools-demo-server"
 path = "examples/devtools-demo-server.rs"
+
+[[example]]
+name = "fanuc_server"
+path = "examples/fanuc_server.rs"

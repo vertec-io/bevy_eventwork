@@ -11,6 +11,12 @@ pub struct SerializableEntity {
     pub bits: u64,
 }
 
+impl SerializableEntity {
+    /// A dangling entity that can be used to signal "spawn a new entity" in mutations.
+    /// This uses the same bit pattern as Bevy's Entity::PLACEHOLDER.
+    pub const DANGLING: Self = Self { bits: u64::MAX };
+}
+
 #[cfg(feature = "runtime")]
 impl From<Entity> for SerializableEntity {
     fn from(e: Entity) -> Self {
