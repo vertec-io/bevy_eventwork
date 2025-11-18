@@ -1,0 +1,13 @@
+[package]
+name = "fanuc_real_shared"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+server = ["dep:bevy"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"] }
+bevy = { workspace = true, optional = true }
+
