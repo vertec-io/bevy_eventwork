@@ -1,38 +1,35 @@
 //! Shared types for FANUC robot control using real FANUC_RMI_API
-//! 
-//! This crate provides wrapper types around FANUC_RMI_API DTO types that can be
+//!
+//! This crate provides types that mirror FANUC_RMI_API DTO types and can be
 //! used as Bevy components and synchronized via eventwork_sync.
 
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "server")]
 use bevy::prelude::*;
 
-// Re-export FANUC types for convenience
+// Re-export FANUC types for convenience on server
+#[cfg(feature = "server")]
 pub use fanuc_rmi::dto;
 
-/// Wrapper around fanuc_rmi::dto::Position for use as a Bevy component
+/// Robot cartesian position (mirrors fanuc_rmi::dto::Position)
 #[cfg_attr(feature = "server", derive(Component))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct RobotPosition(pub dto::Position);
-
-impl Deref for RobotPosition {
-    type Target = dto::Position;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for RobotPosition {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+pub struct RobotPosition {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+    pub p: f32,
+    pub r: f32,
+    pub ext1: f32,
+    pub ext2: f32,
+    pub ext3: f32,
 }
 
 impl Default for RobotPosition {
     fn default() -> Self {
-        Self(dto::Position {
+        Self {
             x: 0.0,
             y: 0.0,
             z: 400.0, // Start at 400mm above origin
@@ -42,31 +39,62 @@ impl Default for RobotPosition {
             ext1: 0.0,
             ext2: 0.0,
             ext3: 0.0,
-        })
+        }
     }
 }
 
-/// Wrapper around fanuc_rmi::dto::JointAngles for use as a Bevy component
+#[cfg(feature = "server")]
+impl From<dto::Position> for RobotPosition {
+    fn from(pos: dto::Position) -> Self {
+        Self {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            w: pos.w,
+            p: pos.p,
+            r: pos.r,
+            ext1: pos.ext1,
+            ext2: pos.ext2,
+            ext3: pos.ext3,
+        }
+    }
+}
+
+#[cfg(feature = "server")]
+impl From<RobotPosition> for dto::Position {
+    fn from(pos: RobotPosition) -> Self {
+        Self {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            w: pos.w,
+            p: pos.p,
+            r: pos.r,
+            ext1: pos.ext1,
+            ext2: pos.ext2,
+            ext3: pos.ext3,
+        }
+    }
+}
+
+/// Robot joint angles (mirrors fanuc_rmi::dto::JointAngles)
 #[cfg_attr(feature = "server", derive(Component))]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct JointAngles(pub dto::JointAngles);
-
-impl Deref for JointAngles {
-    type Target = dto::JointAngles;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for JointAngles {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+pub struct JointAngles {
+    pub j1: f32,
+    pub j2: f32,
+    pub j3: f32,
+    pub j4: f32,
+    pub j5: f32,
+    pub j6: f32,
+    pub j7: f32,
+    pub j8: f32,
+    pub j9: f32,
 }
 
 impl Default for JointAngles {
     fn default() -> Self {
-        Self(dto::JointAngles {
+        Self {
             j1: 0.0,
             j2: 0.0,
             j3: 0.0,
@@ -76,7 +104,41 @@ impl Default for JointAngles {
             j7: 0.0,
             j8: 0.0,
             j9: 0.0,
-        })
+        }
+    }
+}
+
+#[cfg(feature = "server")]
+impl From<dto::JointAngles> for JointAngles {
+    fn from(angles: dto::JointAngles) -> Self {
+        Self {
+            j1: angles.j1,
+            j2: angles.j2,
+            j3: angles.j3,
+            j4: angles.j4,
+            j5: angles.j5,
+            j6: angles.j6,
+            j7: angles.j7,
+            j8: angles.j8,
+            j9: angles.j9,
+        }
+    }
+}
+
+#[cfg(feature = "server")]
+impl From<JointAngles> for dto::JointAngles {
+    fn from(angles: JointAngles) -> Self {
+        Self {
+            j1: angles.j1,
+            j2: angles.j2,
+            j3: angles.j3,
+            j4: angles.j4,
+            j5: angles.j5,
+            j6: angles.j6,
+            j7: angles.j7,
+            j8: angles.j8,
+            j9: angles.j9,
+        }
     }
 }
 
@@ -122,23 +184,10 @@ impl Default for RobotInfo {
     }
 }
 
-/// Motion command to be sent to the robot
-#[cfg_attr(feature = "server", derive(Component))]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// Motion command to be sent to the robot (server-only)
+#[cfg(feature = "server")]
+#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MotionCommand {
     pub instruction: dto::Instruction,
-}
-
-impl Deref for MotionCommand {
-    type Target = dto::Instruction;
-    fn deref(&self) -> &Self::Target {
-        &self.instruction
-    }
-}
-
-impl DerefMut for MotionCommand {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.instruction
-    }
 }
 

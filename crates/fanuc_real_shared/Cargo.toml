@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-server = ["dep:bevy"]
+server = ["dep:bevy", "dep:fanuc_rmi"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"] }
+fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"], optional = true }
 bevy = { workspace = true, optional = true }
 
