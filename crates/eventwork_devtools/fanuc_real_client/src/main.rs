@@ -225,10 +225,9 @@ fn App() -> impl IntoView {
                                                 <JogControls />
                                             </div>
                                         </div>
-                                        <div class="w-1/2 border-l border-slate-800">
-                                            <DevTools ws_url=url registry=registry.clone() />
-                                        </div>
                                     </div>
+                                    // DevTools as floating widget (default mode)
+                                    <DevTools ws_url=url registry=registry.clone() />
                                 }
                             })
                         }

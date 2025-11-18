@@ -333,6 +333,21 @@ pub mod ui {
         }
     }
 
+    /// Display mode for the DevTools component
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum DevToolsMode {
+        /// Floating widget in lower-left corner (default)
+        Widget,
+        /// Full-page embedded view
+        Embedded,
+    }
+
+    impl Default for DevToolsMode {
+        fn default() -> Self {
+            Self::Widget
+        }
+    }
+
     /// High-level DevTools surface: given a WebSocket URL speaking the
     /// `eventwork_sync` wire protocol, render a modern Tailwind-powered
     /// inspector + mutation console.
@@ -340,16 +355,21 @@ pub mod ui {
     /// # Parameters
     /// - `ws_url`: WebSocket URL to connect to
     /// - `registry`: Type registry for deserializing component data
+    /// - `mode`: Display mode (Widget or Embedded). Defaults to Widget.
     #[component]
     pub fn DevTools(
         ws_url: &'static str,
         registry: ComponentTypeRegistry,
+        #[prop(optional)] mode: DevToolsMode,
     ) -> impl IntoView {
         // Connection + debug state
         let (last_incoming, set_last_incoming) = signal(String::new());
         let (last_error, set_last_error) = signal(Option::<String>::None);
         let (message_expanded, set_message_expanded) = signal(false);
         let (message_flash, set_message_flash) = signal(false);
+
+        // Widget state (for floating mode)
+        let (widget_expanded, set_widget_expanded) = signal(false);
 
         // Live entity/component view built from incoming SyncBatch items.
         let entities = RwSignal::new(HashMap::<u64, HashMap<String, JsonValue>>::new());
@@ -577,7 +597,11 @@ pub mod ui {
                 .and_then(|id| entities.get().get(&id).cloned().map(|components| (id, components)))
         };
 
-        view! {
+        // Render based on mode
+        match mode {
+            DevToolsMode::Embedded => {
+                // Full-page embedded view (current behavior)
+                view! {
             <div class="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 flex flex-col">
                 <header class="border-b border-white/5 bg-slate-900/80 backdrop-blur-sm shadow-sm px-4 py-3 flex items-center justify-between">
                     <div>
@@ -958,6 +982,77 @@ pub mod ui {
                     </section>
                 </main>
             </div>
+        }.into_any()
+            }
+            DevToolsMode::Widget => {
+                // Floating widget mode
+                let open_in_new_tab = move |_| {
+                    // Open DevTools in a new tab/window
+                    if let Some(window) = leptos::web_sys::window() {
+                        let _ = window.open_with_url_and_target(
+                            &format!("{}?devtools=1", window.location().pathname().unwrap_or_default()),
+                            "_blank"
+                        );
+                    }
+                };
+
+                view! {
+                    <div>
+                        // Floating widget button (collapsed state)
+                        <Show
+                            when=move || !widget_expanded.get()
+                            fallback=|| view! { <></> }
+                        >
+                            <button
+                                class="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 border border-white/20"
+                                on:click=move |_| set_widget_expanded.set(true)
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                                </svg>
+                                <span class="text-xs font-semibold">"DevTools"</span>
+                                <Show when=move || !entities.get().is_empty()>
+                                    <span class="px-1.5 py-0.5 bg-white/20 rounded-full text-[10px] font-bold">
+                                        {move || entities.get().len()}
+                                    </span>
+                                </Show>
+                            </button>
+                        </Show>
+
+                        // Modal overlay (expanded state)
+                        <Show
+                            when=move || widget_expanded.get()
+                            fallback=|| view! { <></> }
+                        >
+                            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                                <div class="relative w-[95vw] h-[90vh] max-w-[1800px] rounded-2xl shadow-2xl overflow-hidden border border-white/10">
+                                    // Close and "Open in New Tab" buttons
+                                    <div class="absolute top-3 right-3 z-10 flex gap-2">
+                                        <button
+                                            class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-white/10 flex items-center gap-1.5"
+                                            on:click=open_in_new_tab
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                            </svg>
+                                            "Open in New Tab"
+                                        </button>
+                                        <button
+                                            class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                                            on:click=move |_| set_widget_expanded.set(false)
+                                        >
+                                            "✕ Close"
+                                        </button>
+                                    </div>
+                                    // Render the full DevTools UI inside the modal
+                                    // Call DevTools recursively with Embedded mode
+                                    <DevTools ws_url=ws_url registry=registry.clone() mode=DevToolsMode::Embedded />
+                                </div>
+                            </div>
+                        </Show>
+                    </div>
+                }.into_any()
+            }
         }
     }
 }
