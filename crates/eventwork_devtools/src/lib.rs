@@ -604,9 +604,9 @@ pub mod ui {
         // Render based on mode
         match mode {
             DevToolsMode::Embedded => {
-                // Full-page embedded view (current behavior)
+                // Full-page embedded view with fixed viewport height
                 view! {
-            <div class="h-full w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 flex flex-col">
+            <div class="fixed inset-0 w-full h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 flex flex-col overflow-hidden">
                 <header class="border-b border-white/5 bg-slate-900/80 backdrop-blur-sm shadow-sm px-4 py-3 flex items-center justify-between flex-shrink-0">
                     <div>
                         <h1 class="text-lg font-semibold tracking-tight">"Eventwork DevTools"</h1>
