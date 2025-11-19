@@ -1,0 +1,15 @@
+[package]
+name = "eventwork_client_example_shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+eventwork_client = { path = "../eventwork_client" }
+
+# Bevy dependencies (only for server)
+bevy = { workspace = true, optional = true }
+
+[features]
+server = ["dep:bevy"]
+

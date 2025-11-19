@@ -7,6 +7,8 @@ members = [
     "crates/eventwork_memory",
     "crates/eventwork_macros",
     "crates/eventwork_sync",
+    "crates/eventwork_client",
+    "crates/eventwork_client_example_shared",
     "crates/eventwork_devtools",
     "crates/demo_shared",
     "crates/fanuc_shared",

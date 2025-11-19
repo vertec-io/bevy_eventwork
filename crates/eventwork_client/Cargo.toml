@@ -1,0 +1,48 @@
+[package]
+name = "eventwork_client"
+version = "0.1.0"
+edition = "2021"
+authors = ["Vertec.io"]
+description = "High-level reactive client library for eventwork_sync with Leptos integration"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/vertec-io/bevy_eventwork"
+
+[dependencies]
+# Core dependencies
+serde = { version = "1.0", features = ["derive"] }
+bincode = { version = "2.0.1", features = ["serde"] }
+
+# Leptos dependencies (match devtools version for compatibility)
+leptos = { version = "0.8.12", features = ["csr"] }
+leptos-use = "0.16.3"
+codee = "0.3"
+
+# Eventwork dependencies
+eventwork_sync = { path = "../eventwork_sync", default-features = false }
+eventwork_common = { path = "../eventwork_common" }
+
+# Optional dependencies for stores
+reactive_stores = { version = "0.2", optional = true }
+
+# Utility dependencies
+thiserror = "2.0"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+# Example dependencies
+bevy = { workspace = true }
+eventwork = { path = "../eventwork" }
+eventwork_websockets = { path = "../eventwork_websockets" }
+eventwork_client_example_shared = { path = "../eventwork_client_example_shared", features = ["server"] }
+# Override eventwork_sync to enable runtime feature for examples
+eventwork_sync = { path = "../eventwork_sync", features = ["runtime"] }
+
+[features]
+default = []
+stores = ["dep:reactive_stores"]
+devtools = []
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+

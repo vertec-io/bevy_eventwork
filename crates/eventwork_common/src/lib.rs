@@ -15,7 +15,7 @@ use std::fmt::Display;
 
 pub use eventwork_macros::SubscribeById;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 /// [`NetworkPacket`]s are untyped packets to be sent over the wire
 ///
 /// The packet contains both a human-readable type name (for debugging) and

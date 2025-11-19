@@ -1,0 +1,188 @@
+//! Basic Leptos client example for eventwork_client
+//!
+//! This example demonstrates:
+//! - Using SyncProvider to connect to a Bevy server
+//! - Using use_sync_component hook to subscribe to component updates
+//! - Displaying real-time entity data
+//! - Integrating the DevTools widget
+//!
+//! Run the server first:
+//!   cargo run -p eventwork_client --example basic_server
+//!
+//! Then run this client:
+//!   cd crates/eventwork_client/examples/basic_client
+//!   trunk serve --open
+
+use eventwork_client::{
+    use_sync_component, use_sync_connection, ClientRegistryBuilder,
+    SyncProvider,
+};
+use eventwork_devtools::DevTools;
+use eventwork_sync::client_registry::ComponentTypeRegistry;
+use leptos::prelude::*;
+use reactive_graph::traits::Get;
+
+// Import shared component types (SyncComponent is already implemented in the shared crate)
+use eventwork_client_example_shared::{EntityName, Position, Velocity};
+
+fn main() {
+    console_error_panic_hook::set_once();
+    _ = console_log::init_with_level(log::Level::Debug);
+
+    leptos::mount::mount_to_body(App);
+}
+
+#[component]
+fn App() -> impl IntoView {
+    // Build the client registry
+    let registry = ClientRegistryBuilder::new()
+        .register::<Position>()
+        .register::<Velocity>()
+        .register::<EntityName>()
+        .build();
+
+    // Build the DevTools type registry
+    let mut devtools_registry = ComponentTypeRegistry::new();
+    devtools_registry.register::<Position>();
+    devtools_registry.register::<Velocity>();
+    devtools_registry.register::<EntityName>();
+
+    let ws_url = "ws://127.0.0.1:3000";
+
+    view! {
+        <SyncProvider url=ws_url.to_string() registry=registry auto_connect=true>
+            <div class="min-h-screen w-screen bg-slate-950 text-slate-50 flex flex-col">
+                <Header />
+                <div class="flex-1 flex overflow-hidden">
+                    <main class="flex-1 overflow-auto p-6">
+                        <EntityList />
+                    </main>
+                    <aside class="w-96 border-l border-slate-800 overflow-hidden">
+                        <DevTools ws_url=ws_url registry=devtools_registry />
+                    </aside>
+                </div>
+            </div>
+        </SyncProvider>
+    }
+}
+
+#[component]
+fn Header() -> impl IntoView {
+    let connection = use_sync_connection();
+    let ready_state = connection.ready_state;
+
+    let status_text = move || match ready_state.get() {
+        leptos_use::core::ConnectionReadyState::Connecting => "Connecting...",
+        leptos_use::core::ConnectionReadyState::Open => "Connected",
+        leptos_use::core::ConnectionReadyState::Closing => "Closing...",
+        leptos_use::core::ConnectionReadyState::Closed => "Disconnected",
+    };
+
+    let status_color = move || match ready_state.get() {
+        leptos_use::core::ConnectionReadyState::Open => "bg-emerald-500",
+        leptos_use::core::ConnectionReadyState::Connecting => "bg-yellow-500",
+        _ => "bg-red-500",
+    };
+
+    view! {
+        <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-lg font-semibold tracking-tight">"Eventwork Client - Basic Example"</h1>
+                    <p class="text-xs text-slate-400">"Real-time entity synchronization with Bevy ECS"</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class=move || format!("w-2 h-2 rounded-full {}", status_color())></div>
+                    <span class="text-xs text-slate-400">{status_text}</span>
+                </div>
+            </div>
+        </header>
+    }
+}
+
+#[component]
+fn EntityList() -> impl IntoView {
+    // Subscribe to component updates
+    let positions = use_sync_component::<Position>();
+    let velocities = use_sync_component::<Velocity>();
+    let names = use_sync_component::<EntityName>();
+
+    view! {
+        <div class="space-y-4">
+            <h2 class="text-xl font-semibold">"Entities"</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <For
+                    each=move || {
+                        positions.get()
+                            .keys()
+                            .copied()
+                            .collect::<Vec<_>>()
+                    }
+                    key=|entity_id| *entity_id
+                    children=move |entity_id| {
+                        view! { <EntityCard entity_id=entity_id /> }
+                    }
+                />
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn EntityCard(entity_id: u64) -> impl IntoView {
+    let positions = use_sync_component::<Position>();
+    let velocities = use_sync_component::<Velocity>();
+    let names = use_sync_component::<EntityName>();
+
+    let position = move || positions.get().get(&entity_id).cloned();
+    let velocity = move || velocities.get().get(&entity_id).cloned();
+    let name = move || names.get().get(&entity_id).cloned();
+
+    view! {
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-2">
+            <div class="flex items-center justify-between">
+                <h3 class="font-medium text-sm">
+                    {move || name().map(|n| n.name).unwrap_or_else(|| format!("Entity {}", entity_id))}
+                </h3>
+                <span class="text-xs text-slate-500">
+                    "ID: " {entity_id}
+                </span>
+            </div>
+
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">"Position:"</span>
+                    <span class="font-mono">
+                        {move || position().map(|p| format!("({:.1}, {:.1})", p.x, p.y)).unwrap_or_else(|| "N/A".to_string())}
+                    </span>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">"Velocity:"</span>
+                    <span class="font-mono">
+                        {move || velocity().map(|v| format!("({:.1}, {:.1})", v.x, v.y)).unwrap_or_else(|| "N/A".to_string())}
+                    </span>
+                </div>
+            </div>
+
+            /* Visual representation */
+            <div class="mt-3 h-32 bg-slate-950 rounded border border-slate-700 relative overflow-hidden">
+                {move || {
+                    position().map(|pos| {
+                        // Map position to canvas coordinates (assuming -200 to 200 range)
+                        let x_percent = ((pos.x + 200.0) / 400.0 * 100.0).clamp(0.0, 100.0);
+                        let y_percent = ((pos.y + 200.0) / 400.0 * 100.0).clamp(0.0, 100.0);
+
+                        view! {
+                            <div
+                                class="absolute w-3 h-3 bg-emerald-500 rounded-full -translate-x-1/2 -translate-y-1/2"
+                                style:left=format!("{}%", x_percent)
+                                style:top=format!("{}%", y_percent)
+                            ></div>
+                        }
+                    })
+                }}
+            </div>
+        </div>
+    }
+}
