@@ -47,7 +47,9 @@ fn App() -> impl IntoView {
     devtools_registry.register::<Velocity>();
     devtools_registry.register::<EntityName>();
 
-    let ws_url = "ws://127.0.0.1:3000";
+    let ws_url = "ws://127.0.0.1:3000/sync";
+    // TEMPORARY: Use different URL for DevTools to test if leptos-use is caching connections
+    let devtools_url = "ws://127.0.0.1:3000/sync?devtools=true";
 
     view! {
         <SyncProvider url=ws_url.to_string() registry=registry auto_connect=true>
@@ -58,7 +60,9 @@ fn App() -> impl IntoView {
                         <EntityList />
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
-                        <DevTools ws_url=ws_url registry=devtools_registry />
+                        // TEMPORARY: Disable DevTools to test if it's interfering with SyncProvider
+                        // <DevTools ws_url=devtools_url registry=devtools_registry />
+                        <div class="p-4 text-slate-400">"DevTools temporarily disabled for testing"</div>
                     </aside>
                 </div>
             </div>
@@ -107,16 +111,30 @@ fn EntityList() -> impl IntoView {
     let velocities = use_sync_component::<Velocity>();
     let names = use_sync_component::<EntityName>();
 
+    // Debug: Log positions signal content
+    Effect::new(move |_| {
+        let pos_map = positions.get();
+        leptos::logging::log!("[EntityList] Positions signal updated: {} entities", pos_map.len());
+        for (entity_id, pos) in pos_map.iter() {
+            leptos::logging::log!("[EntityList] Entity {}: Position({}, {})", entity_id, pos.x, pos.y);
+        }
+    });
+
     view! {
         <div class="space-y-4">
             <h2 class="text-xl font-semibold">"Entities"</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {move || {
+                leptos::logging::log!("[EntityList] Rendering entity cards for {} entities", positions.get().len());
+            }}
                 <For
                     each=move || {
-                        positions.get()
+                        let entity_ids = positions.get()
                             .keys()
                             .copied()
-                            .collect::<Vec<_>>()
+                            .collect::<Vec<_>>();
+                        leptos::logging::log!("[EntityList] For loop: {} entity IDs", entity_ids.len());
+                        entity_ids
                     }
                     key=|entity_id| *entity_id
                     children=move |entity_id| {

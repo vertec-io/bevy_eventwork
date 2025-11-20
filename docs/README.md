@@ -4,6 +4,13 @@ This directory contains comprehensive documentation for bevy_eventwork and gener
 
 ## 📚 Documentation Index
 
+### Architecture & Design
+
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [EVENTWORK_SYNC_ARCHITECTURE.md](./EVENTWORK_SYNC_ARCHITECTURE.md) | Complete architecture guide for eventwork_sync and eventwork_client, including the Meteorite pattern, wire protocol, and subscription flow | Developers using eventwork_sync |
+| [EVENTWORK_SYNC_PERFORMANCE.md](./EVENTWORK_SYNC_PERFORMANCE.md) | Performance analysis, best practices, and optimization guide for eventwork_sync applications | Developers optimizing sync performance |
+
 ### For bevy_eventwork Users
 
 | Document | Description | Audience |

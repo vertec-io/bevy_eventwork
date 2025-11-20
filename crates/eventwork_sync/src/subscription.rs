@@ -190,11 +190,26 @@ pub fn cleanup_disconnected(
     };
 
     for event in events.read() {
-        if let NetworkEvent::Disconnected(connection_id) = event {
-            subscriptions.remove_all_for_connection(*connection_id);
-            mutations
-                .pending
-                .retain(|m| m.connection_id != *connection_id);
+        match event {
+            NetworkEvent::Disconnected(connection_id) => {
+                info!("[eventwork_sync] Cleaning up disconnected connection: {:?}", connection_id);
+
+                let before_subs = subscriptions.subscriptions.len();
+                subscriptions.remove_all_for_connection(*connection_id);
+                let after_subs = subscriptions.subscriptions.len();
+                info!("[eventwork_sync] Removed {} subscriptions for {:?}", before_subs - after_subs, connection_id);
+
+                let before_count = mutations.pending.len();
+                mutations
+                    .pending
+                    .retain(|m| m.connection_id != *connection_id);
+                let after_count = mutations.pending.len();
+                info!("[eventwork_sync] Removed {} pending mutations for {:?}", before_count - after_count, connection_id);
+            }
+            NetworkEvent::Connected(connection_id) => {
+                info!("[eventwork_sync] New connection: {:?}", connection_id);
+            }
+            _ => {}
         }
     }
 }

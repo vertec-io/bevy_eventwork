@@ -68,33 +68,40 @@ pub fn SyncProvider(
         DummyEncoder,
     >(
         &url,
-        UseWebSocketOptions::default(),
+        UseWebSocketOptions::default()
+            .immediate(auto_connect) // Auto-connect if requested
+            .on_open(move |_| {
+                #[cfg(target_arch = "wasm32")]
+                leptos::logging::log!("[SyncProvider] WebSocket opened!");
+            })
+            .on_error(move |e| {
+                #[cfg(target_arch = "wasm32")]
+                leptos::logging::warn!("[SyncProvider] WebSocket error: {:?}", e);
+            }),
     );
-
-    // Auto-connect if requested
-    if auto_connect {
-        open();
-    }
 
     // Create error signal
     let last_error = RwSignal::new(None::<SyncError>);
 
     // Create SyncContext
-    // Wrap the send function to convert SyncClientMessage to NetworkPacket
+    // Wrap the send function to convert SyncClientMessage bytes to NetworkPacket
     let send_arc = Arc::new(move |data: &[u8]| {
-        // Deserialize the bytes to SyncClientMessage
-        if let Ok((msg, _)) = bincode::serde::decode_from_slice::<SyncClientMessage, _>(
-            data,
-            bincode::config::standard(),
-        ) {
-            // Wrap in NetworkPacket and send
-            let packet = NetworkPacket {
-                type_name: std::any::type_name::<SyncClientMessage>().to_string(),
-                schema_hash: 0, // Schema hash not used for sync messages
-                data: bincode::serde::encode_to_vec(&msg, bincode::config::standard()).unwrap(),
-            };
-            raw_send(&packet);
-        }
+        // The data is already serialized SyncClientMessage bytes from SyncContext
+        // Just wrap it in a NetworkPacket
+        let packet = NetworkPacket {
+            type_name: std::any::type_name::<SyncClientMessage>().to_string(),
+            schema_hash: 0, // Schema hash not used for sync messages
+            data: data.to_vec(),
+        };
+
+        #[cfg(target_arch = "wasm32")]
+        leptos::logging::log!(
+            "[SyncProvider] Sending NetworkPacket: type_name={}, data_len={}",
+            packet.type_name,
+            packet.data.len()
+        );
+
+        raw_send(&packet);
     });
 
     let open_arc = Arc::new(move || {
@@ -118,24 +125,49 @@ pub fn SyncProvider(
     provide_context(ctx.clone());
 
     // Set up message handler
+    // Use the same pattern as DevTools: watch raw_message with .with() instead of .get()
     Effect::new(move || {
-        if let Some(packet) = raw_message.get() {
-            // Unwrap NetworkPacket and deserialize to SyncServerMessage
-            match bincode::serde::decode_from_slice::<SyncServerMessage, _>(
-                &packet.data,
-                bincode::config::standard(),
-            ) {
-                Ok((server_msg, _)) => {
-                    handle_server_message(&ctx, server_msg, &last_error);
-                }
-                Err(e) => {
-                    last_error.set(Some(SyncError::DeserializationFailed {
-                        component_name: "SyncServerMessage".to_string(),
-                        error: format!("Failed to deserialize from NetworkPacket: {}", e),
-                    }));
+        raw_message.with(|packet_opt| {
+            #[cfg(target_arch = "wasm32")]
+            leptos::logging::log!(
+                "[SyncProvider] raw_message signal fired, packet present: {}",
+                packet_opt.is_some()
+            );
+
+            if let Some(packet) = packet_opt {
+                #[cfg(target_arch = "wasm32")]
+                leptos::logging::log!(
+                    "[SyncProvider] Received NetworkPacket: type_name={}, data_len={}",
+                    packet.type_name,
+                    packet.data.len()
+                );
+
+                // Unwrap NetworkPacket and deserialize to SyncServerMessage
+                match bincode::serde::decode_from_slice::<SyncServerMessage, _>(
+                    &packet.data,
+                    bincode::config::standard(),
+                ) {
+                    Ok((server_msg, _)) => {
+                        #[cfg(target_arch = "wasm32")]
+                        leptos::logging::log!("[SyncProvider] Successfully deserialized SyncServerMessage");
+
+                        handle_server_message(&ctx, server_msg, &last_error);
+                    }
+                    Err(e) => {
+                        #[cfg(target_arch = "wasm32")]
+                        leptos::logging::warn!(
+                            "[SyncProvider] Failed to deserialize SyncServerMessage: {:?}",
+                            e
+                        );
+
+                        last_error.set(Some(SyncError::DeserializationFailed {
+                            component_name: "SyncServerMessage".to_string(),
+                            error: format!("Failed to deserialize from NetworkPacket: {}", e),
+                        }));
+                    }
                 }
             }
-        }
+        });
     });
 
     // Render children
@@ -168,7 +200,7 @@ fn handle_server_message(
 
 /// Handle a single sync item.
 fn handle_sync_item(
-    _ctx: &SyncContext,
+    ctx: &SyncContext,
     item: eventwork_sync::SyncItem,
 ) -> Result<(), SyncError> {
     use eventwork_sync::SyncItem;
@@ -202,10 +234,11 @@ fn handle_sync_item(
                 );
             }
 
-            // TODO: Update the signal for this component type
-            // This requires storing type-erased update functions in the signal cache
-            // or using a different architecture (e.g., storing signals by component name)
-            // For now, we just log the message - the DevTools will show the data
+            // Update the component_data signal with raw bytes
+            // The Effect in subscribe_component will deserialize and update typed signals
+            ctx.component_data.update(|data| {
+                data.insert((entity_id, component_type.clone()), value);
+            });
 
             Ok(())
         }
@@ -225,7 +258,11 @@ fn handle_sync_item(
                 );
             }
 
-            // TODO: Phase 2 - Remove component from signal
+            // Remove the component from component_data
+            ctx.component_data.update(|data| {
+                data.remove(&(entity_id, component_type.clone()));
+            });
+
             Ok(())
         }
         SyncItem::EntityRemoved {
@@ -242,7 +279,11 @@ fn handle_sync_item(
                 );
             }
 
-            // TODO: Phase 2 - Handle entity removal across all component types
+            // Remove all components for this entity
+            ctx.component_data.update(|data| {
+                data.retain(|(eid, _), _| *eid != entity_id);
+            });
+
             Ok(())
         }
     }

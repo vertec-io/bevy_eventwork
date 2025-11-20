@@ -8,7 +8,7 @@ use leptos_use::core::ConnectionReadyState;
 use crate::error::SyncError;
 use crate::registry::ClientRegistry;
 use crate::traits::SyncComponent;
-use eventwork_sync::{SerializableEntity, SubscriptionRequest, UnsubscribeRequest};
+use eventwork_sync::{SerializableEntity, SubscriptionRequest, UnsubscribeRequest, SyncClientMessage};
 
 /// Connection control interface exposed to components.
 ///
@@ -49,6 +49,10 @@ pub struct SyncContext {
     subscriptions: Arc<Mutex<HashMap<String, (u64, usize)>>>,
     /// Next subscription ID
     next_subscription_id: Arc<Mutex<u64>>,
+    /// Raw component data storage: (entity_id, component_name) -> raw bytes
+    /// This is the central storage that handle_sync_item updates
+    /// Effects in subscribe_component watch this and deserialize to typed signals
+    pub(crate) component_data: RwSignal<HashMap<(u64, String), Vec<u8>>>,
 }
 
 impl SyncContext {
@@ -73,6 +77,7 @@ impl SyncContext {
             signal_cache: Arc::new(Mutex::new(HashMap::new())),
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             next_subscription_id: Arc::new(Mutex::new(0)),
+            component_data: RwSignal::new(HashMap::new()),
         }
     }
 
@@ -141,8 +146,87 @@ impl SyncContext {
         // Increment ref count and send subscription request if this is the first subscription
         let is_first = self.increment_subscription(component_name);
         if is_first {
-            self.send_subscription_request(component_name, None);
+            // Set up an Effect to send the subscription request when the WebSocket is open
+            let ctx = self.clone();
+            let component_name_owned = component_name.to_string();
+            let ready_state = self.ready_state;
+
+            Effect::new(move |_| {
+                if ready_state.get() == ConnectionReadyState::Open {
+                    #[cfg(target_arch = "wasm32")]
+                    leptos::logging::log!(
+                        "[SyncContext] WebSocket is open, sending subscription request for '{}'",
+                        component_name_owned
+                    );
+
+                    ctx.send_subscription_request(&component_name_owned, None);
+                }
+            });
         }
+
+        // Set up Effect to watch component_data and deserialize to typed signal
+        // This is the Meteorite pattern: raw bytes -> Effect -> typed signal
+        let component_data = self.component_data;
+        let registry = self.registry.clone();
+        let component_name_str = component_name.to_string();
+        let signal_clone = signal;
+
+        Effect::new(move |_| {
+            let data_map = component_data.get();
+            let mut typed_map = HashMap::new();
+
+            #[cfg(target_arch = "wasm32")]
+            leptos::logging::log!(
+                "[SyncContext] Effect triggered for component '{}', data_map has {} entries",
+                component_name_str,
+                data_map.len()
+            );
+
+            // Iterate through all entities and deserialize components of type T
+            for ((entity_id, comp_name), bytes) in data_map.iter() {
+                if comp_name == &component_name_str {
+                    #[cfg(target_arch = "wasm32")]
+                    leptos::logging::log!(
+                        "[SyncContext] Found matching component '{}' for entity {}, {} bytes",
+                        comp_name,
+                        entity_id,
+                        bytes.len()
+                    );
+
+                    // Deserialize the component
+                    match registry.deserialize::<T>(comp_name, bytes) {
+                        Ok(component) => {
+                            #[cfg(target_arch = "wasm32")]
+                            leptos::logging::log!(
+                                "[SyncContext] Successfully deserialized {} for entity {}",
+                                comp_name,
+                                entity_id
+                            );
+                            typed_map.insert(*entity_id, component);
+                        }
+                        Err(err) => {
+                            #[cfg(target_arch = "wasm32")]
+                            leptos::logging::warn!(
+                                "[SyncContext] Failed to deserialize {} for entity {}: {:?}",
+                                comp_name,
+                                entity_id,
+                                err
+                            );
+                        }
+                    }
+                }
+            }
+
+            #[cfg(target_arch = "wasm32")]
+            leptos::logging::log!(
+                "[SyncContext] Setting signal for '{}' with {} entities",
+                component_name_str,
+                typed_map.len()
+            );
+
+            // Update the typed signal
+            signal_clone.set(typed_map);
+        });
 
         // Set up cleanup on unmount
         let ctx = self.clone();
@@ -153,7 +237,7 @@ impl SyncContext {
             }
         });
 
-        signal.read_only()
+        signal_clone.read_only()
     }
 
     /// Increment subscription ref count. Returns true if this is the first subscription.
@@ -203,8 +287,9 @@ impl SyncContext {
             entity,
         };
 
-        // Serialize and send
-        if let Ok(bytes) = bincode::serde::encode_to_vec(&request, bincode::config::standard()) {
+        // Wrap in SyncClientMessage and serialize
+        let message = SyncClientMessage::Subscription(request);
+        if let Ok(bytes) = bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
             (self.send)(&bytes);
         }
     }
@@ -215,8 +300,9 @@ impl SyncContext {
             subscription_id,
         };
 
-        // Serialize and send
-        if let Ok(bytes) = bincode::serde::encode_to_vec(&request, bincode::config::standard()) {
+        // Wrap in SyncClientMessage and serialize
+        let message = SyncClientMessage::Unsubscribe(request);
+        if let Ok(bytes) = bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
             (self.send)(&bytes);
         }
     }
