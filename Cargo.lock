@@ -2743,8 +2743,10 @@ dependencies = [
  "eventwork_websockets",
  "leptos",
  "leptos-use",
+ "reactive_graph",
  "reactive_stores 0.2.5",
  "serde",
+ "serde_json",
  "thiserror 2.0.17",
  "wasm-bindgen-test",
 ]
@@ -2769,20 +2771,6 @@ dependencies = [
  "serde",
  "wasm-bindgen",
  "web-sys",
-]
-
-[[package]]
-name = "eventwork_devtools"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "eventwork_common",
- "eventwork_sync",
- "leptos",
- "leptos-use",
- "reactive_graph",
- "serde",
- "serde_json",
 ]
 
 [[package]]

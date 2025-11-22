@@ -258,3 +258,194 @@ pub fn use_sync_mutations() -> ReadSignal<HashMap<u64, MutationState>> {
     ctx.mutations()
 }
 
+/// Hook for editable component fields with automatic local state management.
+///
+/// This hook simplifies the pattern of creating editable fields that sync with the server.
+/// It manages:
+/// - Local state for immediate UI updates
+/// - Focus tracking to prevent server updates from overwriting user input
+/// - Automatic sync from server to local when not editing
+/// - Commit function to send mutations to server
+///
+/// # Returns
+///
+/// A tuple of:
+/// - `ReadSignal<Option<T>>`: Server value (read-only, from subscription)
+/// - `RwSignal<T>`: Local value (read-write, for immediate UI updates)
+/// - `WriteSignal<()>`: Commit function (call to send mutation to server)
+///
+/// # Panics
+///
+/// Panics if called outside of a `SyncProvider` context.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::{use_sync_component_write, SyncComponent};
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct Position {
+///     x: f32,
+///     y: f32,
+/// }
+///
+/// impl_sync_component!(Position);
+///
+/// #[component]
+/// fn PositionEditor(entity_id: u64) -> impl IntoView {
+///     let (server_pos, local_pos, commit_pos) =
+///         use_sync_component_write::<Position>(entity_id);
+///
+///     view! {
+///         <div>
+///             <input
+///                 type="number"
+///                 prop:value=move || local_pos.get().x.to_string()
+///                 on:input=move |ev| {
+///                     local_pos.update(|pos| {
+///                         pos.x = event_target_value(&ev).parse().unwrap_or(pos.x);
+///                     });
+///                 }
+///                 on:blur=move |_| commit_pos.set(())
+///             />
+///             <input
+///                 type="number"
+///                 prop:value=move || local_pos.get().y.to_string()
+///                 on:input=move |ev| {
+///                     local_pos.update(|pos| {
+///                         pos.y = event_target_value(&ev).parse().unwrap_or(pos.y);
+///                     });
+///                 }
+///                 on:blur=move |_| commit_pos.set(())
+///             />
+///         </div>
+///     }
+/// }
+/// ```
+pub fn use_sync_component_write<T: SyncComponent + Clone + Default + 'static>(
+    entity_id: u64,
+) -> (
+    Signal<Option<T>>,
+    RwSignal<T>,
+    WriteSignal<()>,
+) {
+    let ctx = expect_context::<SyncContext>();
+
+    // Subscribe to all instances of this component type
+    let all_components = use_sync_component::<T>();
+
+    // Create a derived signal for just this entity's component
+    let server_value = Signal::derive(move || {
+        all_components.get().get(&entity_id).cloned()
+    });
+
+    // Create local editable value (initialized with default)
+    let local_value = RwSignal::new(T::default());
+
+    // Track if currently editing (has focus)
+    let (is_editing, set_is_editing) = signal(false);
+
+    // Sync server -> local when not editing
+    Effect::new(move |_| {
+        if !is_editing.get() {
+            if let Some(value) = server_value.get() {
+                local_value.set(value);
+            }
+        }
+    });
+
+    // Create commit signal
+    let (commit_trigger, set_commit_trigger) = signal(());
+
+    // Track if this is the first run to avoid sending mutation on mount
+    let is_first_run = RwSignal::new(true);
+
+    // Handle commits - use untracked to avoid reactivity to local_value changes
+    Effect::new(move |_| {
+        commit_trigger.track();
+
+        // Skip the first run to avoid sending mutation on mount
+        if is_first_run.get_untracked() {
+            is_first_run.set(false);
+            return;
+        }
+
+        // Read local_value without tracking to avoid infinite loops
+        let value = local_value.get_untracked();
+        ctx.mutate(entity_id, value);
+
+        set_is_editing.set(false);
+    });
+
+    // Return read-only server, read-write local, and commit trigger
+    (server_value, local_value, set_commit_trigger)
+}
+
+/// Hook for creating controlled input fields with focus tracking.
+///
+/// This is a lower-level hook that manages the boilerplate of creating an editable
+/// field that syncs with a server value but doesn't overwrite user input during editing.
+///
+/// Unlike `use_sync_component_write`, this hook works with any value type and doesn't
+/// automatically send mutations - you provide the commit callback.
+///
+/// The key feature is that it returns a **derived signal** that switches between the
+/// local (editing) value and the server value based on focus state. This prevents
+/// the DOM from being updated while the user is editing, which would steal focus.
+///
+/// # Returns
+///
+/// A tuple of:
+/// - `Signal<T>`: Display value (derived signal that switches between local and server)
+/// - `RwSignal<T>`: Local value (write-only, for `on:input` handler)
+/// - `WriteSignal<bool>`: Focus setter (call with `true` on focus, `false` on blur)
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::use_controlled_input;
+///
+/// #[component]
+/// fn NumberInput(server_value: Signal<String>, on_commit: impl Fn(String) + 'static) -> impl IntoView {
+///     let (display_value, local_value, set_is_focused) = use_controlled_input(server_value);
+///
+///     view! {
+///         <input
+///             prop:value=move || display_value.get()
+///             on:input=move |ev| local_value.set(event_target_value(&ev))
+///             on:focus=move |_| set_is_focused.set(true)
+///             on:blur=move |_| {
+///                 set_is_focused.set(false);
+///                 on_commit(local_value.get_untracked());
+///             }
+///         />
+///     }
+/// }
+/// ```
+pub fn use_controlled_input<T: Clone + Send + Sync + 'static>(
+    server_value: Signal<T>,
+) -> (Signal<T>, RwSignal<T>, WriteSignal<bool>) {
+    // Create local editable value
+    let local_value = RwSignal::new(server_value.get_untracked());
+
+    // Track if currently focused
+    let (is_focused, set_is_focused) = signal(false);
+
+    // Create a derived signal that chooses between local and server value based on focus
+    // This prevents DOM updates while editing
+    let display_value = Signal::derive(move || {
+        if is_focused.get() {
+            // While focused, show local value (user's edits)
+            local_value.get()
+        } else {
+            // When not focused, show server value and sync local
+            let server = server_value.get();
+            local_value.update_untracked(|v| *v = server.clone());
+            server
+        }
+    });
+
+    (display_value, local_value, set_is_focused)
+}
+

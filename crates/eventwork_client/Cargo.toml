@@ -24,6 +24,10 @@ eventwork_common = { path = "../eventwork_common" }
 # Optional dependencies for stores
 reactive_stores = { version = "0.2", optional = true }
 
+# Optional dependencies for devtools
+serde_json = { version = "1", optional = true }
+reactive_graph = { version = "0.2", optional = true }
+
 # Utility dependencies
 thiserror = "2.0"
 
@@ -41,7 +45,7 @@ eventwork_sync = { path = "../eventwork_sync", features = ["runtime"] }
 [features]
 default = []
 stores = ["dep:reactive_stores"]
-devtools = []
+devtools = ["dep:serde_json", "dep:reactive_graph"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

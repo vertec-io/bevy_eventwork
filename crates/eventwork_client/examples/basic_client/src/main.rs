@@ -14,10 +14,10 @@
 //!   trunk serve --open
 
 use eventwork_client::{
-    use_sync_component, use_sync_component_store, use_sync_connection, ClientRegistryBuilder,
-    SyncProvider,
+    use_sync_component, use_sync_component_store, use_sync_component_write, use_sync_connection,
+    ClientRegistryBuilder, SyncProvider,
+    devtools::DevTools,
 };
-use eventwork_devtools::DevTools;
 use eventwork_sync::client_registry::ComponentTypeRegistry;
 use leptos::prelude::*;
 use reactive_graph::traits::{Get, Read};
@@ -96,9 +96,7 @@ fn App() -> impl IntoView {
                         </div>
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
-                        // TEMPORARY: Disable DevTools to test if it's interfering with SyncProvider
-                        // <DevTools ws_url=devtools_url registry=devtools_registry />
-                        <div class="p-4 text-slate-400">"DevTools temporarily disabled for testing"</div>
+                        <DevTools ws_url=devtools_url registry=devtools_registry />
                     </aside>
                 </div>
             </div>
@@ -218,6 +216,9 @@ fn EntityCard(entity_id: u64) -> impl IntoView {
                     </span>
                 </div>
             </div>
+
+            /* Editable Position (demonstrates use_sync_component_write hook) */
+            <EditablePosition entity_id=entity_id />
 
             /* Visual representation */
             <div class="mt-3 h-32 bg-slate-950 rounded border border-slate-700 relative overflow-hidden">
@@ -340,6 +341,54 @@ fn EntityCardWithStore(
 
             <div class="text-xs text-slate-500 italic mt-2">
                 "Using Store for fine-grained reactivity"
+            </div>
+        </div>
+    }
+}
+
+/// Demonstrates the use_sync_component_write hook for editable fields
+#[component]
+fn EditablePosition(entity_id: u64) -> impl IntoView {
+    // Use the write hook to get server value, local value, and commit function
+    let (_server_pos, local_pos, commit_pos) = use_sync_component_write::<Position>(entity_id);
+
+    view! {
+        <div class="mt-3 pt-3 border-t border-slate-800">
+            <div class="text-xs text-slate-400 mb-2">"Edit Position (use_sync_component_write):"</div>
+            <div class="flex gap-2">
+                <div class="flex-1">
+                    <label class="text-[10px] text-slate-500">"X:"</label>
+                    <input
+                        type="number"
+                        step="0.1"
+                        class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        prop:value=move || local_pos.get().x.to_string()
+                        on:input=move |ev| {
+                            local_pos.update(|pos| {
+                                pos.x = event_target_value(&ev).parse().unwrap_or(pos.x);
+                            });
+                        }
+                        on:blur=move |_| commit_pos.set(())
+                    />
+                </div>
+                <div class="flex-1">
+                    <label class="text-[10px] text-slate-500">"Y:"</label>
+                    <input
+                        type="number"
+                        step="0.1"
+                        class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        prop:value=move || local_pos.get().y.to_string()
+                        on:input=move |ev| {
+                            local_pos.update(|pos| {
+                                pos.y = event_target_value(&ev).parse().unwrap_or(pos.y);
+                            });
+                        }
+                        on:blur=move |_| commit_pos.set(())
+                    />
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-1 italic">
+                "Changes are sent to server on blur"
             </div>
         </div>
     }

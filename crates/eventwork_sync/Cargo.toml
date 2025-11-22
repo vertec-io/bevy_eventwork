@@ -9,7 +9,7 @@ license = "MIT"
 [features]
 default = ["runtime"]
 # `runtime` pulls in the full eventwork dependency graph (async-net, etc.) for
-# Bevy server applications. Frontend crates (like `eventwork_devtools`) can
+# Bevy server applications. Frontend crates (like `eventwork_client`) can
 # disable default features to avoid non-wasm-compatible dependencies while
 # still reusing the wire-level message types and client_registry.
 runtime = ["dep:eventwork", "dep:bevy", "dep:eventwork_common", "dep:thiserror"]

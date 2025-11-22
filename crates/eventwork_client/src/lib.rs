@@ -67,7 +67,10 @@ mod traits;
 // Re-exports
 pub use context::{MutationState, SyncConnection, SyncContext};
 pub use error::SyncError;
-pub use hooks::{use_sync_component, use_sync_connection, use_sync_context, use_sync_mutations};
+pub use hooks::{
+    use_controlled_input, use_sync_component, use_sync_component_write, use_sync_connection,
+    use_sync_context, use_sync_mutations,
+};
 pub use provider::SyncProvider;
 pub use registry::{ClientRegistry, ClientRegistryBuilder};
 pub use traits::SyncComponent;
@@ -79,6 +82,9 @@ pub use eventwork_sync::MutationStatus;
 #[cfg(feature = "stores")]
 pub use hooks::use_sync_component_store;
 
-// #[cfg(feature = "devtools")]
-// pub mod devtools;
+#[cfg(feature = "devtools")]
+pub mod devtools;
+
+#[cfg(all(feature = "devtools", target_arch = "wasm32"))]
+pub use devtools::{DevTools, DevToolsMode};
 

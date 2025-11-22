@@ -1,158 +1,32 @@
+//! DevTools UI components
+//!
+//! This module contains the DevTools widget and related UI components.
+
+use crate::devtools::sync::{DevtoolsSync, use_sync};
+
+use eventwork_common::codec::EventworkBincodeCodec;
+use eventwork_common::NetworkPacket;
 use leptos::prelude::*;
+use leptos::web_sys::console;
+use leptos_use::{
+    core::ConnectionReadyState,
+    use_websocket_with_options,
+    DummyEncoder,
+    UseWebSocketOptions,
+    UseWebSocketReturn,
+};
 use reactive_graph::traits::{Get, Update};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use eventwork_sync::{
-    MutationResponse,
     SerializableEntity,
     SyncClientMessage,
-    SyncServerMessage,
-    client_registry::ComponentTypeRegistry,
-    client_sync::SyncClient,
-};
-
-/// Leptos-reactive wrapper around `SyncClient` for use in Leptos applications.
-///
-/// This provides the same API as `SyncClient` but with reactive signals for
-/// tracking mutation state in Leptos components.
-#[derive(Clone)]
-pub struct DevtoolsSync {
-    client: Arc<SyncClient>,
-    mutations: RwSignal<HashMap<u64, eventwork_sync::client_sync::MutationState>>,
-}
-
-// Re-export MutationState from eventwork_sync for convenience
-pub use eventwork_sync::client_sync::MutationState;
-
-// Re-export DevTools UI components for WASM targets
-#[cfg(target_arch = "wasm32")]
-pub use ui::{DevTools, DevToolsMode};
-
-/// General-purpose sync hook for wiring the eventwork_sync wire protocol
-/// into an arbitrary transport (typically a WebSocket using eventwork's
-/// binary codec).
-///
-/// The `send` closure is responsible for serializing and transmitting
-/// `SyncClientMessage` values. This keeps the devtools crate agnostic of
-/// any particular WebSocket or HTTP client implementation.
-///
-/// The `registry` is used to serialize mutations from JSON back to the
-/// concrete component types expected by the server.
-pub fn use_sync(
-    send: impl Fn(SyncClientMessage) + Send + Sync + 'static,
-    registry: ComponentTypeRegistry,
-) -> DevtoolsSync {
-    let client = Arc::new(SyncClient::new(send, registry));
-    let mutations = RwSignal::new(HashMap::new());
-
-    DevtoolsSync {
-        client,
-        mutations,
-    }
-}
-
-impl DevtoolsSync {
-    /// Send a raw `SyncClientMessage` without any local bookkeeping.
-    ///
-    /// This is useful for subscription management or other operations
-    /// that don't need per-request client-side tracking.
-    pub fn send_raw(&self, message: SyncClientMessage) {
-        self.client.send_raw(message);
-    }
-
-    /// Read-only view of all tracked mutations keyed by `request_id`.
-    pub fn mutations(&self) -> RwSignal<HashMap<u64, MutationState>> {
-        self.mutations
-    }
-
-    /// Convenience accessor for a single mutation state, if known.
-    pub fn mutation_state(&self, request_id: u64) -> Option<MutationState> {
-        self.mutations.get().get(&request_id).cloned()
-    }
-
-    /// Queue a new mutation for `(entity, component_type)` with the
-    /// provided JSON value. Returns the generated `request_id` that will
-    /// be echoed back by the server in its `MutationResponse`.
-    pub fn mutate(
-        &self,
-        entity: SerializableEntity,
-        component_type: impl Into<String>,
-        value: JsonValue,
-    ) -> u64 {
-        // Delegate to SyncClient
-        let request_id = self.client.mutate(entity, component_type, value);
-
-        // Track in reactive signal for Leptos
-        self.mutations.update(|map| {
-            map.insert(request_id, MutationState::new_pending(request_id));
-        });
-
-        request_id
-    }
-
-    /// Handle a server-side message, updating mutation state when a
-    /// `MutationResponse` is observed.
-    pub fn handle_server_message(&self, message: &SyncServerMessage) {
-        // Delegate to SyncClient
-        self.client.handle_server_message(message);
-
-        // Sync the mutation state to our reactive signal
-        self.sync_mutations_from_client();
-    }
-
-    /// Helper to handle a `MutationResponse` directly, for cases where
-    /// the transport layer already demultiplexes server messages.
-    pub fn handle_mutation_response(&self, response: &MutationResponse) {
-        // Delegate to SyncClient
-        self.client.handle_mutation_response(response);
-
-        // Sync the mutation state to our reactive signal
-        self.sync_mutations_from_client();
-    }
-
-    /// Sync mutation state from the underlying SyncClient to the reactive signal.
-    fn sync_mutations_from_client(&self) {
-        let client_mutations = self.client.mutations();
-        self.mutations.set(client_mutations);
-    }
-
-    /// Get a reference to the underlying SyncClient.
-    pub fn client(&self) -> &SyncClient {
-        &self.client
-    }
-}
-
-
-// Re-export core wire-level types so downstream tools can depend on this
-// crate alone for typical sync workflows.
-pub use eventwork_sync::{
-    MutateComponent as SyncMutateComponent,
-    MutationResponse as SyncMutationResponse,
-    MutationStatus as SyncMutationStatus,
-    SerializableEntity as SyncSerializableEntity,
-    SyncBatch,
-    SyncClientMessage as SyncClientMsg,
     SyncItem,
-    SyncServerMessage as SyncServerMsg,
+    SyncServerMessage,
     SubscriptionRequest,
-    UnsubscribeRequest,
+    client_registry::ComponentTypeRegistry,
 };
-
-#[cfg(target_arch = "wasm32")]
-pub mod ui {
-    use super::*;
-    use eventwork_common::codec::EventworkBincodeCodec;
-    use eventwork_common::NetworkPacket;
-    use leptos_use::{
-        core::ConnectionReadyState,
-        use_websocket_with_options,
-        DummyEncoder,
-        UseWebSocketOptions,
-        UseWebSocketReturn,
-    };
-    use leptos::web_sys::console;
 
     fn entity_label(id: u64, components: &HashMap<String, JsonValue>) -> String {
         for value in components.values() {
@@ -222,10 +96,6 @@ pub mod ui {
         sync: RwSignal<DevtoolsSync>,
     ) -> impl IntoView {
         let component_type_for_fields = component_type.clone();
-
-        // Track which field is currently being edited (entity_id, component_type, field_name)
-        let (editing_field, set_editing_field) = signal::<Option<(u64, String, String)>>(None);
-
         let fields = move || {
             entities
                 .get()
@@ -256,12 +126,6 @@ pub mod ui {
                         let field_for_handler = field_name.clone();
                         let entity_bits_for_handler = entity_bits;
 
-                        // Clone for use in multiple closures
-                        let component_type_for_focus = component_type_for_handler.clone();
-                        let field_for_focus = field_for_handler.clone();
-                        let component_type_for_blur = component_type_for_handler.clone();
-                        let field_for_blur = field_for_handler.clone();
-
                         let field_view: AnyView = match field_value {
                             JsonValue::Bool(b) => view! {
                                 <div class="flex items-center justify-between gap-2">
@@ -285,49 +149,22 @@ pub mod ui {
                                 </div>
                             }.into_any(),
                             JsonValue::Number(num) => {
-                                // Create local state for this input field
-                                let (local_value, set_local_value) = signal(num.to_string());
-                                let (is_focused, set_is_focused) = signal(false);
-
-                                // Update local state when server value changes, but only if not focused
-                                let num_for_effect = num.clone();
-                                Effect::new(move |_| {
-                                    if !is_focused.get() {
-                                        set_local_value.set(num_for_effect.to_string());
-                                    }
-                                });
-
+                                let initial = num.to_string();
                                 view! {
                                     <div class="space-y-1">
                                         <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
                                         <input
                                             class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                            prop:value=move || local_value.get()
-                                            on:input=move |ev| {
-                                                // Update local state immediately for responsive UI
-                                                set_local_value.set(event_target_value(&ev));
-                                            }
-                                            on:focus=move |_| {
-                                                set_is_focused.set(true);
-                                                set_editing_field.set(Some((
-                                                    entity_bits_for_handler,
-                                                    component_type_for_focus.clone(),
-                                                    field_for_focus.clone(),
-                                                )));
-                                            }
-                                            on:blur=move |_| {
-                                                set_is_focused.set(false);
-                                                set_editing_field.set(None);
-
-                                                // Send mutation to server on blur
-                                                let raw = local_value.get();
+                                            value=initial
+                                            on:change=move |ev| {
+                                                let raw = event_target_value(&ev);
                                                 if let Some(num) = parse_number_like(&num, &raw) {
                                                     apply_field_update(
                                                         entities_for_handler,
                                                         sync_for_handler,
                                                         entity_bits_for_handler,
-                                                        component_type_for_blur.clone(),
-                                                        field_for_blur.clone(),
+                                                        component_type_for_handler.clone(),
+                                                        field_for_handler.clone(),
                                                         JsonValue::Number(num),
                                                     );
                                                 }
@@ -336,56 +173,26 @@ pub mod ui {
                                     </div>
                                 }.into_any()
                             }
-                            JsonValue::String(s) => {
-                                // Create local state for this input field
-                                let (local_value, set_local_value) = signal(s.clone());
-                                let (is_focused, set_is_focused) = signal(false);
-
-                                // Update local state when server value changes, but only if not focused
-                                let s_for_effect = s.clone();
-                                Effect::new(move |_| {
-                                    if !is_focused.get() {
-                                        set_local_value.set(s_for_effect.clone());
-                                    }
-                                });
-
-                                view! {
-                                    <div class="space-y-1">
-                                        <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
-                                        <input
-                                            class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                            prop:value=move || local_value.get()
-                                            on:input=move |ev| {
-                                                // Update local state immediately for responsive UI
-                                                set_local_value.set(event_target_value(&ev));
-                                            }
-                                            on:focus=move |_| {
-                                                set_is_focused.set(true);
-                                                set_editing_field.set(Some((
-                                                    entity_bits_for_handler,
-                                                    component_type_for_focus.clone(),
-                                                    field_for_focus.clone(),
-                                                )));
-                                            }
-                                            on:blur=move |_| {
-                                                set_is_focused.set(false);
-                                                set_editing_field.set(None);
-
-                                                // Send mutation to server on blur
-                                                let raw = local_value.get();
-                                                apply_field_update(
-                                                    entities_for_handler,
-                                                    sync_for_handler,
-                                                    entity_bits_for_handler,
-                                                    component_type_for_blur.clone(),
-                                                    field_for_blur.clone(),
-                                                    JsonValue::String(raw),
-                                                );
-                                            }
-                                        />
-                                    </div>
-                                }.into_any()
-                            },
+                            JsonValue::String(s) => view! {
+                                <div class="space-y-1">
+                                    <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
+                                    <input
+                                        class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                        value=s
+                                        on:change=move |ev| {
+                                            let raw = event_target_value(&ev);
+                                            apply_field_update(
+                                                entities_for_handler,
+                                                sync_for_handler,
+                                                entity_bits_for_handler,
+                                                component_type_for_handler.clone(),
+                                                field_for_handler.clone(),
+                                                JsonValue::String(raw),
+                                            );
+                                        }
+                                    />
+                                </div>
+                            }.into_any(),
                             other => {
                                 let json = serde_json::to_string_pretty(&other).unwrap_or_default();
                                 view! {
@@ -662,11 +469,15 @@ pub mod ui {
             (roots, children_map)
         };
 
-        let selected = move || {
-            selected_entity
-                .get()
-                .and_then(|id| entities.get().get(&id).cloned().map(|components| (id, components)))
-        };
+        // The selected entity ID - this is the only thing we memoize to prevent
+        // recreating the entire inspector view when the user clicks a different entity.
+        // We DON'T memoize the component data because that would create a reactive
+        // dependency on the entities signal, causing the Memo to recompute on every update.
+        let selected_id = Memo::new(move |_| {
+            let id = selected_entity.get();
+            leptos::logging::log!("🔍 selected_id Memo recomputed: {:?}", id);
+            id
+        });
 
         // Render based on mode
         match mode {
@@ -921,7 +732,7 @@ pub mod ui {
                         <h2 class="text-sm font-semibold text-slate-100 mb-2 flex-shrink-0">"Inspector"</h2>
                         <div class="flex-1 overflow-y-auto min-h-0">
                             <Show
-                                when=move || selected().is_some()
+                                when=move || selected_id.get().is_some()
                                 fallback=move || view! {
                                     <div class="text-[11px] text-slate-500">
                                         "Select an entity from the left to inspect and edit its components."
@@ -929,7 +740,11 @@ pub mod ui {
                                 }
                             >
                                 {move || {
-                                    let Some((id, components)) = selected() else {
+                                    // Look up the component data reactively here, not in the Memo
+                                    let Some(id) = selected_id.get() else {
+                                        return ().into_view().into_any();
+                                    };
+                                    let Some(components) = entities.get().get(&id).cloned() else {
                                         return ().into_view().into_any();
                                     };
 
@@ -948,30 +763,55 @@ pub mod ui {
                                             <div class="border-t border-slate-800 pt-3 space-y-3">
                                             <For
                                                 each=move || {
-                                                    let mut v: Vec<(String, JsonValue)> = components
-                                                        .iter()
-                                                        .map(|(ty, value)| (ty.clone(), value.clone()))
+                                                    // Only pass component type names, not values
+                                                    // This prevents the For component from recreating children when values change
+                                                    let mut types: Vec<String> = components
+                                                        .keys()
+                                                        .cloned()
                                                         .collect();
-                                                    v.sort_by_key(|(ty, _)| ty.clone());
-                                                    v
+                                                    types.sort();
+                                                    types
                                                 }
-                                                key=|(ty, _)| ty.clone()
-                                                children=move |(ty, value): (String, JsonValue)| {
+                                                key=|ty: &String| ty.clone()
+                                                children=move |ty: String| {
                                                     let entities_for = entities;
                                                     let sync_for = sync;
                                                     let ty_for = ty.clone();
+                                                    let ty_for_value = ty.clone();
                                                     let id_for = id;
-                                                    let body: AnyView = match value {
-                                                        JsonValue::Object(_) => {
+
+                                                    let body: AnyView = {
+                                                        // Check if this is an Object component (editable) or other (read-only)
+                                                        // Use get_untracked() to avoid creating a reactive dependency
+                                                        // We only need to check this once when the component is first rendered
+                                                        let is_object = entities_for
+                                                            .get_untracked()
+                                                            .get(&id_for)
+                                                            .and_then(|comps| comps.get(&ty_for_value))
+                                                            .map(|v| matches!(v, JsonValue::Object(_)))
+                                                            .unwrap_or(false);
+
+                                                        if is_object {
                                                             component_editor(id_for, ty_for.clone(), entities_for, sync_for)
                                                                 .into_view()
                                                                 .into_any()
-                                                        }
-                                                        other => {
-                                                            let json = serde_json::to_string_pretty(&other).unwrap_or_default();
+                                                        } else {
+                                                            // For non-object components, create a reactive signal for the value
+                                                            let component_value = move || {
+                                                                entities_for
+                                                                    .get()
+                                                                    .get(&id_for)
+                                                                    .and_then(|comps| comps.get(&ty_for_value))
+                                                                    .cloned()
+                                                            };
+
                                                             view! {
                                                                 <pre class="mt-1 bg-slate-950/60 border border-slate-800 rounded p-1 font-mono text-[10px] whitespace-pre-wrap break-all">
-                                                                    {json}
+                                                                    {move || {
+                                                                        component_value()
+                                                                            .and_then(|v| serde_json::to_string_pretty(&v).ok())
+                                                                            .unwrap_or_default()
+                                                                    }}
                                                                 </pre>
                                                             }.into_any()
                                                         }
@@ -1129,4 +969,3 @@ pub mod ui {
             }
         }
     }
-}

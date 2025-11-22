@@ -27,8 +27,7 @@ wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["console"] }
 
 # Eventwork dependencies
-eventwork_client = { path = "../..", features = ["stores"] }
-eventwork_devtools = { path = "../../../eventwork_devtools" }
+eventwork_client = { path = "../..", features = ["stores", "devtools"] }
 eventwork_sync = { path = "../../../eventwork_sync", default-features = false }
 eventwork_client_example_shared = { path = "../../../eventwork_client_example_shared", features = ["stores"] }
 

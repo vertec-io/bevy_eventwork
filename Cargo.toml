@@ -9,7 +9,6 @@ members = [
     "crates/eventwork_sync",
     "crates/eventwork_client",
     "crates/eventwork_client_example_shared",
-    "crates/eventwork_devtools",
     "crates/demo_shared",
     "crates/fanuc_shared",
     "crates/fanuc_real_shared",
@@ -24,7 +23,6 @@ exclude = [
     "crates/eventwork_websockets/src/wasm_client_example",
     "crates/eventwork/examples",
     "crates/eventwork_websockets/leptos_client_example",
-    "crates/eventwork_devtools/devtools-demo-client",
 ]
 
 
