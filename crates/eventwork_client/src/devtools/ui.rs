@@ -7,6 +7,7 @@ use crate::devtools::sync::{DevtoolsSync, use_sync};
 use eventwork_common::codec::EventworkBincodeCodec;
 use eventwork_common::NetworkPacket;
 use leptos::prelude::*;
+use leptos::html::Input;
 use leptos::web_sys::console;
 use leptos_use::{
     core::ConnectionReadyState,
@@ -96,17 +97,19 @@ use eventwork_sync::{
         sync: RwSignal<DevtoolsSync>,
     ) -> impl IntoView {
         let component_type_for_fields = component_type.clone();
-        let fields = move || {
+
+        // Get field names only (stable keys for For component)
+        // Use .get_untracked() to avoid creating reactive dependency that would cause For to re-run
+        let field_names = move || {
             entities
-                .get()
+                .get_untracked()
                 .get(&entity_bits)
                 .and_then(|components| components.get(&component_type_for_fields))
                 .and_then(|value| {
                     if let JsonValue::Object(obj) = value {
-                        let mut v: Vec<(String, JsonValue)> =
-                            obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                        v.sort_by_key(|(k, _)| k.clone());
-                        Some(v)
+                        let mut keys: Vec<String> = obj.keys().cloned().collect();
+                        keys.sort();
+                        Some(keys)
                     } else {
                         None
                     }
@@ -117,54 +120,138 @@ use eventwork_sync::{
         view! {
             <div class="space-y-2">
                 <For
-                    each=fields
-                    key=|(field, _)| field.clone()
-                    children=move |(field_name, field_value): (String, JsonValue)| {
-                        let entities_for_handler = entities;
-                        let sync_for_handler = sync;
-                        let component_type_for_handler = component_type.clone();
-                        let field_for_handler = field_name.clone();
-                        let entity_bits_for_handler = entity_bits;
+                    each=field_names
+                    key=|name| name.clone()
+                    children=move |field_name: String| {
+                        // Get the initial field value to determine the field type
+                        let initial_field_value = entities
+                            .get_untracked()
+                            .get(&entity_bits)
+                            .and_then(|c| c.get(&component_type))
+                            .and_then(|v| {
+                                if let JsonValue::Object(obj) = v {
+                                    obj.get(&field_name).cloned()
+                                } else {
+                                    None
+                                }
+                            });
 
-                        let field_view: AnyView = match field_value {
-                            JsonValue::Bool(b) => view! {
-                                <div class="flex items-center justify-between gap-2">
-                                    <span class="text-[11px] text-slate-300">{field_name.clone()}</span>
-                                    <input
-                                        type="checkbox"
-                                        class="h-3 w-3 rounded border-slate-600 bg-slate-950"
-                                        prop:checked=b
-                                        on:input=move |ev| {
-                                            let value = event_target_checked(&ev);
-                                            apply_field_update(
-                                                entities_for_handler,
-                                                sync_for_handler,
-                                                entity_bits_for_handler,
-                                                component_type_for_handler.clone(),
-                                                field_for_handler.clone(),
-                                                JsonValue::Bool(value),
-                                            );
+                        // Render different field types
+                        match initial_field_value {
+                            Some(JsonValue::Bool(initial_bool)) => {
+                                // Boolean fields: use checkbox with immediate updates
+                                let checkbox_ref = NodeRef::<Input>::new();
+
+                                // Effect to update checkbox when server value changes
+                                Effect::new({
+                                    let field_name = field_name.clone();
+                                    let checkbox_ref = checkbox_ref.clone();
+                                    let component_type = component_type.clone();
+
+                                    move |_| {
+                                        if let Some(value) = entities.get()
+                                            .get(&entity_bits)
+                                            .and_then(|c| c.get(&component_type))
+                                            .and_then(|v| {
+                                                if let JsonValue::Object(obj) = v {
+                                                    obj.get(&field_name).and_then(|v| v.as_bool())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                        {
+                                            if let Some(checkbox) = checkbox_ref.get() {
+                                                checkbox.set_checked(value);
+                                            }
                                         }
-                                    />
-                                </div>
-                            }.into_any(),
-                            JsonValue::Number(num) => {
-                                let initial = num.to_string();
+                                    }
+                                });
+
+                                let component_type_for_handler = component_type.clone();
+                                let field_name_for_handler = field_name.clone();
+
+                                view! {
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-[11px] text-slate-300">{field_name.clone()}</span>
+                                        <input
+                                            node_ref=checkbox_ref
+                                            type="checkbox"
+                                            class="h-3 w-3 rounded border-slate-600 bg-slate-950"
+                                            prop:checked=initial_bool
+                                            on:input=move |ev| {
+                                                let value = event_target_checked(&ev);
+                                                apply_field_update(
+                                                    entities,
+                                                    sync,
+                                                    entity_bits,
+                                                    component_type_for_handler.clone(),
+                                                    field_name_for_handler.clone(),
+                                                    JsonValue::Bool(value),
+                                                );
+                                            }
+                                        />
+                                    </div>
+                                }.into_any()
+                            }
+                            Some(JsonValue::Number(initial_num)) => {
+                                // Number fields: use text input with focus tracking
+                                let input_ref = NodeRef::<Input>::new();
+                                let is_focused = RwSignal::new(false);
+
+                                // Effect to update input when server value changes (only when NOT focused)
+                                Effect::new({
+                                    let field_name = field_name.clone();
+                                    let input_ref = input_ref.clone();
+                                    let component_type = component_type.clone();
+
+                                    move |_| {
+                                        if let Some(value) = entities.get()
+                                            .get(&entity_bits)
+                                            .and_then(|c| c.get(&component_type))
+                                            .and_then(|v| {
+                                                if let JsonValue::Object(obj) = v {
+                                                    obj.get(&field_name).and_then(|v| v.as_number())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                        {
+                                            // Only update DOM if input is NOT focused
+                                            if !is_focused.get_untracked() {
+                                                if let Some(input) = input_ref.get() {
+                                                    let new_value = value.to_string();
+                                                    // Only update if value actually changed
+                                                    if input.value() != new_value {
+                                                        input.set_value(&new_value);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+
+                                let initial_value = initial_num.to_string();
+                                let component_type_for_handler = component_type.clone();
+                                let field_name_for_handler = field_name.clone();
+
                                 view! {
                                     <div class="space-y-1">
                                         <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
                                         <input
+                                            node_ref=input_ref
                                             class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                            value=initial
-                                            on:change=move |ev| {
+                                            value=initial_value
+                                            on:focus=move |_| is_focused.set(true)
+                                            on:blur=move |ev| {
+                                                is_focused.set(false);
                                                 let raw = event_target_value(&ev);
-                                                if let Some(num) = parse_number_like(&num, &raw) {
+                                                if let Some(num) = parse_number_like(&initial_num, &raw) {
                                                     apply_field_update(
-                                                        entities_for_handler,
-                                                        sync_for_handler,
-                                                        entity_bits_for_handler,
+                                                        entities,
+                                                        sync,
+                                                        entity_bits,
                                                         component_type_for_handler.clone(),
-                                                        field_for_handler.clone(),
+                                                        field_name_for_handler.clone(),
                                                         JsonValue::Number(num),
                                                     );
                                                 }
@@ -173,27 +260,71 @@ use eventwork_sync::{
                                     </div>
                                 }.into_any()
                             }
-                            JsonValue::String(s) => view! {
-                                <div class="space-y-1">
-                                    <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
-                                    <input
-                                        class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                        value=s
-                                        on:change=move |ev| {
-                                            let raw = event_target_value(&ev);
-                                            apply_field_update(
-                                                entities_for_handler,
-                                                sync_for_handler,
-                                                entity_bits_for_handler,
-                                                component_type_for_handler.clone(),
-                                                field_for_handler.clone(),
-                                                JsonValue::String(raw),
-                                            );
+                            Some(JsonValue::String(initial_str)) => {
+                                // String fields: use text input with focus tracking
+                                let input_ref = NodeRef::<Input>::new();
+                                let is_focused = RwSignal::new(false);
+
+                                // Effect to update input when server value changes (only when NOT focused)
+                                Effect::new({
+                                    let field_name = field_name.clone();
+                                    let input_ref = input_ref.clone();
+                                    let component_type = component_type.clone();
+
+                                    move |_| {
+                                        if let Some(value) = entities.get()
+                                            .get(&entity_bits)
+                                            .and_then(|c| c.get(&component_type))
+                                            .and_then(|v| {
+                                                if let JsonValue::Object(obj) = v {
+                                                    obj.get(&field_name).and_then(|v| v.as_str())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                        {
+                                            // Only update DOM if input is NOT focused
+                                            if !is_focused.get_untracked() {
+                                                if let Some(input) = input_ref.get() {
+                                                    // Only update if value actually changed
+                                                    if input.value() != value {
+                                                        input.set_value(value);
+                                                    }
+                                                }
+                                            }
                                         }
-                                    />
-                                </div>
-                            }.into_any(),
-                            other => {
+                                    }
+                                });
+
+                                let component_type_for_handler = component_type.clone();
+                                let field_name_for_handler = field_name.clone();
+
+                                view! {
+                                    <div class="space-y-1">
+                                        <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
+                                        <input
+                                            node_ref=input_ref
+                                            class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            value=initial_str
+                                            on:focus=move |_| is_focused.set(true)
+                                            on:blur=move |ev| {
+                                                is_focused.set(false);
+                                                let raw = event_target_value(&ev);
+                                                apply_field_update(
+                                                    entities,
+                                                    sync,
+                                                    entity_bits,
+                                                    component_type_for_handler.clone(),
+                                                    field_name_for_handler.clone(),
+                                                    JsonValue::String(raw),
+                                                );
+                                            }
+                                        />
+                                    </div>
+                                }.into_any()
+                            }
+                            Some(other) => {
+                                // Other types: read-only JSON display
                                 let json = serde_json::to_string_pretty(&other).unwrap_or_default();
                                 view! {
                                     <div class="space-y-1">
@@ -202,9 +333,16 @@ use eventwork_sync::{
                                     </div>
                                 }.into_any()
                             }
-                        };
-
-                        field_view
+                            None => {
+                                // Field not found
+                                view! {
+                                    <div class="space-y-1">
+                                        <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
+                                        <div class="text-[10px] text-slate-500">"(field not found)"</div>
+                                    </div>
+                                }.into_any()
+                            }
+                        }
                     }
                 />
             </div>
@@ -740,15 +878,17 @@ use eventwork_sync::{
                                 }
                             >
                                 {move || {
-                                    // Look up the component data reactively here, not in the Memo
+                                    // Look up the selected entity ID
                                     let Some(id) = selected_id.get() else {
                                         return ().into_view().into_any();
                                     };
-                                    let Some(components) = entities.get().get(&id).cloned() else {
-                                        return ().into_view().into_any();
-                                    };
 
-                                    let label = entity_label(id, &components);
+                                    // Get the entity label (use get_untracked to avoid recreating the entire view)
+                                    let label = entities.get_untracked()
+                                        .get(&id)
+                                        .map(|components| entity_label(id, components))
+                                        .unwrap_or_else(|| format!("Entity #{}", id));
+
                                     view! {
                                         <div class="flex flex-col gap-3 text-xs">
                                             <div class="flex items-center justify-between">
@@ -763,14 +903,19 @@ use eventwork_sync::{
                                             <div class="border-t border-slate-800 pt-3 space-y-3">
                                             <For
                                                 each=move || {
-                                                    // Only pass component type names, not values
-                                                    // This prevents the For component from recreating children when values change
-                                                    let mut types: Vec<String> = components
-                                                        .keys()
-                                                        .cloned()
-                                                        .collect();
-                                                    types.sort();
-                                                    types
+                                                    // Use .get_untracked() to avoid creating reactive dependency
+                                                    // This prevents the parent closure from rerunning when entities changes
+                                                    // The For will only update when selected_id changes (parent closure reruns)
+                                                    // Individual fields update via Effects in component_editor
+                                                    entities
+                                                        .get_untracked()
+                                                        .get(&id)
+                                                        .map(|components| {
+                                                            let mut types: Vec<String> = components.keys().cloned().collect();
+                                                            types.sort();
+                                                            types
+                                                        })
+                                                        .unwrap_or_default()
                                                 }
                                                 key=|ty: &String| ty.clone()
                                                 children=move |ty: String| {
