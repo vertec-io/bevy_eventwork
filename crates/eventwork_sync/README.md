@@ -1,0 +1,187 @@
+# eventwork_sync
+
+Reflection-driven ECS component synchronization for Bevy servers.
+
+[![Crates.io](https://img.shields.io/crates/v/eventwork_sync.svg)](https://crates.io/crates/eventwork_sync)
+[![Documentation](https://docs.rs/eventwork_sync/badge.svg)](https://docs.rs/eventwork_sync)
+[![License](https://img.shields.io/crates/l/eventwork_sync.svg)](https://github.com/vertec-io/bevy_eventwork/blob/main/LICENSE)
+
+---
+
+## Overview
+
+**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using Bevy's reflection system. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and multiplayer games.
+
+### Key Features
+
+- ✅ **Automatic Synchronization** - Components are automatically sent to subscribed clients
+- ✅ **Reflection-Driven** - Uses Bevy's reflection system, no manual serialization code
+- ✅ **Opt-In Per Component** - Only components you register are synchronized
+- ✅ **Mutation Support** - Clients can request component changes (with authorization)
+- ✅ **High Performance** - Message conflation and rate limiting prevent overwhelming clients
+- ✅ **Configurable** - Control update rates, conflation, and authorization policies
+
+---
+
+## Quick Start
+
+### Installation
+
+```toml
+[dependencies]
+bevy = "0.17"
+eventwork = "1.1"
+eventwork_sync = "0.1"
+eventwork_websockets = "1.1"
+serde = { version = "1.0", features = ["derive"] }
+```
+
+### Basic Usage
+
+```rust
+use bevy::prelude::*;
+use bevy::tasks::TaskPoolBuilder;
+use eventwork::{EventworkPlugin, EventworkRuntime, NetworkSettings, AppNetworkMessage};
+use eventwork_sync::{EventworkSyncPlugin, AppEventworkSyncExt};
+use eventwork_websockets::WebSocketProvider;
+use serde::{Serialize, Deserialize};
+
+// Define components to synchronize
+#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone, Default)]
+#[reflect(Component)]
+struct Position {
+    x: f32,
+    y: f32,
+}
+
+#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone, Default)]
+#[reflect(Component)]
+struct Velocity {
+    x: f32,
+    y: f32,
+}
+
+fn main() {
+    let mut app = App::new();
+    
+    app.add_plugins(DefaultPlugins);
+    
+    // Add eventwork networking
+    app.add_plugins(EventworkPlugin::<WebSocketProvider, bevy::tasks::TaskPool>::default());
+    app.insert_resource(EventworkRuntime(
+        TaskPoolBuilder::new().num_threads(2).build()
+    ));
+    app.insert_resource(NetworkSettings::default());
+    
+    // Add eventwork_sync plugin
+    app.add_plugins(EventworkSyncPlugin::<WebSocketProvider>::default());
+    
+    // Register components for synchronization
+    app.sync_component::<Position>(None);
+    app.sync_component::<Velocity>(None);
+    
+    app.add_systems(Startup, setup);
+    app.add_systems(Update, move_entities);
+    
+    app.run();
+}
+
+fn setup(mut commands: Commands) {
+    // Start listening for connections
+    commands.listen("127.0.0.1:8082");
+    
+    // Spawn entities - they'll be automatically synchronized
+    commands.spawn((
+        Position { x: 0.0, y: 0.0 },
+        Velocity { x: 1.0, y: 0.5 },
+    ));
+}
+
+fn move_entities(
+    time: Res<Time>,
+    mut query: Query<(&mut Position, &Velocity)>,
+) {
+    for (mut pos, vel) in &mut query {
+        pos.x += vel.x * time.delta_secs();
+        pos.y += vel.y * time.delta_secs();
+    }
+}
+```
+
+That's it! Components are now automatically synchronized to connected clients.
+
+---
+
+## Configuration
+
+### Global Settings
+
+```rust
+use eventwork_sync::SyncSettings;
+
+app.insert_resource(SyncSettings {
+    // Limit updates to 30 Hz (30 updates per second)
+    max_update_rate_hz: Some(30.0),
+    
+    // Enable message conflation (only send latest update)
+    enable_message_conflation: true,
+});
+```
+
+### Mutation Authorization
+
+Control which mutations clients can perform:
+
+```rust
+use eventwork_sync::{MutationAuthorizer, MutationAuthContext, MutationStatus};
+
+struct MyAuthorizer;
+
+impl MutationAuthorizer for MyAuthorizer {
+    fn authorize(&self, ctx: &MutationAuthContext) -> MutationStatus {
+        // Implement your authorization logic
+        if ctx.component_type == "Position" {
+            MutationStatus::Accepted
+        } else {
+            MutationStatus::Rejected("Not authorized".to_string())
+        }
+    }
+}
+
+app.insert_resource(MutationAuthorizerResource(Box::new(MyAuthorizer)));
+```
+
+---
+
+## Documentation
+
+- **[Getting Started Guide](../../docs/getting-started/eventwork-sync.md)** - Step-by-step tutorial
+- **[API Documentation](https://docs.rs/eventwork_sync)** - Complete API reference
+- **[Architecture](../../docs/architecture/sync-architecture.md)** - How it works internally
+- **[Examples](./examples/)** - Working code examples
+
+---
+
+## Examples
+
+See the `examples/` directory for complete working examples:
+
+- **`basic_sync_server.rs`** - Minimal getting started example
+- **`devtools-demo-server.rs`** - Server for DevTools demo
+- **`fanuc_server.rs`** - Robotics control example
+
+Run an example:
+```bash
+cargo run -p eventwork_sync --example basic_sync_server --features runtime
+```
+
+---
+
+## License
+
+Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+
+---
+
+**Part of the [bevy_eventwork](https://github.com/vertec-io/bevy_eventwork) ecosystem**
+
