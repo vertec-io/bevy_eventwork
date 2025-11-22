@@ -889,6 +889,20 @@ use eventwork_sync::{
                                         .map(|components| entity_label(id, components))
                                         .unwrap_or_else(|| format!("Entity #{}", id));
 
+                                    // Create a Memo that tracks only component type names (keys) for this entity
+                                    // This will update when component types are added/removed, but NOT when values change
+                                    let component_types = Memo::new(move |_| {
+                                        entities
+                                            .get()
+                                            .get(&id)
+                                            .map(|components| {
+                                                let mut types: Vec<String> = components.keys().cloned().collect();
+                                                types.sort();
+                                                types
+                                            })
+                                            .unwrap_or_default()
+                                    });
+
                                     view! {
                                         <div class="flex flex-col gap-3 text-xs">
                                             <div class="flex items-center justify-between">
@@ -902,21 +916,7 @@ use eventwork_sync::{
                                             </div>
                                             <div class="border-t border-slate-800 pt-3 space-y-3">
                                             <For
-                                                each=move || {
-                                                    // Use .get_untracked() to avoid creating reactive dependency
-                                                    // This prevents the parent closure from rerunning when entities changes
-                                                    // The For will only update when selected_id changes (parent closure reruns)
-                                                    // Individual fields update via Effects in component_editor
-                                                    entities
-                                                        .get_untracked()
-                                                        .get(&id)
-                                                        .map(|components| {
-                                                            let mut types: Vec<String> = components.keys().cloned().collect();
-                                                            types.sort();
-                                                            types
-                                                        })
-                                                        .unwrap_or_default()
-                                                }
+                                                each=move || component_types.get()
                                                 key=|ty: &String| ty.clone()
                                                 children=move |ty: String| {
                                                     let entities_for = entities;
