@@ -1,6 +1,10 @@
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::str::FromStr;
 
 use leptos::prelude::*;
+use leptos::html::Input;
+use leptos::web_sys;
 
 use crate::context::{MutationState, SyncConnection, SyncContext};
 use crate::traits::SyncComponent;
@@ -447,5 +451,187 @@ pub fn use_controlled_input<T: Clone + Send + Sync + 'static>(
     });
 
     (display_value, local_value, set_is_focused)
+}
+
+/// Hook for creating editable fields with Enter-to-apply, blur-to-revert UX.
+///
+/// This hook implements the NodeRef + Effect + focus tracking pattern to achieve:
+/// - Focus retention through server updates
+/// - User input preservation while focused
+/// - Enter key to apply mutation
+/// - Blur (click away) to revert to server value
+///
+/// Unlike `use_controlled_input`, this hook uses manual DOM updates via NodeRef
+/// to avoid reactive property binding that would steal focus. It also implements
+/// the Enter-to-apply, blur-to-revert UX pattern that provides clear feedback
+/// to users about when mutations are applied.
+///
+/// # Type Parameters
+///
+/// - `T`: The component type (must implement `SyncComponent`)
+/// - `F`: The field type (must implement `Display + FromStr`)
+///
+/// # Arguments
+///
+/// - `entity_id`: The entity to edit
+/// - `field_accessor`: A function that extracts the field value from the component
+/// - `field_mutator`: A function that creates a new component with the field updated
+///
+/// # Returns
+///
+/// A tuple of:
+/// - `NodeRef<Input>`: Reference to the input element (use with `node_ref=`)
+/// - `RwSignal<bool>`: Focus state (use with `on:focus` and `on:blur`)
+/// - `String`: Initial value for the input (use with `value=`)
+/// - `impl Fn(web_sys::KeyboardEvent)`: Keydown handler (use with `on:keydown`)
+/// - `impl Fn()`: Blur handler (use with `on:blur`)
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::{use_sync_field_editor, SyncComponent};
+/// use leptos::prelude::*;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct Position {
+///     x: f32,
+///     y: f32,
+/// }
+///
+/// impl_sync_component!(Position);
+///
+/// #[component]
+/// fn PositionEditor(entity_id: u64) -> impl IntoView {
+///     let (input_ref, is_focused, initial_value, on_keydown, on_blur_handler) =
+///         use_sync_field_editor(
+///             entity_id,
+///             |pos: &Position| pos.x,
+///             |pos: &Position, new_x: f32| Position { x: new_x, y: pos.y },
+///         );
+///
+///     view! {
+///         <input
+///             node_ref=input_ref
+///             type="number"
+///             value=initial_value
+///             on:focus=move |_| is_focused.set(true)
+///             on:blur=move |_| {
+///                 is_focused.set(false);
+///                 on_blur_handler();
+///             }
+///             on:keydown=on_keydown
+///         />
+///     }
+/// }
+/// ```
+pub fn use_sync_field_editor<T, F, A, M>(
+    entity_id: u64,
+    field_accessor: A,
+    field_mutator: M,
+) -> (
+    NodeRef<Input>,
+    RwSignal<bool>,
+    String,
+    impl Fn(web_sys::KeyboardEvent) + Clone,
+    impl Fn() + Clone,
+)
+where
+    T: SyncComponent + Clone + Default + 'static,
+    F: Display + FromStr + Clone + PartialEq + 'static,
+    A: Fn(&T) -> F + Clone + 'static,
+    M: Fn(&T, F) -> T + Clone + 'static,
+{
+    let ctx = expect_context::<SyncContext>();
+
+    // Subscribe to all instances of this component type
+    let all_components = use_sync_component::<T>();
+
+    // Create NodeRef for direct DOM access
+    let input_ref = NodeRef::<Input>::new();
+
+    // Track focus state
+    let is_focused = RwSignal::new(false);
+
+    // Get initial value
+    let initial_value = all_components
+        .get_untracked()
+        .get(&entity_id)
+        .map(|component| field_accessor(component).to_string())
+        .unwrap_or_default();
+
+    // Effect to update input when server value changes (only when NOT focused)
+    {
+        let input_ref = input_ref.clone();
+        let field_accessor = field_accessor.clone();
+
+        Effect::new(move |_| {
+            if let Some(component) = all_components.get().get(&entity_id) {
+                let server_value = field_accessor(component).to_string();
+
+                // Only update DOM if input is NOT focused
+                if !is_focused.get_untracked() {
+                    if let Some(input) = input_ref.get() {
+                        // Only update if value actually changed
+                        if input.value() != server_value {
+                            input.set_value(&server_value);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Create blur handler (reverts to server value)
+    let on_blur_handler = {
+        let input_ref = input_ref.clone();
+        let field_accessor = field_accessor.clone();
+
+        move || {
+            if let Some(component) = all_components.get_untracked().get(&entity_id) {
+                let server_value = field_accessor(component).to_string();
+                if let Some(input) = input_ref.get_untracked() {
+                    input.set_value(&server_value);
+                }
+            }
+        }
+    };
+
+    // Create keydown handler (applies mutation on Enter)
+    let on_keydown = {
+        let input_ref = input_ref.clone();
+
+        move |ev: web_sys::KeyboardEvent| {
+            if ev.key() == "Enter" {
+                // Get current component value
+                if let Some(component) = all_components.get_untracked().get(&entity_id) {
+                    // Get input value
+                    if let Some(input) = input_ref.get_untracked() {
+                        let raw_value = input.value();
+
+                        // Parse the value
+                        if let Ok(parsed_value) = raw_value.parse::<F>() {
+                            // Create updated component
+                            let updated_component = field_mutator(component, parsed_value);
+
+                            // Send mutation
+                            ctx.mutate(entity_id, updated_component);
+
+                            // Blur the input to trigger revert (in case server rejects)
+                            let _ = input.blur();
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    (
+        input_ref,
+        is_focused,
+        initial_value,
+        on_keydown,
+        on_blur_handler,
+    )
 }
 

@@ -16,6 +16,8 @@
 //!
 //! ## Quick Start
 //!
+//! ### Read-Only Display
+//!
 //! ```rust,ignore
 //! use leptos::prelude::*;
 //! use eventwork_client::{SyncProvider, use_sync_component, ClientRegistryBuilder};
@@ -26,7 +28,7 @@
 //!         .register::<Position>()
 //!         .register::<Velocity>()
 //!         .build();
-//!     
+//!
 //!     view! {
 //!         <SyncProvider url="ws://localhost:8080" registry=registry>
 //!             <GameView/>
@@ -38,7 +40,7 @@
 //! fn GameView() -> impl IntoView {
 //!     // Automatically subscribes, updates, and unsubscribes
 //!     let positions = use_sync_component::<Position>();
-//!     
+//!
 //!     view! {
 //!         <For
 //!             each=move || positions.get().iter().map(|(id, pos)| (*id, pos.clone())).collect::<Vec<_>>()
@@ -55,8 +57,59 @@
 //!     }
 //! }
 //! ```
+//!
+//! ### Editable Fields with Focus Retention
+//!
+//! ```rust,ignore
+//! use leptos::prelude::*;
+//! use eventwork_client::{SyncFieldInput, SyncComponent};
+//! use serde::{Deserialize, Serialize};
+//!
+//! #[derive(Clone, Default, Serialize, Deserialize)]
+//! struct Position {
+//!     x: f32,
+//!     y: f32,
+//! }
+//!
+//! impl_sync_component!(Position);
+//!
+//! #[component]
+//! fn PositionEditor(entity_id: u64) -> impl IntoView {
+//!     view! {
+//!         <div class="position-editor">
+//!             <label>
+//!                 "X: "
+//!                 <SyncFieldInput
+//!                     entity_id=entity_id
+//!                     field_accessor=|pos: &Position| pos.x
+//!                     field_mutator=|pos: &Position, new_x: f32| Position { x: new_x, y: pos.y }
+//!                     input_type="number"
+//!                     class="number-input"
+//!                 />
+//!             </label>
+//!             <label>
+//!                 "Y: "
+//!                 <SyncFieldInput
+//!                     entity_id=entity_id
+//!                     field_accessor=|pos: &Position| pos.y
+//!                     field_mutator=|pos: &Position, new_y: f32| Position { x: pos.x, y: new_y }
+//!                     input_type="number"
+//!                     class="number-input"
+//!                 />
+//!             </label>
+//!         </div>
+//!     }
+//! }
+//! ```
+//!
+//! The `SyncFieldInput` component implements:
+//! - ✅ Focus retention through server updates
+//! - ✅ User input preservation while focused
+//! - ✅ Enter key to apply mutation
+//! - ✅ Blur (click away) to revert to server value
 
 // Module declarations
+mod components;
 mod context;
 mod error;
 mod hooks;
@@ -65,11 +118,12 @@ mod registry;
 mod traits;
 
 // Re-exports
+pub use components::SyncFieldInput;
 pub use context::{MutationState, SyncConnection, SyncContext};
 pub use error::SyncError;
 pub use hooks::{
     use_controlled_input, use_sync_component, use_sync_component_write, use_sync_connection,
-    use_sync_context, use_sync_mutations,
+    use_sync_context, use_sync_field_editor, use_sync_mutations,
 };
 pub use provider::SyncProvider;
 pub use registry::{ClientRegistry, ClientRegistryBuilder};
