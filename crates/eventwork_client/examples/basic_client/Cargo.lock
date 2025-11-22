@@ -513,6 +513,7 @@ dependencies = [
  "eventwork_sync",
  "leptos",
  "leptos-use",
+ "reactive_stores 0.2.5",
  "serde",
  "thiserror 2.0.17",
 ]
@@ -532,6 +533,7 @@ dependencies = [
  "leptos-use",
  "log",
  "reactive_graph",
+ "reactive_stores 0.2.5",
  "serde",
  "wasm-bindgen",
  "web-sys",
@@ -542,6 +544,7 @@ name = "eventwork_client_example_shared"
 version = "0.1.0"
 dependencies = [
  "eventwork_client",
+ "reactive_stores 0.2.5",
  "serde",
 ]
 
@@ -1499,6 +1502,23 @@ dependencies = [
 
 [[package]]
 name = "reactive_stores"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79983e88dfd1a2925e29a4853ab9161b234ea78dd0d44ed33a706c9cd5e35762"
+dependencies = [
+ "dashmap",
+ "guardian",
+ "itertools",
+ "or_poisoned",
+ "paste",
+ "reactive_graph",
+ "reactive_stores_macro",
+ "rustc-hash",
+ "send_wrapper",
+]
+
+[[package]]
+name = "reactive_stores"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25b73d94139821e0a2f31fb4e0eaf6ebbcf4d15c5e2fb353dc3babd4f6d35674"
@@ -1866,7 +1886,7 @@ dependencies = [
  "parking_lot",
  "paste",
  "reactive_graph",
- "reactive_stores",
+ "reactive_stores 0.3.0",
  "rustc-hash",
  "rustc_version",
  "send_wrapper",

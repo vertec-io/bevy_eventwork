@@ -13,6 +13,7 @@ license = "MIT"
 leptos = { version = "0.8.12", features = ["csr"] }
 leptos-use = "0.16.3"
 reactive_graph = "0.2"
+reactive_stores = "0.2"
 console_error_panic_hook = "0.1"
 console_log = "1.0"
 log = "0.4"
@@ -26,10 +27,10 @@ wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["console"] }
 
 # Eventwork dependencies
-eventwork_client = { path = "../.." }
+eventwork_client = { path = "../..", features = ["stores"] }
 eventwork_devtools = { path = "../../../eventwork_devtools" }
 eventwork_sync = { path = "../../../eventwork_sync", default-features = false }
-eventwork_client_example_shared = { path = "../../../eventwork_client_example_shared" }
+eventwork_client_example_shared = { path = "../../../eventwork_client_example_shared", features = ["stores"] }
 
 [profile.release]
 opt-level = 'z'

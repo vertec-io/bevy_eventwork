@@ -65,16 +65,19 @@ mod registry;
 mod traits;
 
 // Re-exports
-pub use context::{SyncConnection, SyncContext};
+pub use context::{MutationState, SyncConnection, SyncContext};
 pub use error::SyncError;
-pub use hooks::{use_sync_component, use_sync_connection};
+pub use hooks::{use_sync_component, use_sync_connection, use_sync_context, use_sync_mutations};
 pub use provider::SyncProvider;
 pub use registry::{ClientRegistry, ClientRegistryBuilder};
 pub use traits::SyncComponent;
 
+// Re-export mutation types from eventwork_sync for convenience
+pub use eventwork_sync::MutationStatus;
+
 // Conditional re-exports
-// #[cfg(feature = "stores")]
-// pub use hooks::use_sync_component_store;
+#[cfg(feature = "stores")]
+pub use hooks::use_sync_component_store;
 
 // #[cfg(feature = "devtools")]
 // pub mod devtools;

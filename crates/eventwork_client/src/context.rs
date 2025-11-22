@@ -8,7 +8,13 @@ use leptos_use::core::ConnectionReadyState;
 use crate::error::SyncError;
 use crate::registry::ClientRegistry;
 use crate::traits::SyncComponent;
-use eventwork_sync::{SerializableEntity, SubscriptionRequest, UnsubscribeRequest, SyncClientMessage};
+use eventwork_sync::{
+    MutateComponent, MutationResponse, MutationStatus, SerializableEntity, SubscriptionRequest,
+    UnsubscribeRequest, SyncClientMessage,
+};
+
+#[cfg(feature = "stores")]
+use reactive_stores::Store;
 
 /// Connection control interface exposed to components.
 ///
@@ -21,6 +27,24 @@ pub struct SyncConnection {
     pub open: Arc<dyn Fn() + Send + Sync>,
     /// Close the WebSocket connection
     pub close: Arc<dyn Fn() + Send + Sync>,
+}
+
+/// Per-request mutation state tracked on the client.
+#[derive(Clone, Debug)]
+pub struct MutationState {
+    pub request_id: u64,
+    pub status: Option<MutationStatus>,
+    pub message: Option<String>,
+}
+
+impl MutationState {
+    pub fn new_pending(request_id: u64) -> Self {
+        Self {
+            request_id,
+            status: None,
+            message: None,
+        }
+    }
 }
 
 /// Context providing access to the sync client.
@@ -53,6 +77,11 @@ pub struct SyncContext {
     /// This is the central storage that handle_sync_item updates
     /// Effects in subscribe_component watch this and deserialize to typed signals
     pub(crate) component_data: RwSignal<HashMap<(u64, String), Vec<u8>>>,
+    /// Mutation state tracking: request_id -> MutationState
+    /// This is reactive so components can watch mutation status
+    pub(crate) mutations: RwSignal<HashMap<u64, MutationState>>,
+    /// Next mutation request ID
+    next_request_id: Arc<Mutex<u64>>,
 }
 
 impl SyncContext {
@@ -78,6 +107,8 @@ impl SyncContext {
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             next_subscription_id: Arc::new(Mutex::new(0)),
             component_data: RwSignal::new(HashMap::new()),
+            mutations: RwSignal::new(HashMap::new()),
+            next_request_id: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -240,6 +271,150 @@ impl SyncContext {
         signal_clone.read_only()
     }
 
+    /// Subscribe to a component type and return a reactive Store.
+    ///
+    /// This method provides fine-grained reactivity using the `reactive_stores` crate.
+    /// Unlike signals which are atomic, stores allow reactive access to individual fields
+    /// of the component data structure.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: The component type to subscribe to. Must implement `SyncComponent`.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Store<HashMap<u64, T>>` that reactively updates when component data changes.
+    /// Individual entity fields can be accessed reactively using store field accessors.
+    ///
+    /// # Subscription Management
+    ///
+    /// - Automatically sends subscription request on first call for this component type
+    /// - Shares subscription with other components using the same type
+    /// - Automatically unsubscribes when the last component unmounts
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use eventwork_client::use_sync_component_store;
+    /// use reactive_stores::Store;
+    ///
+    /// #[component]
+    /// fn GameView() -> impl IntoView {
+    ///     let positions = use_sync_component_store::<Position>();
+    ///
+    ///     // Access individual entity fields reactively
+    ///     view! {
+    ///         <For
+    ///             each=move || positions.read().keys().copied().collect::<Vec<_>>()
+    ///             key=|id| *id
+    ///             let:entity_id
+    ///         >
+    ///             {move || {
+    ///                 // Fine-grained reactivity: only updates when this entity's position changes
+    ///                 let pos = positions.read().get(&entity_id).cloned();
+    ///                 view! { <div>{format!("{:?}", pos)}</div> }
+    ///             }}
+    ///         </For>
+    ///     }
+    /// }
+    /// ```
+    #[cfg(feature = "stores")]
+    pub fn subscribe_component_store<T>(&self) -> Store<HashMap<u64, T>>
+    where
+        T: SyncComponent + Clone + Default + 'static,
+    {
+        let component_name = T::component_name();
+        let type_id = TypeId::of::<T>();
+        let cache_key = (type_id, component_name.to_string());
+
+        // Check if we already have a store for this component type
+        {
+            let cache = self.signal_cache.lock().unwrap();
+            if let Some(weak_store) = cache.get(&cache_key) {
+                if let Some(arc_store) = weak_store.upgrade() {
+                    // Downcast to Store<HashMap<u64, T>>
+                    if let Ok(store) = arc_store.downcast::<Store<HashMap<u64, T>>>() {
+                        // Increment ref count
+                        self.increment_subscription(component_name);
+
+                        // Set up cleanup
+                        let ctx = self.clone();
+                        let component_name_owned = component_name.to_string();
+                        on_cleanup(move || {
+                            if let Some(subscription_id) = ctx.decrement_subscription(&component_name_owned) {
+                                ctx.send_unsubscribe_request(subscription_id);
+                            }
+                        });
+
+                        return (*store).clone();
+                    }
+                }
+            }
+        }
+
+        // Create a new store
+        let store = Store::new(HashMap::<u64, T>::new());
+        let store_clone = store.clone();
+
+        // Cache the store with a weak reference
+        {
+            let mut cache = self.signal_cache.lock().unwrap();
+            cache.insert(
+                cache_key,
+                Arc::downgrade(&(Arc::new(store.clone()) as Arc<dyn Any + Send + Sync>)),
+            );
+        }
+
+        // Increment subscription ref count and send subscription request if needed
+        let is_first_subscription = self.increment_subscription(component_name);
+        if is_first_subscription {
+            self.send_subscription_request(component_name, None);
+        }
+
+        // Set up an Effect to watch component_data and update the store
+        let component_data = self.component_data;
+        let registry = self.registry.clone();
+        let component_name_str = component_name.to_string();
+
+        Effect::new(move |_| {
+            let data_map = component_data.get();
+            let mut typed_map = HashMap::new();
+
+            for ((entity_id, comp_name), bytes) in data_map.iter() {
+                if comp_name == &component_name_str {
+                    match registry.deserialize::<T>(comp_name, bytes) {
+                        Ok(component) => {
+                            typed_map.insert(*entity_id, component);
+                        }
+                        Err(_err) => {
+                            #[cfg(target_arch = "wasm32")]
+                            leptos::logging::warn!(
+                                "[SyncContext] Failed to deserialize {} for entity {}: {:?}",
+                                comp_name,
+                                entity_id,
+                                _err
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Update the store
+            store_clone.write().clone_from(&typed_map);
+        });
+
+        // Set up cleanup on unmount
+        let ctx = self.clone();
+        let component_name_owned = component_name.to_string();
+        on_cleanup(move || {
+            if let Some(subscription_id) = ctx.decrement_subscription(&component_name_owned) {
+                ctx.send_unsubscribe_request(subscription_id);
+            }
+        });
+
+        store
+    }
+
     /// Increment subscription ref count. Returns true if this is the first subscription.
     fn increment_subscription(&self, component_name: &str) -> bool {
         let mut subs = self.subscriptions.lock().unwrap();
@@ -351,6 +526,140 @@ impl SyncContext {
                 }
             }
         }
+    }
+
+    /// Send a mutation request to the server.
+    ///
+    /// This serializes the component and sends a mutation request to the server.
+    /// Returns the request_id that can be used to track the mutation status.
+    ///
+    /// # Arguments
+    /// - `entity_id`: The entity to mutate
+    /// - `component`: The new component value
+    ///
+    /// # Returns
+    /// The request_id that will be echoed back in the MutationResponse.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use eventwork_client::{use_sync_context, SyncComponent};
+    ///
+    /// #[component]
+    /// fn UpdatePosition() -> impl IntoView {
+    ///     let ctx = use_sync_context();
+    ///
+    ///     let update_position = move |_| {
+    ///         let new_pos = Position { x: 10.0, y: 20.0 };
+    ///         let request_id = ctx.mutate(entity_id, new_pos);
+    ///         // Track mutation status with use_sync_mutations()
+    ///     };
+    ///
+    ///     view! {
+    ///         <button on:click=update_position>"Update Position"</button>
+    ///     }
+    /// }
+    /// ```
+    pub fn mutate<T: SyncComponent>(&self, entity_id: u64, component: T) -> u64 {
+        let component_name = T::component_name();
+
+        // Generate request ID
+        let request_id = {
+            let mut next_id = self.next_request_id.lock().unwrap();
+            *next_id += 1;
+            *next_id
+        };
+
+        // Track the pending mutation locally
+        self.mutations.update(|map| {
+            map.insert(request_id, MutationState::new_pending(request_id));
+        });
+
+        // Serialize the component to bincode bytes
+        let value_bytes = match bincode::serde::encode_to_vec(&component, bincode::config::standard()) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                #[cfg(target_arch = "wasm32")]
+                leptos::logging::error!(
+                    "[SyncContext] Failed to serialize mutation for '{}': {:?}",
+                    component_name,
+                    e
+                );
+
+                // Update mutation state to error
+                self.mutations.update(|map| {
+                    if let Some(state) = map.get_mut(&request_id) {
+                        state.status = Some(MutationStatus::InternalError);
+                        state.message = Some(format!("Serialization failed: {}", e));
+                    }
+                });
+
+                return request_id;
+            }
+        };
+
+        // Create mutation message
+        let msg = SyncClientMessage::Mutate(MutateComponent {
+            request_id: Some(request_id),
+            entity: SerializableEntity { bits: entity_id },
+            component_type: component_name.to_string(),
+            value: value_bytes,
+        });
+
+        // Serialize and send
+        if let Ok(bytes) = bincode::serde::encode_to_vec(&msg, bincode::config::standard()) {
+            (self.send)(&bytes);
+        } else {
+            #[cfg(target_arch = "wasm32")]
+            leptos::logging::error!(
+                "[SyncContext] Failed to serialize SyncClientMessage for mutation"
+            );
+
+            // Update mutation state to error
+            self.mutations.update(|map| {
+                if let Some(state) = map.get_mut(&request_id) {
+                    state.status = Some(MutationStatus::InternalError);
+                    state.message = Some("Failed to serialize message".to_string());
+                }
+            });
+        }
+
+        request_id
+    }
+
+    /// Handle a mutation response from the server.
+    ///
+    /// This is called by the provider when a MutationResponse is received.
+    /// It updates the reactive mutation state so components can track status.
+    pub(crate) fn handle_mutation_response(&self, response: &MutationResponse) {
+        if let Some(request_id) = response.request_id {
+            self.mutations.update(|map| {
+                map.entry(request_id)
+                    .and_modify(|state| {
+                        state.status = Some(response.status.clone());
+                        state.message = response.message.clone();
+                    })
+                    .or_insert_with(|| MutationState {
+                        request_id,
+                        status: Some(response.status.clone()),
+                        message: response.message.clone(),
+                    });
+            });
+
+            #[cfg(target_arch = "wasm32")]
+            leptos::logging::log!(
+                "[SyncContext] Mutation {} completed with status {:?}",
+                request_id,
+                response.status
+            );
+        }
+    }
+
+    /// Get a read-only signal for tracking mutation states.
+    ///
+    /// This allows components to reactively watch mutation status.
+    pub fn mutations(&self) -> ReadSignal<HashMap<u64, MutationState>> {
+        self.mutations.read_only()
     }
 }
 

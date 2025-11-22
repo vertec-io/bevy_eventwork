@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
 };
 
-use async_channel::unbounded;
+use async_channel::{bounded, unbounded};
 use bevy::prelude::*;
 use dashmap::DashMap;
 use futures_lite::StreamExt;
@@ -332,8 +332,11 @@ pub(crate) fn handle_new_incoming_connections<NP: NetworkProvider, RT: Runtime>(
         let write_network_settings = network_settings.clone();
         let disconnected_connections = server.disconnected_connections.sender.clone();
 
-        let (outgoing_tx, outgoing_rx) = unbounded();
-        let (incoming_tx, incoming_rx) = unbounded();
+        // Use bounded channels to prevent memory leaks
+        // Capacity is configurable via NetworkSettings
+        let channel_capacity = NP::channel_capacity(&network_settings);
+        let (outgoing_tx, outgoing_rx) = bounded(channel_capacity);
+        let (incoming_tx, incoming_rx) = unbounded(); // Incoming can stay unbounded (client -> server)
 
         server.established_connections.insert(
                 conn_id,

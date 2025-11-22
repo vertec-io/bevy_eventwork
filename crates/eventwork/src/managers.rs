@@ -104,4 +104,8 @@ pub trait NetworkProvider: 'static + Send + Sync {
     /// Split the socket into a read and write half, so that the two actions
     /// can be handled concurrently.
     fn split(combined: Self::Socket) -> (Self::ReadHalf, Self::WriteHalf);
+
+    /// Get the channel capacity from the network settings.
+    /// This is used to create bounded channels for outgoing messages.
+    fn channel_capacity(settings: &Self::NetworkSettings) -> usize;
 }

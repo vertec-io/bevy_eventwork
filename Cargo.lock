@@ -2755,6 +2755,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "eventwork_client",
+ "reactive_stores 0.2.5",
  "serde",
 ]
 

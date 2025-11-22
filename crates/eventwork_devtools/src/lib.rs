@@ -222,6 +222,10 @@ pub mod ui {
         sync: RwSignal<DevtoolsSync>,
     ) -> impl IntoView {
         let component_type_for_fields = component_type.clone();
+
+        // Track which field is currently being edited (entity_id, component_type, field_name)
+        let (editing_field, set_editing_field) = signal::<Option<(u64, String, String)>>(None);
+
         let fields = move || {
             entities
                 .get()
@@ -252,6 +256,12 @@ pub mod ui {
                         let field_for_handler = field_name.clone();
                         let entity_bits_for_handler = entity_bits;
 
+                        // Clone for use in multiple closures
+                        let component_type_for_focus = component_type_for_handler.clone();
+                        let field_for_focus = field_for_handler.clone();
+                        let component_type_for_blur = component_type_for_handler.clone();
+                        let field_for_blur = field_for_handler.clone();
+
                         let field_view: AnyView = match field_value {
                             JsonValue::Bool(b) => view! {
                                 <div class="flex items-center justify-between gap-2">
@@ -275,22 +285,49 @@ pub mod ui {
                                 </div>
                             }.into_any(),
                             JsonValue::Number(num) => {
-                                let initial = num.to_string();
+                                // Create local state for this input field
+                                let (local_value, set_local_value) = signal(num.to_string());
+                                let (is_focused, set_is_focused) = signal(false);
+
+                                // Update local state when server value changes, but only if not focused
+                                let num_for_effect = num.clone();
+                                Effect::new(move |_| {
+                                    if !is_focused.get() {
+                                        set_local_value.set(num_for_effect.to_string());
+                                    }
+                                });
+
                                 view! {
                                     <div class="space-y-1">
                                         <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
                                         <input
                                             class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                            value=initial
-                                            on:change=move |ev| {
-                                                let raw = event_target_value(&ev);
+                                            prop:value=move || local_value.get()
+                                            on:input=move |ev| {
+                                                // Update local state immediately for responsive UI
+                                                set_local_value.set(event_target_value(&ev));
+                                            }
+                                            on:focus=move |_| {
+                                                set_is_focused.set(true);
+                                                set_editing_field.set(Some((
+                                                    entity_bits_for_handler,
+                                                    component_type_for_focus.clone(),
+                                                    field_for_focus.clone(),
+                                                )));
+                                            }
+                                            on:blur=move |_| {
+                                                set_is_focused.set(false);
+                                                set_editing_field.set(None);
+
+                                                // Send mutation to server on blur
+                                                let raw = local_value.get();
                                                 if let Some(num) = parse_number_like(&num, &raw) {
                                                     apply_field_update(
                                                         entities_for_handler,
                                                         sync_for_handler,
                                                         entity_bits_for_handler,
-                                                        component_type_for_handler.clone(),
-                                                        field_for_handler.clone(),
+                                                        component_type_for_blur.clone(),
+                                                        field_for_blur.clone(),
                                                         JsonValue::Number(num),
                                                     );
                                                 }
@@ -299,26 +336,56 @@ pub mod ui {
                                     </div>
                                 }.into_any()
                             }
-                            JsonValue::String(s) => view! {
-                                <div class="space-y-1">
-                                    <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
-                                    <input
-                                        class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                        value=s
-                                        on:change=move |ev| {
-                                            let raw = event_target_value(&ev);
-                                            apply_field_update(
-                                                entities_for_handler,
-                                                sync_for_handler,
-                                                entity_bits_for_handler,
-                                                component_type_for_handler.clone(),
-                                                field_for_handler.clone(),
-                                                JsonValue::String(raw),
-                                            );
-                                        }
-                                    />
-                                </div>
-                            }.into_any(),
+                            JsonValue::String(s) => {
+                                // Create local state for this input field
+                                let (local_value, set_local_value) = signal(s.clone());
+                                let (is_focused, set_is_focused) = signal(false);
+
+                                // Update local state when server value changes, but only if not focused
+                                let s_for_effect = s.clone();
+                                Effect::new(move |_| {
+                                    if !is_focused.get() {
+                                        set_local_value.set(s_for_effect.clone());
+                                    }
+                                });
+
+                                view! {
+                                    <div class="space-y-1">
+                                        <div class="text-[11px] text-slate-300">{field_name.clone()}</div>
+                                        <input
+                                            class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            prop:value=move || local_value.get()
+                                            on:input=move |ev| {
+                                                // Update local state immediately for responsive UI
+                                                set_local_value.set(event_target_value(&ev));
+                                            }
+                                            on:focus=move |_| {
+                                                set_is_focused.set(true);
+                                                set_editing_field.set(Some((
+                                                    entity_bits_for_handler,
+                                                    component_type_for_focus.clone(),
+                                                    field_for_focus.clone(),
+                                                )));
+                                            }
+                                            on:blur=move |_| {
+                                                set_is_focused.set(false);
+                                                set_editing_field.set(None);
+
+                                                // Send mutation to server on blur
+                                                let raw = local_value.get();
+                                                apply_field_update(
+                                                    entities_for_handler,
+                                                    sync_for_handler,
+                                                    entity_bits_for_handler,
+                                                    component_type_for_blur.clone(),
+                                                    field_for_blur.clone(),
+                                                    JsonValue::String(raw),
+                                                );
+                                            }
+                                        />
+                                    </div>
+                                }.into_any()
+                            },
                             other => {
                                 let json = serde_json::to_string_pretty(&other).unwrap_or_default();
                                 view! {

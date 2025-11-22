@@ -9,26 +9,32 @@ impl Runtime for bevy::tasks::TaskPool {
     fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) -> Self::JoinHandle {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            Some(self.spawn(task))
+            tracing::debug!("[TaskPool::spawn] Spawning and detaching task");
+            let task = self.spawn(task);
+            task.detach();
+            tracing::debug!("[TaskPool::spawn] Task detached");
+            None
         }
 
         #[cfg(target_arch = "wasm32")]
         {
             self.spawn(task);
-            return None;
+            None
         }
     }
 
     fn spawn_local(&self, task: impl Future<Output = ()> + 'static) -> Self::JoinHandle {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            Some(self.spawn_local(task))
+            let task = self.spawn_local(task);
+            task.detach();
+            None
         }
 
         #[cfg(target_arch = "wasm32")]
         {
             self.spawn_local(task);
-            return None;
+            None
         }
     }
 }

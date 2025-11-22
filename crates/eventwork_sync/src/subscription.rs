@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use eventwork::{managers::NetworkProvider, managers::Network, NetworkData, NetworkEvent};
 
 use crate::messages::{SyncClientMessage, SyncServerMessage, SyncBatch, SyncItem};
-use crate::registry::{ComponentChangeEvent, EntityDespawnEvent, MutationQueue, QueuedMutation, SnapshotQueue, SnapshotRequest, SubscriptionEntry, SubscriptionManager};
+use crate::registry::{ComponentChangeEvent, EntityDespawnEvent, MutationQueue, QueuedMutation, SnapshotQueue, SnapshotRequest, SubscriptionEntry, SubscriptionManager, SyncSettings, ConflationQueue};
 
 /// System that reads incoming SyncClientMessage messages and updates the
 /// SubscriptionManager / dispatches actions accordingly.
@@ -102,22 +102,33 @@ pub fn handle_client_messages<NP: NetworkProvider>(
 }
 
 /// System that takes aggregated ComponentChangeEvent and EntityDespawnEvent items
-/// and routes them to all interested subscribers as a SyncServerMessage::SyncBatch.
+/// and routes them to all interested subscribers.
+///
+/// If conflation is enabled, items are queued in the ConflationQueue and will be
+/// sent later by flush_conflation_queue. Otherwise, they are sent immediately.
 pub fn broadcast_component_changes<NP: NetworkProvider>(
     mut component_events: MessageReader<ComponentChangeEvent>,
     mut despawn_events: MessageReader<EntityDespawnEvent>,
     subscriptions: Option<Res<SubscriptionManager>>,
+    settings: Option<Res<SyncSettings>>,
+    mut conflation_queue: Option<ResMut<ConflationQueue>>,
     net: Option<Res<Network<NP>>>,
 ) {
     // If the required resources aren't available yet (for example, if the
     // network has been torn down during shutdown), bail out quietly.
-    let (Some(subscriptions), Some(net)) = (subscriptions, net) else {
+    let Some(subscriptions) = subscriptions else {
         return;
     };
 
     if component_events.is_empty() && despawn_events.is_empty() {
         return;
     }
+
+    // Determine if we should use conflation
+    let use_conflation = settings
+        .as_ref()
+        .map(|s| s.enable_message_conflation && s.max_update_rate_hz.is_some())
+        .unwrap_or(false);
 
     // For v1 we use a simple O(N*M) strategy: for each change, scan
     // subscriptions. This is sufficient to validate the pipeline and can be
@@ -169,14 +180,28 @@ pub fn broadcast_component_changes<NP: NetworkProvider>(
         }
     }
 
-    // Send batches
-    for (connection_id, items) in per_connection {
-        if items.is_empty() {
-            continue;
+    // Either queue items for later (with conflation) or send immediately
+    if use_conflation {
+        // Queue items in the conflation queue
+        if let Some(ref mut queue) = conflation_queue {
+            let enable_conflation = settings.as_ref().unwrap().enable_message_conflation;
+            for (connection_id, items) in per_connection {
+                for item in items {
+                    queue.enqueue(connection_id, item, enable_conflation);
+                }
+            }
         }
-        let batch = SyncBatch { items };
-        // Use Eventwork's Network API to send directly to this connection.
-        let _ = net.send(connection_id, SyncServerMessage::SyncBatch(batch));
+    } else {
+        // Send immediately (original behavior)
+        if let Some(net) = net {
+            for (connection_id, items) in per_connection {
+                if items.is_empty() {
+                    continue;
+                }
+                let batch = SyncBatch { items };
+                let _ = net.send(connection_id, SyncServerMessage::SyncBatch(batch));
+            }
+        }
     }
 }
 /// Cleanup subscriptions and pending mutations when connections disconnect.

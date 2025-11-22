@@ -186,9 +186,12 @@ fn process_jog_commands(
         let instruction = dto::Instruction::FrcLinearRelative(dto::FrcLinearRelative {
             sequence_id: 0, // Will be assigned by driver
             configuration: dto::Configuration {
+                u_tool_number: 0,
+                u_frame_number: 0,
                 front: 1,
                 up: 1,
                 left: 1,
+                flip: 0,
                 turn4: 0,
                 turn5: 0,
                 turn6: 0,

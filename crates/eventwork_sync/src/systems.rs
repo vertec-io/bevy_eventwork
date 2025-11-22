@@ -19,6 +19,8 @@ use crate::registry::{
     SnapshotQueue,
     SubscriptionManager,
     SyncRegistry,
+    SyncSettings,
+    ConflationQueue,
 };
 use crate::subscription::{broadcast_component_changes, cleanup_disconnected, handle_client_messages};
 
@@ -36,6 +38,16 @@ pub enum EventworkSyncSystems {
 
 /// Install core resources and systems for EventworkSync into the app.
 pub(crate) fn install<NP: NetworkProvider>(app: &mut App) {
+    // Initialize SyncSettings first (needed to create ConflationQueue)
+    app.init_resource::<SyncSettings>();
+
+    // Initialize ConflationQueue with settings from SyncSettings
+    {
+        let settings = app.world().resource::<SyncSettings>();
+        let update_rate_hz = settings.max_update_rate_hz.unwrap_or(60.0);
+        app.insert_resource(ConflationQueue::new(update_rate_hz));
+    }
+
     app.init_resource::<SubscriptionManager>()
         .init_resource::<MutationQueue>()
         .init_resource::<SnapshotQueue>()
@@ -45,10 +57,12 @@ pub(crate) fn install<NP: NetworkProvider>(app: &mut App) {
     // Verify resources were initialized
     let world = app.world();
     info!(
-        "[eventwork_sync::install] Resources initialized: SubscriptionManager={}, MutationQueue={}, SnapshotQueue={}",
+        "[eventwork_sync::install] Resources initialized: SubscriptionManager={}, MutationQueue={}, SnapshotQueue={}, SyncSettings={}, ConflationQueue={}",
         world.contains_resource::<SubscriptionManager>(),
         world.contains_resource::<MutationQueue>(),
-        world.contains_resource::<SnapshotQueue>()
+        world.contains_resource::<SnapshotQueue>(),
+        world.contains_resource::<SyncSettings>(),
+        world.contains_resource::<ConflationQueue>()
     );
 
     app.configure_sets(
@@ -81,10 +95,15 @@ pub(crate) fn install<NP: NetworkProvider>(app: &mut App) {
             Update,
             process_snapshot_queue::<NP>.in_set(EventworkSyncSystems::Observe),
         )
-        // ComponentChangeEvent -> SyncServerMessage batches
+        // ComponentChangeEvent -> SyncServerMessage batches (or queue for conflation)
         .add_systems(
             Update,
             broadcast_component_changes::<NP>.in_set(EventworkSyncSystems::Outbound),
+        )
+        // Flush conflation queue on timer
+        .add_systems(
+            Update,
+            flush_conflation_queue::<NP>.in_set(EventworkSyncSystems::Outbound),
         );
 
     // Register sync messages with eventwork so they can be transported
@@ -332,6 +351,62 @@ fn observe_entity_despawns<T>(
         writer.write(EntityDespawnEvent {
             entity: crate::messages::SerializableEntity::from(entity),
         });
+    }
+}
+
+/// Flush the conflation queue on a timer, sending batched updates to clients.
+/// This system only runs when conflation is enabled (max_update_rate_hz is set).
+pub fn flush_conflation_queue<NP: NetworkProvider>(
+    mut conflation_queue: ResMut<ConflationQueue>,
+    settings: Res<SyncSettings>,
+    net: Option<Res<Network<NP>>>,
+    time: Res<Time>,
+) {
+    // Only flush if conflation is enabled
+    if !settings.enable_message_conflation || settings.max_update_rate_hz.is_none() {
+        return;
+    }
+
+    // Tick the timer
+    conflation_queue.flush_timer.tick(time.delta());
+
+    // Only flush when timer finishes
+    if !conflation_queue.flush_timer.just_finished() {
+        return;
+    }
+
+    // Get all connection IDs that have pending items
+    let connection_ids: Vec<eventwork_common::ConnectionId> = conflation_queue
+        .pending
+        .keys()
+        .chain(conflation_queue.non_conflatable.keys())
+        .copied()
+        .collect();
+
+    if connection_ids.is_empty() {
+        return;
+    }
+
+    let Some(net) = net else {
+        return;
+    };
+
+    // Flush each connection's pending items
+    for connection_id in connection_ids {
+        let items = conflation_queue.drain_for_connection(connection_id);
+
+        if items.is_empty() {
+            continue;
+        }
+
+        debug!(
+            "[eventwork_sync] Flushing {} conflated items to connection {:?}",
+            items.len(),
+            connection_id
+        );
+
+        let batch = SyncBatch { items };
+        let _ = net.send(connection_id, SyncServerMessage::SyncBatch(batch));
     }
 }
 

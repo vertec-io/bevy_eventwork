@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use std::sync::Arc;
+use std::collections::HashMap;
 
-use crate::messages::{MutationStatus, SerializableEntity};
+use crate::messages::{MutationStatus, SerializableEntity, SyncItem};
 
 /// Configuration for how a component type should be synchronized.
 #[derive(Clone)]
@@ -15,6 +16,137 @@ impl Default for ComponentSyncConfig {
         Self {
             max_updates_per_frame: None,
         }
+    }
+}
+
+/// Global settings for the sync system.
+#[derive(Resource, Clone)]
+pub struct SyncSettings {
+    /// Maximum update rate in Hz (updates per second).
+    /// For example, 30.0 means clients receive at most 30 updates per second.
+    /// Set to None for unlimited (send every frame).
+    pub max_update_rate_hz: Option<f32>,
+
+    /// Whether to enable message conflation (keeping only latest update per entity+component).
+    /// When true, if multiple updates for the same entity+component arrive before the next
+    /// flush, only the latest value is sent.
+    pub enable_message_conflation: bool,
+}
+
+impl Default for SyncSettings {
+    fn default() -> Self {
+        Self {
+            // Default to 30 Hz update rate (good balance for most applications)
+            max_update_rate_hz: Some(30.0),
+            // Enable conflation by default (prevents overwhelming slow clients)
+            enable_message_conflation: true,
+        }
+    }
+}
+
+/// Key for identifying unique updates in the conflation queue.
+/// Updates with the same key will overwrite each other (keeping only the latest).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ConflationKey {
+    pub subscription_id: u64,
+    pub entity: SerializableEntity,
+    pub component_type: String,
+}
+
+impl ConflationKey {
+    pub fn from_sync_item(item: &SyncItem) -> Option<Self> {
+        match item {
+            SyncItem::Update { subscription_id, entity, component_type, .. } => {
+                Some(ConflationKey {
+                    subscription_id: *subscription_id,
+                    entity: entity.clone(),
+                    component_type: component_type.clone(),
+                })
+            }
+            SyncItem::Snapshot { subscription_id, entity, component_type, .. } => {
+                Some(ConflationKey {
+                    subscription_id: *subscription_id,
+                    entity: entity.clone(),
+                    component_type: component_type.clone(),
+                })
+            }
+            // Entity removals and component removals can't be conflated
+            _ => None,
+        }
+    }
+}
+
+/// Queue of pending sync items waiting to be flushed to clients.
+/// This enables message conflation and rate limiting.
+#[derive(Resource, Default)]
+pub struct ConflationQueue {
+    /// Pending items per connection.
+    /// For each connection, we maintain a map of ConflationKey -> SyncItem.
+    /// When conflation is enabled, updates with the same key overwrite each other.
+    pub pending: HashMap<eventwork_common::ConnectionId, HashMap<ConflationKey, SyncItem>>,
+
+    /// Non-conflatable items (entity removals, component removals) are stored separately
+    /// and always sent in order.
+    pub non_conflatable: HashMap<eventwork_common::ConnectionId, Vec<SyncItem>>,
+
+    /// Timer for tracking when to flush the queue.
+    pub flush_timer: Timer,
+}
+
+impl ConflationQueue {
+    pub fn new(update_rate_hz: f32) -> Self {
+        let flush_interval = std::time::Duration::from_secs_f32(1.0 / update_rate_hz);
+        Self {
+            pending: HashMap::new(),
+            non_conflatable: HashMap::new(),
+            flush_timer: Timer::new(flush_interval, TimerMode::Repeating),
+        }
+    }
+
+    /// Add a sync item to the queue.
+    /// If conflation is enabled and the item is conflatable, it will overwrite any existing
+    /// item with the same key.
+    pub fn enqueue(&mut self, connection_id: eventwork_common::ConnectionId, item: SyncItem, enable_conflation: bool) {
+        if enable_conflation {
+            if let Some(key) = ConflationKey::from_sync_item(&item) {
+                // Conflatable item - store in the conflation map
+                self.pending
+                    .entry(connection_id)
+                    .or_default()
+                    .insert(key, item);
+                return;
+            }
+        }
+
+        // Non-conflatable item or conflation disabled - store in order
+        self.non_conflatable
+            .entry(connection_id)
+            .or_default()
+            .push(item);
+    }
+
+    /// Drain all pending items for a connection and return them as a Vec.
+    pub fn drain_for_connection(&mut self, connection_id: eventwork_common::ConnectionId) -> Vec<SyncItem> {
+        let mut items = Vec::new();
+
+        // First, add all conflated items
+        if let Some(conflated) = self.pending.remove(&connection_id) {
+            items.extend(conflated.into_values());
+        }
+
+        // Then, add all non-conflatable items (in order)
+        if let Some(non_conflatable) = self.non_conflatable.remove(&connection_id) {
+            items.extend(non_conflatable);
+        }
+
+        items
+    }
+
+    /// Get the total number of pending items for a connection.
+    pub fn pending_count(&self, connection_id: eventwork_common::ConnectionId) -> usize {
+        let conflated = self.pending.get(&connection_id).map(|m| m.len()).unwrap_or(0);
+        let non_conflatable = self.non_conflatable.get(&connection_id).map(|v| v.len()).unwrap_or(0);
+        conflated + non_conflatable
     }
 }
 

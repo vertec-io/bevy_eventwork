@@ -26,7 +26,7 @@ mod native_websocket {
     use eventwork_common::error::NetworkError;
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
-    use tracing::{debug, error, info, trace};
+    use tracing::{debug, error, info, trace, warn};
     use ws_stream_tungstenite::WsStream;
 
     /// A provider for WebSockets
@@ -56,9 +56,11 @@ mod native_websocket {
             accept_info: Self::AcceptInfo,
             _: Self::NetworkSettings,
         ) -> Result<Self::AcceptStream, NetworkError> {
+            info!("[accept_loop] Starting - attempting to bind to {}", accept_info);
             let listener = TcpListener::bind(accept_info)
                 .await
                 .map_err(NetworkError::Listen)?;
+            info!("[accept_loop] Successfully bound to {}", accept_info);
             Ok(OwnedIncoming::new(listener))
         }
 
@@ -200,48 +202,120 @@ mod native_websocket {
         async fn send_loop(
             mut write_half: Self::WriteHalf,
             messages: Receiver<NetworkPacket>,
-            _settings: Self::NetworkSettings,
+            settings: Self::NetworkSettings,
         ) {
-            while let Ok(message) = messages.recv().await {
-                let encoded = match bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
-                    Ok(encoded) => encoded,
-                    Err(err) => {
-                        error!("Could not encode packet {:?}: {}", message, err);
-                        continue;
+            let warning_threshold = settings.channel_warning_threshold;
+            let channel_capacity = settings.channel_capacity;
+
+            while let Ok(first_message) = messages.recv().await {
+                // Collect all available messages into a batch
+                let mut batch = vec![first_message];
+
+                // Use try_recv() to collect additional messages without blocking
+                // This automatically batches messages that arrive in quick succession
+                loop {
+                    match messages.try_recv() {
+                        Ok(msg) => batch.push(msg),
+                        Err(_) => break, // No more messages available right now
                     }
-                };
+                }
 
-                let len = encoded.len() as u64;
-                debug!("Sending a new message of size: {}", len);
+                let batch_size = batch.len();
 
-                // Combine length prefix and data into a single buffer to avoid fragmentation
-                let mut buffer = Vec::with_capacity(8 + encoded.len());
-                buffer.extend_from_slice(&len.to_le_bytes());
-                buffer.extend_from_slice(&encoded);
+                // Monitor channel depth and warn if approaching capacity
+                let remaining_capacity = messages.capacity().unwrap_or(channel_capacity);
+                let current_depth = messages.len();
+                let depth_percentage = (current_depth as f32 / remaining_capacity as f32 * 100.0) as u8;
 
-                trace!("Sending the complete message with length prefix!");
+                if depth_percentage >= warning_threshold {
+                    warn!(
+                        "Channel depth at {}% ({}/{} messages). Client may be too slow to keep up!",
+                        depth_percentage, current_depth, remaining_capacity
+                    );
+                }
 
-                match write_half.write_all(&buffer).await {
-                    Ok(_) => (),
+                if batch_size > 1 {
+                    debug!("Batching {} messages into single write", batch_size);
+                }
+
+                // Serialize and combine all messages into a single buffer
+                let mut combined_buffer = Vec::new();
+
+                for message in batch {
+                    let encoded = match bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
+                        Ok(encoded) => encoded,
+                        Err(err) => {
+                            error!("Could not encode packet {:?}: {}", message, err);
+                            continue;
+                        }
+                    };
+
+                    let len = encoded.len() as u64;
+
+                    // Add length prefix and data to combined buffer
+                    combined_buffer.extend_from_slice(&len.to_le_bytes());
+                    combined_buffer.extend_from_slice(&encoded);
+                }
+
+                if combined_buffer.is_empty() {
+                    continue; // All messages failed to encode
+                }
+
+                trace!("Sending {} bytes ({} messages)", combined_buffer.len(), batch_size);
+
+                // Single write for entire batch
+                match write_half.write_all(&combined_buffer).await {
+                    Ok(_) => {
+                        if batch_size > 1 {
+                            debug!("Successfully sent batch of {} messages", batch_size);
+                        }
+                    },
                     Err(err) => {
-                        error!("Could not send packet: {:?}: {}", message, err);
+                        error!("Could not send batch of {} messages: {}", batch_size, err);
                         break;
                     }
                 }
 
-                trace!("Succesfully written all!");
+                trace!("Successfully written all!");
             }
         }
 
         fn split(combined: Self::Socket) -> (Self::ReadHalf, Self::WriteHalf) {
             combined.split()
         }
+
+        fn channel_capacity(settings: &Self::NetworkSettings) -> usize {
+            settings.channel_capacity
+        }
     }
 
-    #[derive(Clone, Debug, Resource, Default, Deref, DerefMut)]
+    #[derive(Clone, Debug, Resource, Deref, DerefMut)]
     #[allow(missing_copy_implementations)]
     /// Settings to configure the network, both client and server
-    pub struct NetworkSettings(WebSocketConfig);
+    pub struct NetworkSettings {
+        #[deref]
+        pub websocket_config: WebSocketConfig,
+        /// Channel capacity for outgoing messages per connection (default: 500)
+        ///
+        /// This controls how many messages can be queued for sending before
+        /// old messages are dropped. At 60 FPS, 500 messages = ~8 seconds of buffering.
+        ///
+        /// For industrial applications with high reliability requirements, consider
+        /// increasing to 1000-2000 messages.
+        pub channel_capacity: usize,
+        /// Warn when channel depth exceeds this percentage (default: 80)
+        pub channel_warning_threshold: u8,
+    }
+
+    impl Default for NetworkSettings {
+        fn default() -> Self {
+            Self {
+                websocket_config: WebSocketConfig::default(),
+                channel_capacity: 500,
+                channel_warning_threshold: 80,
+            }
+        }
+    }
 
     /// A special stream for recieving ws connections
     type WsStreamFuture = Pin<Box<dyn Future<Output = Option<WsStream<TcpStream>>>>>;
@@ -327,7 +401,7 @@ mod wasm_websocket {
     use eventwork_common::error::NetworkError;
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
-    use tracing::{debug, error, info, trace};
+    use tracing::{debug, error, info, trace, warn};
     use ws_stream_wasm::{WsMeta, WsStream, WsStreamIo};
 
     /// A provider for WebSockets
@@ -480,56 +554,116 @@ mod wasm_websocket {
         async fn send_loop(
             mut write_half: Self::WriteHalf,
             messages: Receiver<NetworkPacket>,
-            _settings: Self::NetworkSettings,
+            settings: Self::NetworkSettings,
         ) {
-            while let Ok(message) = messages.recv().await {
-                let encoded = match bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
-                    Ok(encoded) => encoded,
-                    Err(err) => {
-                        error!("Could not encode packet {:?}: {}", message, err);
-                        continue;
+            let warning_threshold = settings.channel_warning_threshold;
+            let channel_capacity = settings.channel_capacity;
+
+            while let Ok(first_message) = messages.recv().await {
+                // Collect all available messages into a batch
+                let mut batch = vec![first_message];
+
+                // Use try_recv() to collect additional messages without blocking
+                // This automatically batches messages that arrive in quick succession
+                loop {
+                    match messages.try_recv() {
+                        Ok(msg) => batch.push(msg),
+                        Err(_) => break, // No more messages available right now
                     }
-                };
+                }
 
-                let len = encoded.len() as u64;
-                debug!("Sending a new message of size: {}", len);
+                let batch_size = batch.len();
 
-                // Combine length prefix and data into a single buffer to avoid fragmentation
-                // This is critical for WebSocket to send as a single frame
-                let mut buffer = Vec::with_capacity(8 + encoded.len());
-                buffer.extend_from_slice(&len.to_le_bytes());
-                buffer.extend_from_slice(&encoded);
+                // Monitor channel depth and warn if approaching capacity
+                let remaining_capacity = messages.capacity().unwrap_or(channel_capacity);
+                let current_depth = messages.len();
+                let depth_percentage = (current_depth as f32 / remaining_capacity as f32 * 100.0) as u8;
 
-                trace!("Sending the complete message with length prefix!");
+                if depth_percentage >= warning_threshold {
+                    warn!(
+                        "Channel depth at {}% ({}/{} messages). Client may be too slow to keep up!",
+                        depth_percentage, current_depth, remaining_capacity
+                    );
+                }
 
-                match write_half.write_all(&buffer).await {
-                    Ok(_) => (),
+                if batch_size > 1 {
+                    debug!("Batching {} messages into single write", batch_size);
+                }
+
+                // Serialize and combine all messages into a single buffer
+                let mut combined_buffer = Vec::new();
+
+                for message in batch {
+                    let encoded = match bincode::serde::encode_to_vec(&message, bincode::config::standard()) {
+                        Ok(encoded) => encoded,
+                        Err(err) => {
+                            error!("Could not encode packet {:?}: {}", message, err);
+                            continue;
+                        }
+                    };
+
+                    let len = encoded.len() as u64;
+
+                    // Add length prefix and data to combined buffer
+                    combined_buffer.extend_from_slice(&len.to_le_bytes());
+                    combined_buffer.extend_from_slice(&encoded);
+                }
+
+                if combined_buffer.is_empty() {
+                    continue; // All messages failed to encode
+                }
+
+                trace!("Sending {} bytes ({} messages)", combined_buffer.len(), batch_size);
+
+                // Single write for entire batch
+                match write_half.write_all(&combined_buffer).await {
+                    Ok(_) => {
+                        if batch_size > 1 {
+                            debug!("Successfully sent batch of {} messages", batch_size);
+                        }
+                    },
                     Err(err) => {
-                        error!("Could not send packet: {:?}: {}", message, err);
+                        error!("Could not send batch of {} messages: {}", batch_size, err);
                         break;
                     }
                 }
 
-                trace!("Succesfully written all!");
+                trace!("Successfully written all!");
             }
         }
 
         fn split(combined: Self::Socket) -> (Self::ReadHalf, Self::WriteHalf) {
             combined.1.into_io().split()
         }
+
+        fn channel_capacity(settings: &Self::NetworkSettings) -> usize {
+            settings.channel_capacity
+        }
     }
 
-    #[derive(Clone, Debug, Resource, Deref, DerefMut)]
+    #[derive(Clone, Debug, Resource)]
     #[allow(missing_copy_implementations)]
     /// Settings to configure the network, both client and server
     pub struct NetworkSettings {
-        max_message_size: usize,
+        pub max_message_size: usize,
+        /// Channel capacity for outgoing messages per connection (default: 500)
+        ///
+        /// This controls how many messages can be queued for sending before
+        /// old messages are dropped. At 60 FPS, 500 messages = ~8 seconds of buffering.
+        ///
+        /// For industrial applications with high reliability requirements, consider
+        /// increasing to 1000-2000 messages.
+        pub channel_capacity: usize,
+        /// Warn when channel depth exceeds this percentage (default: 80)
+        pub channel_warning_threshold: u8,
     }
 
     impl Default for NetworkSettings {
         fn default() -> Self {
             Self {
                 max_message_size: 64 << 20,
+                channel_capacity: 500,
+                channel_warning_threshold: 80,
             }
         }
     }

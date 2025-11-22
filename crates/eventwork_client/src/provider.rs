@@ -189,8 +189,9 @@ fn handle_server_message(
                 }
             }
         }
-        SyncServerMessage::MutationResponse(_response) => {
-            // TODO: Handle mutation responses when we implement mutations
+        SyncServerMessage::MutationResponse(response) => {
+            // Handle mutation response
+            ctx.handle_mutation_response(&response);
         }
         SyncServerMessage::QueryResponse(_response) => {
             // TODO: Handle query responses when we implement queries

@@ -14,13 +14,14 @@
 //!   trunk serve --open
 
 use eventwork_client::{
-    use_sync_component, use_sync_connection, ClientRegistryBuilder,
+    use_sync_component, use_sync_component_store, use_sync_connection, ClientRegistryBuilder,
     SyncProvider,
 };
 use eventwork_devtools::DevTools;
 use eventwork_sync::client_registry::ComponentTypeRegistry;
 use leptos::prelude::*;
-use reactive_graph::traits::Get;
+use reactive_graph::traits::{Get, Read};
+use reactive_stores::Store;
 
 // Import shared component types (SyncComponent is already implemented in the shared crate)
 use eventwork_client_example_shared::{EntityName, Position, Velocity};
@@ -51,13 +52,48 @@ fn App() -> impl IntoView {
     // TEMPORARY: Use different URL for DevTools to test if leptos-use is caching connections
     let devtools_url = "ws://127.0.0.1:3000/sync?devtools=true";
 
+    // Tab state: "signals" or "stores"
+    let (active_tab, set_active_tab) = signal("signals".to_string());
+
     view! {
         <SyncProvider url=ws_url.to_string() registry=registry auto_connect=true>
             <div class="min-h-screen w-screen bg-slate-950 text-slate-50 flex flex-col">
                 <Header />
                 <div class="flex-1 flex overflow-hidden">
                     <main class="flex-1 overflow-auto p-6">
-                        <EntityList />
+                        <div class="max-w-6xl mx-auto space-y-6">
+                            // Tab navigation
+                            <div class="flex gap-2 border-b border-slate-800 pb-2">
+                                <button
+                                    class=move || if active_tab.get() == "signals" {
+                                        "px-4 py-2 rounded-t bg-slate-800 text-emerald-400 font-medium text-sm"
+                                    } else {
+                                        "px-4 py-2 rounded-t bg-slate-900 text-slate-400 hover:text-slate-200 text-sm"
+                                    }
+                                    on:click=move |_| set_active_tab.set("signals".to_string())
+                                >
+                                    "Signals (Atomic)"
+                                </button>
+                                <button
+                                    class=move || if active_tab.get() == "stores" {
+                                        "px-4 py-2 rounded-t bg-slate-800 text-emerald-400 font-medium text-sm"
+                                    } else {
+                                        "px-4 py-2 rounded-t bg-slate-900 text-slate-400 hover:text-slate-200 text-sm"
+                                    }
+                                    on:click=move |_| set_active_tab.set("stores".to_string())
+                                >
+                                    "Stores (Fine-Grained)"
+                                </button>
+                            </div>
+
+                            // Tab content
+                            <Show
+                                when=move || active_tab.get() == "signals"
+                                fallback=move || view! { <EntityListWithStores /> }
+                            >
+                                <EntityList />
+                            </Show>
+                        </div>
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
                         // TEMPORARY: Disable DevTools to test if it's interfering with SyncProvider
@@ -200,6 +236,110 @@ fn EntityCard(entity_id: u64) -> impl IntoView {
                         }
                     })
                 }}
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn EntityListWithStores() -> impl IntoView {
+    // Subscribe to component updates using stores for fine-grained reactivity
+    let positions = use_sync_component_store::<Position>();
+    let velocities = use_sync_component_store::<Velocity>();
+    let names = use_sync_component_store::<EntityName>();
+
+    // Debug: Log when the store updates
+    Effect::new(move |_| {
+        let pos_map = positions.read();
+        leptos::logging::log!("[EntityListWithStores] Positions store updated: {} entities", pos_map.len());
+    });
+
+    view! {
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold">"Entities (Store-based)"</h2>
+                <div class="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded">
+                    "Fine-grained reactivity with reactive_stores"
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <For
+                    each=move || {
+                        positions.read()
+                            .keys()
+                            .copied()
+                            .collect::<Vec<_>>()
+                    }
+                    key=|entity_id| *entity_id
+                    children=move |entity_id| {
+                        view! { <EntityCardWithStore entity_id=entity_id positions=positions velocities=velocities names=names /> }
+                    }
+                />
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn EntityCardWithStore(
+    entity_id: u64,
+    positions: Store<std::collections::HashMap<u64, Position>>,
+    velocities: Store<std::collections::HashMap<u64, Velocity>>,
+    names: Store<std::collections::HashMap<u64, EntityName>>,
+) -> impl IntoView {
+    // Fine-grained reactivity: only updates when this specific entity's data changes
+    let position = move || positions.read().get(&entity_id).cloned();
+    let velocity = move || velocities.read().get(&entity_id).cloned();
+    let name = move || names.read().get(&entity_id).cloned();
+
+    view! {
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-2">
+            <div class="flex items-center justify-between">
+                <h3 class="font-medium text-sm">
+                    {move || name().map(|n| n.name).unwrap_or_else(|| format!("Entity {}", entity_id))}
+                </h3>
+                <span class="text-xs text-slate-500">
+                    "ID: " {entity_id}
+                </span>
+            </div>
+
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">"Position:"</span>
+                    <span class="font-mono">
+                        {move || position().map(|p| format!("({:.1}, {:.1})", p.x, p.y)).unwrap_or_else(|| "N/A".to_string())}
+                    </span>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">"Velocity:"</span>
+                    <span class="font-mono">
+                        {move || velocity().map(|v| format!("({:.1}, {:.1})", v.x, v.y)).unwrap_or_else(|| "N/A".to_string())}
+                    </span>
+                </div>
+            </div>
+
+            /* Visual representation */
+            <div class="mt-3 h-32 bg-slate-950 rounded border border-slate-700 relative overflow-hidden">
+                {move || {
+                    position().map(|pos| {
+                        // Map position to canvas coordinates (assuming -200 to 200 range)
+                        let x_percent = ((pos.x + 200.0) / 400.0 * 100.0).clamp(0.0, 100.0);
+                        let y_percent = ((pos.y + 200.0) / 400.0 * 100.0).clamp(0.0, 100.0);
+
+                        view! {
+                            <div
+                                class="absolute w-3 h-3 bg-blue-500 rounded-full -translate-x-1/2 -translate-y-1/2"
+                                style:left=format!("{}%", x_percent)
+                                style:top=format!("{}%", y_percent)
+                            ></div>
+                        }
+                    })
+                }}
+            </div>
+
+            <div class="text-xs text-slate-500 italic mt-2">
+                "Using Store for fine-grained reactivity"
             </div>
         </div>
     }

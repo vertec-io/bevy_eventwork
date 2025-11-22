@@ -28,7 +28,23 @@ pub mod client_sync;
 
 pub use messages::*;
 #[cfg(feature = "runtime")]
-pub use registry::*;
+pub use registry::{
+    ComponentSyncConfig,
+    SyncSettings,
+    ConflationQueue,
+    ComponentRegistration,
+    SyncRegistry,
+    SubscriptionManager,
+    SubscriptionEntry,
+    MutationQueue,
+    SnapshotQueue,
+    ComponentChangeEvent,
+    EntityDespawnEvent,
+    MutationAuthContext,
+    MutationAuthorizer,
+    MutationAuthorizerResource,
+    ServerOnlyMutationAuthorizer,
+};
 #[cfg(feature = "runtime")]
 pub use subscription::*;
 

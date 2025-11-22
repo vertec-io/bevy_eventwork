@@ -9,9 +9,13 @@ use eventwork_client::impl_sync_component;
 #[cfg(feature = "server")]
 use bevy::prelude::*;
 
+#[cfg(feature = "stores")]
+use reactive_stores::Store;
+
 /// 2D position component
 #[cfg_attr(feature = "server", derive(Component, Reflect))]
 #[cfg_attr(feature = "server", reflect(Component))]
+#[cfg_attr(feature = "stores", derive(Store))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Position {
     pub x: f32,
@@ -23,6 +27,7 @@ impl_sync_component!(Position);
 /// 2D velocity component
 #[cfg_attr(feature = "server", derive(Component, Reflect))]
 #[cfg_attr(feature = "server", reflect(Component))]
+#[cfg_attr(feature = "stores", derive(Store))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Velocity {
     pub x: f32,
@@ -34,6 +39,7 @@ impl_sync_component!(Velocity);
 /// Name component
 #[cfg_attr(feature = "server", derive(Component, Reflect))]
 #[cfg_attr(feature = "server", reflect(Component))]
+#[cfg_attr(feature = "stores", derive(Store))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct EntityName {
     pub name: String,
