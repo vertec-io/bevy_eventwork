@@ -231,8 +231,10 @@ use eventwork_sync::{
                                 });
 
                                 let initial_value = initial_num.to_string();
-                                let component_type_for_handler = component_type.clone();
-                                let field_name_for_handler = field_name.clone();
+                                let component_type_for_blur = component_type.clone();
+                                let field_name_for_blur = field_name.clone();
+                                let component_type_for_keydown = component_type.clone();
+                                let field_name_for_keydown = field_name.clone();
 
                                 view! {
                                     <div class="space-y-1">
@@ -242,18 +244,43 @@ use eventwork_sync::{
                                             class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                             value=initial_value
                                             on:focus=move |_| is_focused.set(true)
-                                            on:blur=move |ev| {
+                                            on:blur=move |_| {
                                                 is_focused.set(false);
-                                                let raw = event_target_value(&ev);
-                                                if let Some(num) = parse_number_like(&initial_num, &raw) {
-                                                    apply_field_update(
-                                                        entities,
-                                                        sync,
-                                                        entity_bits,
-                                                        component_type_for_handler.clone(),
-                                                        field_name_for_handler.clone(),
-                                                        JsonValue::Number(num),
-                                                    );
+                                                // On blur: revert to latest server value
+                                                if let Some(server_value) = entities.get_untracked()
+                                                    .get(&entity_bits)
+                                                    .and_then(|c| c.get(&component_type_for_blur))
+                                                    .and_then(|v| {
+                                                        if let JsonValue::Object(obj) = v {
+                                                            obj.get(&field_name_for_blur).and_then(|v| v.as_number())
+                                                        } else {
+                                                            None
+                                                        }
+                                                    })
+                                                {
+                                                    if let Some(input) = input_ref.get_untracked() {
+                                                        input.set_value(&server_value.to_string());
+                                                    }
+                                                }
+                                            }
+                                            on:keydown=move |ev| {
+                                                // On Enter: apply mutation
+                                                if ev.key() == "Enter" {
+                                                    let raw = event_target_value(&ev);
+                                                    if let Some(num) = parse_number_like(&initial_num, &raw) {
+                                                        apply_field_update(
+                                                            entities,
+                                                            sync,
+                                                            entity_bits,
+                                                            component_type_for_keydown.clone(),
+                                                            field_name_for_keydown.clone(),
+                                                            JsonValue::Number(num),
+                                                        );
+                                                        // Blur the input to trigger revert (in case server rejects)
+                                                        if let Some(input) = input_ref.get_untracked() {
+                                                            let _ = input.blur();
+                                                        }
+                                                    }
                                                 }
                                             }
                                         />
@@ -296,8 +323,10 @@ use eventwork_sync::{
                                     }
                                 });
 
-                                let component_type_for_handler = component_type.clone();
-                                let field_name_for_handler = field_name.clone();
+                                let component_type_for_blur = component_type.clone();
+                                let field_name_for_blur = field_name.clone();
+                                let component_type_for_keydown = component_type.clone();
+                                let field_name_for_keydown = field_name.clone();
 
                                 view! {
                                     <div class="space-y-1">
@@ -307,17 +336,42 @@ use eventwork_sync::{
                                             class="w-full rounded-md bg-slate-950/70 border border-slate-700 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                             value=initial_str
                                             on:focus=move |_| is_focused.set(true)
-                                            on:blur=move |ev| {
+                                            on:blur=move |_| {
                                                 is_focused.set(false);
-                                                let raw = event_target_value(&ev);
-                                                apply_field_update(
-                                                    entities,
-                                                    sync,
-                                                    entity_bits,
-                                                    component_type_for_handler.clone(),
-                                                    field_name_for_handler.clone(),
-                                                    JsonValue::String(raw),
-                                                );
+                                                // On blur: revert to latest server value
+                                                if let Some(server_value) = entities.get_untracked()
+                                                    .get(&entity_bits)
+                                                    .and_then(|c| c.get(&component_type_for_blur))
+                                                    .and_then(|v| {
+                                                        if let JsonValue::Object(obj) = v {
+                                                            obj.get(&field_name_for_blur).and_then(|v| v.as_str())
+                                                        } else {
+                                                            None
+                                                        }
+                                                    })
+                                                {
+                                                    if let Some(input) = input_ref.get_untracked() {
+                                                        input.set_value(server_value);
+                                                    }
+                                                }
+                                            }
+                                            on:keydown=move |ev| {
+                                                // On Enter: apply mutation
+                                                if ev.key() == "Enter" {
+                                                    let raw = event_target_value(&ev);
+                                                    apply_field_update(
+                                                        entities,
+                                                        sync,
+                                                        entity_bits,
+                                                        component_type_for_keydown.clone(),
+                                                        field_name_for_keydown.clone(),
+                                                        JsonValue::String(raw),
+                                                    );
+                                                    // Blur the input to trigger revert (in case server rejects)
+                                                    if let Some(input) = input_ref.get_untracked() {
+                                                        let _ = input.blur();
+                                                    }
+                                                }
                                             }
                                         />
                                     </div>
