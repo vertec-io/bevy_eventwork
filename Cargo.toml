@@ -8,10 +8,15 @@ members = [
     "crates/eventwork_macros",
     "crates/eventwork_sync",
     "crates/eventwork_client",
-    "crates/eventwork_client_example_shared",
-    "crates/demo_shared",
-    "crates/fanuc_shared",
-    "crates/fanuc_real_shared",
+    "examples/shared/basic_types",
+    "examples/shared/demo_types",
+    "examples/shared/fanuc_types",
+    "examples/shared/fanuc_real_types",
+    "examples/basic/server",
+    "examples/basic/client",
+    "examples/fanuc/server",
+    "examples/fanuc/client",
+    "examples/devtools-demo/server",
 ]
 
 [workspace.package]
@@ -28,8 +33,36 @@ exclude = [
 
 
 [workspace.dependencies]
+# Core eventwork crates
+eventwork = { path = "crates/eventwork" }
+eventwork_client = { path = "crates/eventwork_client" }
+eventwork_sync = { path = "crates/eventwork_sync", default-features = false }
+eventwork_websockets = { path = "crates/eventwork_websockets" }
+eventwork_common = { path = "crates/eventwork_common" }
+
+# Example shared types
+basic_types = { path = "examples/shared/basic_types" }
+demo_types = { path = "examples/shared/demo_types" }
+fanuc_types = { path = "examples/shared/fanuc_types" }
+fanuc_real_types = { path = "examples/shared/fanuc_real_types" }
+
+# Common dependencies
 bevy = { version = "0.17", default-features = false, features = ["multi_threaded", "bevy_log"] }
 bincode = { version = "2.0.1", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+
+# Leptos dependencies (for WASM clients)
+leptos = { version = "0.8.12", features = ["csr"] }
+leptos-use = "0.16.3"
+reactive_graph = "0.2"
+reactive_stores = "0.2"
+
+# WASM dependencies
+console_error_panic_hook = "0.1"
+console_log = "1.0"
+log = "0.4"
+wasm-bindgen = "0.2"
+web-sys = "0.3"
 
 # Fast-compile config
 [profile.dev]

@@ -1,0 +1,17 @@
+[[hooks]]
+stage = "build"
+command = "sh"
+command_arguments = ["-c", "echo 'Building FANUC real robot control client...'" ]
+
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+ignore = ["dist"]
+
+[serve]
+address = "127.0.0.1"
+port = 8084
+open = false
+

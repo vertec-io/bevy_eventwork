@@ -62,28 +62,40 @@ shared_types = { path = "../shared_types" }
 - ✅ **WASM-compatible** - No Bevy means it compiles to WASM
 - ✅ **Type safety** - Compile-time guarantees that client and server use same types
 
-### Step 2: Implement SyncComponent
+### Step 2: Automatic SyncComponent Implementation
 
-In your shared crate (or client code), use the `impl_sync_component!` macro:
+**Good news!** The `SyncComponent` trait is **automatically implemented** for all types that are `Serialize + Deserialize + Send + Sync + 'static`.
+
+No manual implementation needed! Just derive `Serialize` and `Deserialize` on your types:
 
 ```rust
-use eventwork_client::impl_sync_component;
+use serde::{Serialize, Deserialize};
 
-impl_sync_component!(Position);
-impl_sync_component!(Velocity);
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Position {
+    pub x: f32,
+    pub y: f32,
+}
+
+// That's it! SyncComponent is automatically implemented.
 ```
 
-**What does this do?**
-- Implements the `SyncComponent` trait for your types
-- Provides `component_name()` method that returns the short type name
-- Required for `use_sync_component::<T>()` hook to work
-- Maps type to component name for subscription system
+**How does it work?**
+- eventwork_client provides a blanket implementation of `SyncComponent`
+- Component names are automatically extracted using `std::any::type_name::<T>()`
+- Names are cached for performance (~500ns first call, ~50-100ns subsequent)
+- This matches the server-side behavior in eventwork_sync
 
-**Why is this needed?**
-- eventwork_sync identifies components by their short type name (e.g., "Position")
-- The macro extracts this name at runtime using `std::any::type_name::<T>()`
-- This is different from eventwork core's blanket `EventworkMessage` implementation
-- Both are necessary for different parts of the system
+**Migration Note:**
+If you have existing code using `impl_sync_component!`, it still works but is now unnecessary:
+
+```rust
+// OLD (still works, but unnecessary):
+impl_sync_component!(Position);
+
+// NEW (automatic):
+// Nothing needed!
+```
 
 ### Step 3: Set Up the Client Registry
 

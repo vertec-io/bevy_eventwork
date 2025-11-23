@@ -1,0 +1,29 @@
+[package]
+name = "basic_client"
+version = "0.1.0"
+edition = "2021"
+description = "Basic Leptos client example for eventwork_client"
+license = "MIT"
+
+[dependencies]
+# Leptos dependencies
+leptos = { workspace = true }
+leptos-use = { workspace = true }
+reactive_graph = { workspace = true }
+reactive_stores = { workspace = true }
+console_error_panic_hook = { workspace = true }
+console_log = { workspace = true }
+log = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+bincode = { workspace = true }
+
+# WASM dependencies
+wasm-bindgen = { workspace = true }
+web-sys = { workspace = true, features = ["console"] }
+
+# Eventwork dependencies
+eventwork_client = { workspace = true, features = ["stores", "devtools"] }
+eventwork_sync = { workspace = true, default-features = false }
+basic_types = { workspace = true, features = ["stores"] }

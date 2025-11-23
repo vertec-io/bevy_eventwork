@@ -1,0 +1,17 @@
+[package]
+name = "basic_types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+eventwork_client = { path = "../../../crates/eventwork_client" }
+reactive_stores = { version = "0.2", optional = true }
+
+# Bevy dependencies (only for server)
+bevy = { version = "0.17", default-features = false, features = ["multi_threaded", "bevy_log"], optional = true }
+
+[features]
+server = ["dep:bevy"]
+stores = ["dep:reactive_stores"]
+

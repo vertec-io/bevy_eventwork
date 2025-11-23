@@ -45,7 +45,7 @@ use crate::traits::SyncComponent;
 ///     y: f32,
 /// }
 ///
-/// impl_sync_component!(Position);
+/// // SyncComponent is automatically implemented!
 ///
 /// #[component]
 /// fn PositionEditor(entity_id: u64) -> impl IntoView {

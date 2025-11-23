@@ -1,0 +1,21 @@
+[package]
+name = "fanuc_server"
+version = "0.1.0"
+edition = "2021"
+description = "FANUC robot control server example for eventwork_sync"
+license = "MIT"
+
+[dependencies]
+bevy = { workspace = true }
+eventwork = { workspace = true }
+eventwork_sync = { workspace = true, features = ["runtime"] }
+eventwork_websockets = { workspace = true }
+fanuc_real_types = { workspace = true, features = ["server"] }
+bevy-tokio-tasks = { git = "https://github.com/vertec-io/async_bevy_web.git" }
+tokio = { version = "1", features = ["full"] }
+bincode = { workspace = true }
+fanuc_rmi = { git = "https://github.com/vertec-io/Fanuc_RMI_API.git", features = ["driver"], default-features = true }
+
+# Local simulator for testing
+sim = { path = "../../../../Fanuc_RMI_API/sim" }
+

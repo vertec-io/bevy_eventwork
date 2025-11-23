@@ -37,7 +37,7 @@ use reactive_stores::Store;
 ///     y: f32,
 /// }
 ///
-/// impl_sync_component!(Position);
+/// // SyncComponent is automatically implemented!
 ///
 /// #[component]
 /// fn PositionList() -> impl IntoView {
@@ -148,7 +148,7 @@ pub fn use_sync_connection() -> SyncConnection {
 ///     y: f32,
 /// }
 ///
-/// impl_sync_component!(Position);
+/// // SyncComponent is automatically implemented!
 ///
 /// #[component]
 /// fn PositionList() -> impl IntoView {
@@ -294,7 +294,7 @@ pub fn use_sync_mutations() -> ReadSignal<HashMap<u64, MutationState>> {
 ///     y: f32,
 /// }
 ///
-/// impl_sync_component!(Position);
+/// // SyncComponent is automatically implemented!
 ///
 /// #[component]
 /// fn PositionEditor(entity_id: u64) -> impl IntoView {
@@ -499,7 +499,7 @@ pub fn use_controlled_input<T: Clone + Send + Sync + 'static>(
 ///     y: f32,
 /// }
 ///
-/// impl_sync_component!(Position);
+/// // SyncComponent is automatically implemented!
 ///
 /// #[component]
 /// fn PositionEditor(entity_id: u64) -> impl IntoView {

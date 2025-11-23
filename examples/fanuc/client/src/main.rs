@@ -1,7 +1,8 @@
 use eventwork_client::{
     ClientRegistryBuilder, DevTools, SyncProvider, use_sync_component,
 };
-use fanuc_real_shared::{RobotPosition, RobotStatus, JointAngles, RobotInfo};
+use eventwork_sync::client_registry::ComponentTypeRegistry;
+use fanuc_real_types::{RobotPosition, RobotStatus, JointAngles, RobotInfo};
 use leptos::prelude::*;
 
 // SyncComponent is automatically implemented for all Serialize + Deserialize types.
@@ -16,10 +17,6 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
-    let (host, set_host) = signal("127.0.0.1".to_string());
-    let (port, set_port) = signal("8082".to_string());
-    let (ws_url, set_ws_url) = signal(None::<String>);
-
     // Create type registry and register component types
     let registry = ClientRegistryBuilder::new()
         .register::<RobotPosition>()
@@ -28,74 +25,37 @@ fn App() -> impl IntoView {
         .register::<RobotInfo>()
         .build();
 
-    let on_connect = move |_| {
-        let url = format!("ws://{}:{}", host.get(), port.get());
-        set_ws_url.set(Some(url));
-    };
+    // Build the DevTools type registry
+    let mut devtools_registry = ComponentTypeRegistry::new();
+    devtools_registry.register::<RobotPosition>();
+    devtools_registry.register::<RobotStatus>();
+    devtools_registry.register::<JointAngles>();
+    devtools_registry.register::<RobotInfo>();
+
+    let ws_url = "ws://127.0.0.1:8082/sync";
+    let devtools_url = "ws://127.0.0.1:8082/sync?devtools=true";
 
     view! {
-        <div class="min-h-screen w-screen bg-slate-950 text-slate-50 flex flex-col">
-            <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4 flex items-center justify-between">
-                <div>
+        <SyncProvider url=ws_url.to_string() registry=registry auto_connect=true>
+            <div class="min-h-screen w-screen bg-slate-950 text-slate-50 flex flex-col">
+                <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4">
                     <h1 class="text-lg font-semibold tracking-tight">"FANUC Real Robot Control"</h1>
                     <p class="text-xs text-slate-400">"Real FANUC simulator control using eventwork_sync"</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <input
-                        type="text"
-                        class="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        prop:value=host
-                        on:input=move |ev| set_host.set(event_target_value(&ev))
-                        placeholder="Host"
-                    />
-                    <input
-                        type="text"
-                        class="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        prop:value=port
-                        on:input=move |ev| set_port.set(event_target_value(&ev))
-                        placeholder="Port"
-                    />
-                    <button
-                        class="px-3 py-1.5 rounded bg-emerald-500 text-xs font-medium text-slate-950 hover:bg-emerald-400 transition"
-                        on:click=on_connect
-                    >
-                        "Connect"
-                    </button>
-                </div>
-            </header>
-
-            <main class="flex-1 overflow-hidden">
-                <Show
-                    when=move || ws_url.get().is_some()
-                    fallback=move || view! {
-                        <div class="h-full w-full flex items-center justify-center text-slate-400 text-sm">
-                            <p>"Enter a host/port and click Connect to start controlling the robot."</p>
+                </header>
+                <div class="flex-1 flex overflow-hidden">
+                    <main class="flex-1 p-6 overflow-auto">
+                        <div class="max-w-4xl mx-auto space-y-6">
+                            <RobotStatusDisplay />
+                            <PositionDisplay />
+                            <JointAnglesDisplay />
                         </div>
-                    }
-                >
-                    {move || {
-                        ws_url.get().map(|url| {
-                            view! {
-                                <SyncProvider url=url registry=registry.clone()>
-                                    <div class="flex-1 flex">
-                                        <div class="flex-1 p-6 overflow-auto">
-                                            <div class="max-w-4xl mx-auto space-y-6">
-                                                <RobotStatusDisplay />
-                                                <PositionDisplay />
-                                                <JointAnglesDisplay />
-                                            </div>
-                                        </div>
-                                        <div class="w-1/2 border-l border-slate-800">
-                                            <DevTools />
-                                        </div>
-                                    </div>
-                                </SyncProvider>
-                            }
-                        })
-                    }}
-                </Show>
-            </main>
-        </div>
+                    </main>
+                    <aside class="w-96 border-l border-slate-800 overflow-hidden">
+                        <DevTools ws_url=devtools_url registry=devtools_registry />
+                    </aside>
+                </div>
+            </div>
+        </SyncProvider>
     }
 }
 

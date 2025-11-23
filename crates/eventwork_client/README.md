@@ -58,19 +58,18 @@ shared_types = { path = "../shared_types" }
 - ✅ **NO "server" feature** - Client builds without Bevy dependency
 - ✅ **Same types as server** - Guaranteed type compatibility
 - ✅ **WASM-compatible** - No Bevy means it compiles to WASM
-- ✅ **impl_sync_component! required** - Implements `SyncComponent` trait for hooks
+- ✅ **Automatic trait implementation** - `SyncComponent` is automatically implemented for all `Serialize + Deserialize` types
 
 ### Basic Usage
 
 ```rust
 use leptos::prelude::*;
 use eventwork_client::{
-    SyncProvider, use_sync_component, ClientRegistryBuilder, impl_sync_component
+    SyncProvider, use_sync_component, ClientRegistryBuilder
 };
 use shared_types::Position;
 
-// Implement SyncComponent trait for the shared type
-impl_sync_component!(Position);
+// SyncComponent is automatically implemented - no manual implementation needed!
 
 #[component]
 pub fn App() -> impl IntoView {
