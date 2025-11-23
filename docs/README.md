@@ -6,9 +6,9 @@ Welcome to the comprehensive documentation for the bevy_eventwork ecosystem!
 
 **New to bevy_eventwork?** Start here:
 
-1. **Core Networking** - TCP-based networking with Bevy (coming soon)
-2. **Server-Side Sync** - Synchronize ECS components to clients (coming soon)
-3. **Client-Side Reactive UI** - Build reactive web UIs with Leptos (coming soon)
+1. **[Server-Side Sync](getting-started/eventwork-sync.md)** - Synchronize ECS components to clients
+2. **[Client-Side Reactive UI](getting-started/eventwork-client.md)** - Build reactive web UIs with Leptos
+3. **Core Networking** - TCP-based networking with Bevy (coming soon)
 4. **Full Stack Example** - Complete client-server application (coming soon)
 
 ---
@@ -59,7 +59,7 @@ Reference materials, glossary, troubleshooting, and FAQ.
 - Just derive `Serialize + Deserialize`
 - Type-safe message handling
 
-**Reflection-Driven Sync** (eventwork_sync)
+**Bincode-Based Sync** (eventwork_sync)
 - Automatic component synchronization
 - Opt-in per component type
 - Configurable sync settings

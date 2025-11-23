@@ -41,31 +41,30 @@ rustup target add wasm32-unknown-unknown
 
 ## Quick Start
 
-### Step 1: Define Shared Types
+### Step 1: Use the Shared Crate
 
-Create a shared types crate or module that both server and client can use:
+Use the same shared crate as your server (see [eventwork_sync Getting Started](./eventwork-sync.md) for how to create it).
 
-```rust
-use serde::{Serialize, Deserialize};
+**Client `Cargo.toml`**:
 
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
-pub struct Position {
-    pub x: f32,
-    pub y: f32,
-}
-
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
-pub struct Velocity {
-    pub x: f32,
-    pub y: f32,
-}
+```toml
+[dependencies]
+leptos = "0.8"
+eventwork_client = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+# Import shared types WITHOUT the "server" feature
+shared_types = { path = "../shared_types" }
 ```
 
-**Note**: Client types don't need `Component` or `Reflect` - just `Serialize` and `Deserialize`.
+**Key Points**:
+- ✅ **NO "server" feature** - Client builds without Bevy dependency
+- ✅ **Same types as server** - `Position`, `Velocity`, etc. are identical
+- ✅ **WASM-compatible** - No Bevy means it compiles to WASM
+- ✅ **Type safety** - Compile-time guarantees that client and server use same types
 
 ### Step 2: Implement SyncComponent
 
-Use the `impl_sync_component!` macro to make your types work with eventwork_client:
+In your shared crate (or client code), use the `impl_sync_component!` macro:
 
 ```rust
 use eventwork_client::impl_sync_component;
@@ -74,7 +73,17 @@ impl_sync_component!(Position);
 impl_sync_component!(Velocity);
 ```
 
-This macro implements the `SyncComponent` trait, which provides type information for serialization.
+**What does this do?**
+- Implements the `SyncComponent` trait for your types
+- Provides `component_name()` method that returns the short type name
+- Required for `use_sync_component::<T>()` hook to work
+- Maps type to component name for subscription system
+
+**Why is this needed?**
+- eventwork_sync identifies components by their short type name (e.g., "Position")
+- The macro extracts this name at runtime using `std::any::type_name::<T>()`
+- This is different from eventwork core's blanket `EventworkMessage` implementation
+- Both are necessary for different parts of the system
 
 ### Step 3: Set Up the Client Registry
 
@@ -83,6 +92,7 @@ Create a registry that maps type names to deserializers:
 ```rust
 use leptos::prelude::*;
 use eventwork_client::{SyncProvider, ClientRegistryBuilder};
+use shared_types::{Position, Velocity};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -90,7 +100,7 @@ pub fn App() -> impl IntoView {
         .register::<Position>()
         .register::<Velocity>()
         .build();
-    
+
     view! {
         <SyncProvider
             url="ws://localhost:8082"

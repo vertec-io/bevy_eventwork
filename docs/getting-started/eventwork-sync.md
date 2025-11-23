@@ -1,9 +1,9 @@
 # Getting Started with eventwork_sync
 
-**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using reflection.
+**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization.
 
-**Time**: 30-45 minutes  
-**Difficulty**: Intermediate  
+**Time**: 30-45 minutes
+**Difficulty**: Intermediate
 **Prerequisites**: Basic Bevy knowledge, eventwork setup
 
 ---
@@ -12,7 +12,7 @@
 
 eventwork_sync provides:
 - **Automatic component synchronization** - Components are automatically sent to subscribed clients
-- **Reflection-driven** - Uses Bevy's reflection system, no manual serialization code
+- **Bincode serialization** - Fast binary serialization, no reflection required
 - **Opt-in per component** - Only components you register are synchronized
 - **Mutation support** - Clients can request component changes (with authorization)
 - **Configurable** - Control update rates, conflation, and more
@@ -36,32 +36,71 @@ serde = { version = "1.0", features = ["derive"] }
 
 ## Quick Start
 
-### Step 1: Define Your Components
+### Step 1: Create a Shared Crate
 
-Components must derive `Component`, `Reflect`, `Serialize`, and `Deserialize`:
+The recommended pattern is to create a shared crate that both server and client can use. This allows type definitions to be shared without requiring the client to depend on Bevy.
+
+**Create `shared_types/Cargo.toml`**:
+
+```toml
+[package]
+name = "shared_types"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+server = ["dep:bevy"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+bevy = { version = "0.17", optional = true }
+```
+
+**Create `shared_types/src/lib.rs`**:
 
 ```rust
-use bevy::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone, Default)]
-#[reflect(Component)]
-struct Position {
-    x: f32,
-    y: f32,
+// Conditionally import Bevy only when building for server
+#[cfg(feature = "server")]
+use bevy::prelude::*;
+
+// Component trait is only derived when building with "server" feature
+#[cfg_attr(feature = "server", derive(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Position {
+    pub x: f32,
+    pub y: f32,
 }
 
-#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone, Default)]
-#[reflect(Component)]
-struct Velocity {
-    x: f32,
-    y: f32,
+#[cfg_attr(feature = "server", derive(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Velocity {
+    pub x: f32,
+    pub y: f32,
 }
 ```
 
-**Important**: The `#[reflect(Component)]` attribute is required for Bevy's reflection system.
+**Key Points**:
+- ✅ **NO Reflect trait required** - eventwork_sync uses bincode, not reflection
+- ✅ **Conditional compilation** - `Component` is only derived when `server` feature is enabled
+- ✅ **Client has no Bevy dependency** - Client builds without the `server` feature
+- ✅ **Same types, different traits** - Server gets `Component`, client gets just `Serialize + Deserialize`
 
-### Step 2: Add the Plugin
+### Step 2: Set Up the Server
+
+**Server `Cargo.toml`**:
+
+```toml
+[dependencies]
+bevy = "0.17"
+eventwork = "1.1"
+eventwork_sync = "0.1"
+eventwork_websockets = "1.1"
+shared_types = { path = "../shared_types", features = ["server"] }
+```
+
+**Server `main.rs`**:
 
 ```rust
 use bevy::prelude::*;
@@ -69,29 +108,30 @@ use bevy::tasks::TaskPoolBuilder;
 use eventwork::{EventworkPlugin, EventworkRuntime, NetworkSettings};
 use eventwork_sync::{EventworkSyncPlugin, AppEventworkSyncExt};
 use eventwork_websockets::WebSocketProvider;
+use shared_types::{Position, Velocity};
 
 fn main() {
     let mut app = App::new();
-    
+
     app.add_plugins(DefaultPlugins);
-    
+
     // Add eventwork networking
     app.add_plugins(EventworkPlugin::<WebSocketProvider, bevy::tasks::TaskPool>::default());
     app.insert_resource(EventworkRuntime(
         TaskPoolBuilder::new().num_threads(2).build()
     ));
     app.insert_resource(NetworkSettings::default());
-    
+
     // Add eventwork_sync plugin
     app.add_plugins(EventworkSyncPlugin::<WebSocketProvider>::default());
-    
+
     // Register components for synchronization
     app.sync_component::<Position>(None);
     app.sync_component::<Velocity>(None);
-    
+
     app.add_systems(Startup, setup);
     app.add_systems(Update, move_entities);
-    
+
     app.run();
 }
 ```

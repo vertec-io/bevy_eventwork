@@ -13,8 +13,7 @@ use bevy::prelude::*;
 use reactive_stores::Store;
 
 /// 2D position component
-#[cfg_attr(feature = "server", derive(Component, Reflect))]
-#[cfg_attr(feature = "server", reflect(Component))]
+#[cfg_attr(feature = "server", derive(Component))]
 #[cfg_attr(feature = "stores", derive(Store))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Position {
@@ -25,8 +24,7 @@ pub struct Position {
 impl_sync_component!(Position);
 
 /// 2D velocity component
-#[cfg_attr(feature = "server", derive(Component, Reflect))]
-#[cfg_attr(feature = "server", reflect(Component))]
+#[cfg_attr(feature = "server", derive(Component))]
 #[cfg_attr(feature = "stores", derive(Store))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Velocity {
@@ -37,8 +35,7 @@ pub struct Velocity {
 impl_sync_component!(Velocity);
 
 /// Name component
-#[cfg_attr(feature = "server", derive(Component, Reflect))]
-#[cfg_attr(feature = "server", reflect(Component))]
+#[cfg_attr(feature = "server", derive(Component))]
 #[cfg_attr(feature = "stores", derive(Store))]
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct EntityName {

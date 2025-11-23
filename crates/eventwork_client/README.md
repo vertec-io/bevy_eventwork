@@ -41,6 +41,25 @@ cargo install trunk
 rustup target add wasm32-unknown-unknown
 ```
 
+### Shared Crate Pattern (Recommended)
+
+Use the same shared crate as your server. See [eventwork_sync README](../eventwork_sync/README.md) for how to create it.
+
+**Client `Cargo.toml`**:
+```toml
+[dependencies]
+leptos = "0.8"
+eventwork_client = "0.1"
+# Import shared types WITHOUT the "server" feature
+shared_types = { path = "../shared_types" }
+```
+
+**Key Points**:
+- ✅ **NO "server" feature** - Client builds without Bevy dependency
+- ✅ **Same types as server** - Guaranteed type compatibility
+- ✅ **WASM-compatible** - No Bevy means it compiles to WASM
+- ✅ **impl_sync_component! required** - Implements `SyncComponent` trait for hooks
+
 ### Basic Usage
 
 ```rust
@@ -48,15 +67,9 @@ use leptos::prelude::*;
 use eventwork_client::{
     SyncProvider, use_sync_component, ClientRegistryBuilder, impl_sync_component
 };
-use serde::{Serialize, Deserialize};
+use shared_types::Position;
 
-// Define shared types (same as server)
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
-pub struct Position {
-    pub x: f32,
-    pub y: f32,
-}
-
+// Implement SyncComponent trait for the shared type
 impl_sync_component!(Position);
 
 #[component]
@@ -64,7 +77,7 @@ pub fn App() -> impl IntoView {
     let registry = ClientRegistryBuilder::new()
         .register::<Position>()
         .build();
-    
+
     view! {
         <SyncProvider url="ws://localhost:8082" registry=registry>
             <GameView/>
@@ -76,7 +89,7 @@ pub fn App() -> impl IntoView {
 fn GameView() -> impl IntoView {
     // Automatically subscribes to Position components
     let positions = use_sync_component::<Position>();
-    
+
     view! {
         <div class="game-view">
             <h1>"Entities"</h1>
@@ -104,6 +117,25 @@ fn GameView() -> impl IntoView {
     }
 }
 ```
+
+### About impl_sync_component!
+
+The `impl_sync_component!` macro is **required** for types to work with eventwork_client hooks:
+
+```rust
+impl_sync_component!(Position);
+```
+
+**What it does**:
+- Implements the `SyncComponent` trait for your type
+- Provides `component_name()` method that returns the short type name
+- Enables `use_sync_component::<T>()` to subscribe to the correct component type
+
+**Why it's needed**:
+- eventwork_sync identifies components by their short type name (e.g., "Position")
+- The macro extracts this name using `std::any::type_name::<T>()`
+- This is different from eventwork core's blanket `EventworkMessage` implementation
+- Both serve different purposes and are both necessary
 
 ### Editable Fields
 

@@ -1,6 +1,6 @@
 # eventwork_sync
 
-Reflection-driven ECS component synchronization for Bevy servers.
+Bincode-based ECS component synchronization for Bevy servers.
 
 [![Crates.io](https://img.shields.io/crates/v/eventwork_sync.svg)](https://crates.io/crates/eventwork_sync)
 [![Documentation](https://docs.rs/eventwork_sync/badge.svg)](https://docs.rs/eventwork_sync)
@@ -10,12 +10,12 @@ Reflection-driven ECS component synchronization for Bevy servers.
 
 ## Overview
 
-**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using Bevy's reflection system. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and multiplayer games.
+**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and multiplayer games.
 
 ### Key Features
 
 - ✅ **Automatic Synchronization** - Components are automatically sent to subscribed clients
-- ✅ **Reflection-Driven** - Uses Bevy's reflection system, no manual serialization code
+- ✅ **Bincode Serialization** - Fast binary serialization, no reflection required
 - ✅ **Opt-In Per Component** - Only components you register are synchronized
 - ✅ **Mutation Support** - Clients can request component changes (with authorization)
 - ✅ **High Performance** - Message conflation and rate limiting prevent overwhelming clients
@@ -36,6 +36,49 @@ eventwork_websockets = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 ```
 
+### Shared Crate Pattern (Recommended)
+
+The recommended approach is to create a shared crate for types used by both server and client:
+
+**`shared_types/Cargo.toml`**:
+```toml
+[features]
+server = ["dep:bevy"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+bevy = { version = "0.17", optional = true }
+```
+
+**`shared_types/src/lib.rs`**:
+```rust
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "server")]
+use bevy::prelude::*;
+
+// Component trait is only derived when building with "server" feature
+#[cfg_attr(feature = "server", derive(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Position {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[cfg_attr(feature = "server", derive(Component))]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct Velocity {
+    pub x: f32,
+    pub y: f32,
+}
+```
+
+**Key Points**:
+- ✅ **NO Reflect trait required** - eventwork_sync uses bincode, not reflection
+- ✅ **Conditional compilation** - `Component` only derived with `server` feature
+- ✅ **Client has no Bevy dependency** - Builds without `server` feature for WASM
+- ✅ **Type safety** - Server and client guaranteed to use same types
+
 ### Basic Usage
 
 ```rust
@@ -44,52 +87,37 @@ use bevy::tasks::TaskPoolBuilder;
 use eventwork::{EventworkPlugin, EventworkRuntime, NetworkSettings, AppNetworkMessage};
 use eventwork_sync::{EventworkSyncPlugin, AppEventworkSyncExt};
 use eventwork_websockets::WebSocketProvider;
-use serde::{Serialize, Deserialize};
-
-// Define components to synchronize
-#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone, Default)]
-#[reflect(Component)]
-struct Position {
-    x: f32,
-    y: f32,
-}
-
-#[derive(Component, Reflect, Serialize, Deserialize, Debug, Clone, Default)]
-#[reflect(Component)]
-struct Velocity {
-    x: f32,
-    y: f32,
-}
+use shared_types::{Position, Velocity};
 
 fn main() {
     let mut app = App::new();
-    
+
     app.add_plugins(DefaultPlugins);
-    
+
     // Add eventwork networking
     app.add_plugins(EventworkPlugin::<WebSocketProvider, bevy::tasks::TaskPool>::default());
     app.insert_resource(EventworkRuntime(
         TaskPoolBuilder::new().num_threads(2).build()
     ));
     app.insert_resource(NetworkSettings::default());
-    
+
     // Add eventwork_sync plugin
     app.add_plugins(EventworkSyncPlugin::<WebSocketProvider>::default());
-    
+
     // Register components for synchronization
     app.sync_component::<Position>(None);
     app.sync_component::<Velocity>(None);
-    
+
     app.add_systems(Startup, setup);
     app.add_systems(Update, move_entities);
-    
+
     app.run();
 }
 
 fn setup(mut commands: Commands) {
     // Start listening for connections
     commands.listen("127.0.0.1:8082");
-    
+
     // Spawn entities - they'll be automatically synchronized
     commands.spawn((
         Position { x: 0.0, y: 0.0 },
