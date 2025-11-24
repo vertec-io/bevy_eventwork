@@ -1,7 +1,6 @@
 use eventwork_client::{
-    ClientRegistryBuilder, DevTools, SyncProvider, use_sync_component,
+    ClientTypeRegistry, devtools::DevTools, SyncProvider, use_sync_component,
 };
-use eventwork_sync::client_registry::ComponentTypeRegistry;
 use fanuc_real_types::{RobotPosition, RobotStatus, JointAngles, RobotInfo};
 use leptos::prelude::*;
 
@@ -17,26 +16,20 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
-    // Create type registry and register component types
-    let registry = ClientRegistryBuilder::new()
+    // Create type registry with DevTools support
+    let registry = ClientTypeRegistry::builder()
         .register::<RobotPosition>()
         .register::<RobotStatus>()
         .register::<JointAngles>()
         .register::<RobotInfo>()
+        .with_devtools_support()  // Enable DevTools
         .build();
-
-    // Build the DevTools type registry
-    let mut devtools_registry = ComponentTypeRegistry::new();
-    devtools_registry.register::<RobotPosition>();
-    devtools_registry.register::<RobotStatus>();
-    devtools_registry.register::<JointAngles>();
-    devtools_registry.register::<RobotInfo>();
 
     let ws_url = "ws://127.0.0.1:8082/sync";
     let devtools_url = "ws://127.0.0.1:8082/sync?devtools=true";
 
     view! {
-        <SyncProvider url=ws_url.to_string() registry=registry auto_connect=true>
+        <SyncProvider url=ws_url.to_string() registry=registry.clone() auto_connect=true>
             <div class="min-h-screen w-screen bg-slate-950 text-slate-50 flex flex-col">
                 <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4">
                     <h1 class="text-lg font-semibold tracking-tight">"FANUC Real Robot Control"</h1>
@@ -51,7 +44,7 @@ fn App() -> impl IntoView {
                         </div>
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
-                        <DevTools ws_url=devtools_url registry=devtools_registry />
+                        <DevTools ws_url=devtools_url registry=registry />
                     </aside>
                 </div>
             </div>

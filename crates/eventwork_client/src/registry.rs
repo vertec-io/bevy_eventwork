@@ -7,6 +7,8 @@ use crate::traits::SyncComponent;
 
 /// Registry mapping component type names to deserializer functions.
 ///
+/// **DEPRECATED**: Use `ClientTypeRegistry` instead. This type will be removed in a future version.
+///
 /// This is the client-side type registry that allows deserializing component data
 /// received from the server. Each component type must be registered before it can
 /// be deserialized.
@@ -14,13 +16,17 @@ use crate::traits::SyncComponent;
 /// # Example
 ///
 /// ```rust,ignore
-/// use eventwork_client::{ClientRegistryBuilder, SyncComponent};
+/// use eventwork_client::ClientTypeRegistry;
 ///
-/// let registry = ClientRegistryBuilder::new()
+/// let registry = ClientTypeRegistry::builder()
 ///     .register::<Position>()
 ///     .register::<Velocity>()
 ///     .build();
 /// ```
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `ClientTypeRegistry` instead. See migration guide in documentation."
+)]
 pub struct ClientRegistry {
     /// Map from component type name to deserializer function
     deserializers: HashMap<String, Arc<dyn Fn(&[u8]) -> Result<Box<dyn Any + Send + Sync>, bincode::error::DecodeError> + Send + Sync>>,
@@ -108,19 +114,25 @@ impl Default for ClientRegistry {
 
 /// Builder for constructing a `ClientRegistry`.
 ///
+/// **DEPRECATED**: Use `ClientTypeRegistry::builder()` instead. This type will be removed in a future version.
+///
 /// This provides a fluent API for registering multiple component types.
 ///
 /// # Example
 ///
 /// ```rust,ignore
-/// use eventwork_client::ClientRegistryBuilder;
+/// use eventwork_client::ClientTypeRegistry;
 ///
-/// let registry = ClientRegistryBuilder::new()
+/// let registry = ClientTypeRegistry::builder()
 ///     .register::<Position>()
 ///     .register::<Velocity>()
 ///     .register::<Health>()
 ///     .build();
 /// ```
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `ClientTypeRegistry::builder()` instead. See migration guide in documentation."
+)]
 pub struct ClientRegistryBuilder {
     registry: ClientRegistry,
 }

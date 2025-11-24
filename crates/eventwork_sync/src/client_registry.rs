@@ -20,23 +20,30 @@ pub type SerializeFn = fn(&serde_json::Value) -> Result<Vec<u8>, bincode::error:
 
 /// Registry mapping component type names to deserializer and serializer functions.
 ///
+/// **DEPRECATED**: Use `ClientTypeRegistry` from `eventwork_client` instead. This type will be removed in a future version.
+///
 /// This is the client-side equivalent of Bevy's type registry. It allows clients
 /// to work with component data in a type-safe way without compile-time knowledge
 /// of all component types.
 ///
 /// # Example
 /// ```ignore
-/// use eventwork_sync::client_registry::ComponentTypeRegistry;
+/// use eventwork_client::ClientTypeRegistry;
 ///
-/// let mut registry = ComponentTypeRegistry::new();
-/// registry.register::<MyComponent>();
+/// let registry = ClientTypeRegistry::builder()
+///     .register_with_json::<MyComponent>()
+///     .build();
 ///
 /// // Deserialize component data from server
-/// let json_value = registry.deserialize_by_name("MyComponent", &bytes)?;
+/// let json_value = registry.deserialize_to_json("MyComponent", &bytes)?;
 ///
 /// // Serialize mutation to send to server
-/// let bytes = registry.serialize_by_name("MyComponent", &json_value)?;
+/// let bytes = registry.serialize_from_json("MyComponent", &json_value)?;
 /// ```
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `ClientTypeRegistry` from `eventwork_client` instead. See migration guide in documentation."
+)]
 #[derive(Clone)]
 pub struct ComponentTypeRegistry {
     deserializers: HashMap<String, DeserializeFn>,

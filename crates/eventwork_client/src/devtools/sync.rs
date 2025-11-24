@@ -1,8 +1,7 @@
-//! DevtoolsSync - Leptos-reactive wrapper around SyncClient
+//! DevtoolsSync - Leptos-reactive wrapper for DevTools sync functionality
 //!
-//! This module provides a reactive wrapper around eventwork_sync's SyncClient
-//! for use in DevTools and other Leptos applications that need direct access
-//! to the sync protocol.
+//! This module provides a reactive wrapper for DevTools that uses ClientTypeRegistry
+//! for JSON conversion and mutation support.
 
 use leptos::prelude::*;
 use reactive_graph::traits::{Get, Update};
@@ -10,26 +9,45 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::client_type_registry::ClientTypeRegistry;
+
 use eventwork_sync::{
+    MutateComponent,
     MutationResponse,
+    MutationStatus,
     SerializableEntity,
     SyncClientMessage,
     SyncServerMessage,
-    client_registry::ComponentTypeRegistry,
-    client_sync::SyncClient,
 };
 
-// Re-export MutationState from eventwork_sync for convenience
-pub use eventwork_sync::client_sync::MutationState;
+/// Mutation state for tracking client-side mutation requests.
+#[derive(Clone, Debug)]
+pub struct MutationState {
+    pub request_id: u64,
+    pub status: Option<MutationStatus>,
+    pub message: Option<String>,
+}
 
-/// Leptos-reactive wrapper around `SyncClient` for use in Leptos applications.
+impl MutationState {
+    pub fn new_pending(request_id: u64) -> Self {
+        Self {
+            request_id,
+            status: None,
+            message: None,
+        }
+    }
+}
+
+/// Leptos-reactive sync client for DevTools.
 ///
-/// This provides the same API as `SyncClient` but with reactive signals for
-/// tracking mutation state in Leptos components.
+/// This provides mutation tracking and JSON-based component editing
+/// using `ClientTypeRegistry` for serialization/deserialization.
 #[derive(Clone)]
 pub struct DevtoolsSync {
-    client: Arc<SyncClient>,
+    send: Arc<dyn Fn(SyncClientMessage) + Send + Sync>,
+    registry: Arc<ClientTypeRegistry>,
     mutations: RwSignal<HashMap<u64, MutationState>>,
+    next_request_id: Arc<std::sync::Mutex<u64>>,
 }
 
 /// General-purpose sync hook for wiring the eventwork_sync wire protocol
@@ -44,14 +62,13 @@ pub struct DevtoolsSync {
 /// concrete component types expected by the server.
 pub fn use_sync(
     send: impl Fn(SyncClientMessage) + Send + Sync + 'static,
-    registry: ComponentTypeRegistry,
+    registry: Arc<ClientTypeRegistry>,
 ) -> DevtoolsSync {
-    let client = Arc::new(SyncClient::new(send, registry));
-    let mutations = RwSignal::new(HashMap::new());
-
     DevtoolsSync {
-        client,
-        mutations,
+        send: Arc::new(send),
+        registry,
+        mutations: RwSignal::new(HashMap::new()),
+        next_request_id: Arc::new(std::sync::Mutex::new(1)),
     }
 }
 
@@ -61,7 +78,7 @@ impl DevtoolsSync {
     /// This is useful for subscription management or other operations
     /// that don't need per-request client-side tracking.
     pub fn send_raw(&self, message: SyncClientMessage) {
-        self.client.send_raw(message);
+        (self.send)(message);
     }
 
     /// Read-only view of all tracked mutations keyed by `request_id`.
@@ -83,46 +100,77 @@ impl DevtoolsSync {
         component_type: impl Into<String>,
         value: JsonValue,
     ) -> u64 {
-        // Delegate to SyncClient
-        let request_id = self.client.mutate(entity, component_type, value);
+        let component_type = component_type.into();
 
-        // Track in reactive signal for Leptos
-        self.mutations.update(|map| {
-            map.insert(request_id, MutationState::new_pending(request_id));
-        });
+        // Generate request ID
+        let request_id = {
+            let mut id = self.next_request_id.lock().unwrap();
+            let current = *id;
+            *id += 1;
+            current
+        };
 
-        request_id
+        // Serialize JSON to bincode using registry
+        match self.registry.serialize_from_json(&component_type, &value) {
+            Ok(value_bytes) => {
+                // Send mutation message
+                let message = SyncClientMessage::Mutate(MutateComponent {
+                    request_id: Some(request_id),
+                    entity,
+                    component_type,
+                    value: value_bytes,
+                });
+                (self.send)(message);
+
+                // Track in reactive signal for Leptos
+                self.mutations.update(|map| {
+                    map.insert(request_id, MutationState::new_pending(request_id));
+                });
+
+                request_id
+            }
+            Err(_err) => {
+                // Track failed mutation
+                self.mutations.update(|map| {
+                    map.insert(request_id, MutationState {
+                        request_id,
+                        status: Some(MutationStatus::InternalError),
+                        message: Some("Serialization failed".to_string()),
+                    });
+                });
+
+                request_id
+            }
+        }
     }
 
     /// Handle a server-side message, updating mutation state when a
     /// `MutationResponse` is observed.
     pub fn handle_server_message(&self, message: &SyncServerMessage) {
-        // Delegate to SyncClient
-        self.client.handle_server_message(message);
-
-        // Sync the mutation state to our reactive signal
-        self.sync_mutations_from_client();
+        // Update reactive state for MutationResponse
+        if let SyncServerMessage::MutationResponse(response) = message {
+            if let Some(request_id) = response.request_id {
+                self.mutations.update(|map| {
+                    if let Some(state) = map.get_mut(&request_id) {
+                        state.status = Some(response.status.clone());
+                        state.message = response.message.clone();
+                    }
+                });
+            }
+        }
     }
 
     /// Helper to handle a `MutationResponse` directly, for cases where
     /// the transport layer already demultiplexes server messages.
     pub fn handle_mutation_response(&self, response: &MutationResponse) {
-        // Delegate to SyncClient
-        self.client.handle_mutation_response(response);
-
-        // Sync the mutation state to our reactive signal
-        self.sync_mutations_from_client();
-    }
-
-    /// Sync mutation state from the underlying SyncClient to the reactive signal.
-    fn sync_mutations_from_client(&self) {
-        let client_mutations = self.client.mutations();
-        self.mutations.set(client_mutations);
-    }
-
-    /// Get a reference to the underlying SyncClient.
-    pub fn client(&self) -> &SyncClient {
-        &self.client
+        if let Some(request_id) = response.request_id {
+            self.mutations.update(|map| {
+                if let Some(state) = map.get_mut(&request_id) {
+                    state.status = Some(response.status.clone());
+                    state.message = response.message.clone();
+                }
+            });
+        }
     }
 }
 

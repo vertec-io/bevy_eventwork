@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex, Weak};
 use leptos::prelude::*;
 use leptos_use::core::ConnectionReadyState;
 
+use crate::client_type_registry::ClientTypeRegistry;
 use crate::error::SyncError;
-use crate::registry::ClientRegistry;
 use crate::traits::SyncComponent;
 use eventwork_sync::{
     MutateComponent, MutationResponse, MutationStatus, SerializableEntity, SubscriptionRequest,
@@ -65,7 +65,7 @@ pub struct SyncContext {
     /// Function to close the connection
     close: Arc<dyn Fn() + Send + Sync>,
     /// Type registry for deserialization
-    registry: Arc<ClientRegistry>,
+    registry: Arc<ClientTypeRegistry>,
     /// Cache of signals for each (TypeId, params) pair
     /// Uses Weak references to allow garbage collection
     signal_cache: Arc<Mutex<HashMap<(TypeId, String), Weak<dyn Any + Send + Sync>>>>,
@@ -94,7 +94,7 @@ impl SyncContext {
         send: Arc<dyn Fn(&[u8]) + Send + Sync>,
         open: Arc<dyn Fn() + Send + Sync>,
         close: Arc<dyn Fn() + Send + Sync>,
-        registry: Arc<ClientRegistry>,
+        registry: Arc<ClientTypeRegistry>,
     ) -> Self {
         Self {
             ready_state,

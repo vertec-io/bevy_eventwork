@@ -5,9 +5,9 @@ use leptos_use::{use_websocket_with_options, DummyEncoder, UseWebSocketOptions, 
 use eventwork_common::codec::EventworkBincodeCodec;
 use eventwork_common::NetworkPacket;
 
+use crate::client_type_registry::ClientTypeRegistry;
 use crate::context::SyncContext;
 use crate::error::SyncError;
-use crate::registry::ClientRegistry;
 use eventwork_sync::{SyncClientMessage, SyncServerMessage};
 
 /// Provider component that sets up WebSocket connection and provides SyncContext.
@@ -18,11 +18,11 @@ use eventwork_sync::{SyncClientMessage, SyncServerMessage};
 /// # Example
 ///
 /// ```rust,ignore
-/// use eventwork_client::{SyncProvider, ClientRegistryBuilder};
+/// use eventwork_client::{SyncProvider, ClientTypeRegistry};
 ///
 /// #[component]
 /// pub fn App() -> impl IntoView {
-///     let registry = ClientRegistryBuilder::new()
+///     let registry = ClientTypeRegistry::builder()
 ///         .register::<Position>()
 ///         .register::<Velocity>()
 ///         .build();
@@ -42,7 +42,7 @@ pub fn SyncProvider(
     /// WebSocket URL to connect to
     url: String,
     /// Type registry for deserializing components
-    registry: Arc<ClientRegistry>,
+    registry: Arc<ClientTypeRegistry>,
     /// Whether to automatically connect on mount (default: true)
     #[prop(optional)]
     auto_connect: Option<bool>,

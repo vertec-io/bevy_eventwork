@@ -2,6 +2,7 @@
 //!
 //! This module contains the DevTools widget and related UI components.
 
+use crate::client_type_registry::ClientTypeRegistry;
 use crate::devtools::sync::{DevtoolsSync, use_sync};
 
 use eventwork_common::codec::EventworkBincodeCodec;
@@ -19,6 +20,7 @@ use leptos_use::{
 use reactive_graph::traits::{Get, Update};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use eventwork_sync::{
     SerializableEntity,
@@ -26,7 +28,6 @@ use eventwork_sync::{
     SyncItem,
     SyncServerMessage,
     SubscriptionRequest,
-    client_registry::ComponentTypeRegistry,
 };
 
     fn entity_label(id: u64, components: &HashMap<String, JsonValue>) -> String {
@@ -429,9 +430,15 @@ use eventwork_sync::{
     #[component]
     pub fn DevTools(
         ws_url: &'static str,
-        registry: ComponentTypeRegistry,
+        registry: Arc<ClientTypeRegistry>,
         #[prop(optional)] mode: DevToolsMode,
     ) -> impl IntoView {
+        // Check if DevTools support is enabled in the registry
+        let devtools_support_enabled = registry.is_devtools_support_enabled();
+        if !devtools_support_enabled {
+            console::error_1(&"[DevTools] ERROR: ClientTypeRegistry was not built with .with_devtools_support()! DevTools will not function correctly. Please add .with_devtools_support() to your registry builder.".into());
+        }
+
         // Connection + debug state
         let (last_incoming, set_last_incoming) = signal(String::new());
         let (last_error, set_last_error) = signal(Option::<String>::None);
@@ -518,8 +525,8 @@ use eventwork_sync::{
             RwSignal::new(s)
         };
 
-        // Provide the SyncClient via context so other components can use it
-        provide_context(sync.get_untracked().client().clone());
+        // Provide the DevtoolsSync via context so other components can use it
+        provide_context(sync.get_untracked());
 
         // React to incoming server messages: update mutation state and
         // maintain a simple entity/component projection.
@@ -550,7 +557,7 @@ use eventwork_sync::{
                                         SyncItem::Snapshot { entity, component_type, value, .. }
                                         | SyncItem::Update { entity, component_type, value, .. } => {
                                             // Use the type registry to deserialize component data
-                                            match registry.deserialize_by_name(component_type, value) {
+                                            match registry.deserialize_to_json(component_type, value) {
                                                 Ok(json_value) => {
                                                     map.entry(entity.bits)
                                                         .or_default()
@@ -698,6 +705,29 @@ use eventwork_sync::{
                         >"Disconnect"</button>
                     </div>
                 </header>
+
+                // Error banner when DevTools support is not enabled
+                <Show when=move || !devtools_support_enabled>
+                    <div class="bg-red-900/80 border-b border-red-700 px-4 py-3 flex items-start gap-3 flex-shrink-0">
+                        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-semibold text-red-200">"DevTools Support Not Enabled"</h3>
+                            <p class="text-xs text-red-300 mt-1">
+                                "The ClientTypeRegistry was not built with "
+                                <code class="px-1 py-0.5 bg-red-950/50 rounded font-mono text-red-200">".with_devtools_support()"</code>
+                                ". DevTools will not function correctly. Please update your registry builder:"
+                            </p>
+                            <pre class="mt-2 text-[10px] font-mono bg-red-950/50 border border-red-800 rounded p-2 text-red-200">
+"let registry = ClientTypeRegistry::builder()
+    .register::<YourComponent>()
+    .with_devtools_support()  // ← Add this line
+    .build();"
+                            </pre>
+                        </div>
+                    </div>
+                </Show>
 
                 <main class="flex-1 overflow-hidden grid grid-cols-12 gap-4 p-4 min-h-0">
                     <section class="col-span-3 flex flex-col gap-3 min-h-0">
@@ -1116,14 +1146,26 @@ use eventwork_sync::{
                             fallback=|| view! { <></> }
                         >
                             <button
-                                class="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 border border-white/20"
+                                class=move || {
+                                    let base = "fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-2 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 border border-white/20";
+                                    if devtools_support_enabled {
+                                        format!("{base} bg-gradient-to-r from-indigo-600 to-purple-600")
+                                    } else {
+                                        format!("{base} bg-gradient-to-r from-red-600 to-red-700")
+                                    }
+                                }
                                 on:click=move |_| set_widget_expanded.set(true)
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
                                 </svg>
                                 <span class="text-xs font-semibold">"DevTools"</span>
-                                <Show when=move || !entities.get().is_empty()>
+                                <Show when=move || !devtools_support_enabled>
+                                    <span class="px-1.5 py-0.5 bg-white/30 rounded-full text-[10px] font-bold">
+                                        "!"
+                                    </span>
+                                </Show>
+                                <Show when=move || devtools_support_enabled && !entities.get().is_empty()>
                                     <span class="px-1.5 py-0.5 bg-white/20 rounded-full text-[10px] font-bold">
                                         {move || entities.get().len()}
                                     </span>

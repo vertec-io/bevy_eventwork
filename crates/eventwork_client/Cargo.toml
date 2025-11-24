@@ -10,6 +10,7 @@ repository = "https://github.com/vertec-io/bevy_eventwork"
 [dependencies]
 # Core dependencies
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
 bincode = { version = "2.0.1", features = ["serde"] }
 
 # Leptos dependencies (match devtools version for compatibility)
@@ -25,7 +26,6 @@ eventwork_common = { path = "../eventwork_common" }
 reactive_stores = { version = "0.2", optional = true }
 
 # Optional dependencies for devtools
-serde_json = { version = "1", optional = true }
 reactive_graph = { version = "0.2", optional = true }
 
 # Utility dependencies
@@ -45,7 +45,7 @@ eventwork_sync = { path = "../eventwork_sync", features = ["runtime"] }
 [features]
 default = []
 stores = ["dep:reactive_stores"]
-devtools = ["dep:serde_json", "dep:reactive_graph"]
+devtools = ["dep:reactive_graph"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

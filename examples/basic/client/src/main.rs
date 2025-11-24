@@ -15,10 +15,9 @@
 
 use eventwork_client::{
     use_sync_component, use_sync_component_store, use_sync_component_write, use_sync_connection,
-    ClientRegistryBuilder, SyncProvider,
+    ClientTypeRegistry, SyncProvider,
     devtools::DevTools,
 };
-use eventwork_sync::client_registry::ComponentTypeRegistry;
 use leptos::prelude::*;
 use reactive_graph::traits::{Get, Read};
 use reactive_stores::Store;
@@ -35,18 +34,13 @@ fn main() {
 
 #[component]
 fn App() -> impl IntoView {
-    // Build the client registry
-    let registry = ClientRegistryBuilder::new()
+    // Build the client registry with DevTools support
+    let registry = ClientTypeRegistry::builder()
         .register::<Position>()
         .register::<Velocity>()
         .register::<EntityName>()
+        .with_devtools_support()
         .build();
-
-    // Build the DevTools type registry
-    let mut devtools_registry = ComponentTypeRegistry::new();
-    devtools_registry.register::<Position>();
-    devtools_registry.register::<Velocity>();
-    devtools_registry.register::<EntityName>();
 
     let ws_url = "ws://127.0.0.1:3000/sync";
     // TEMPORARY: Use different URL for DevTools to test if leptos-use is caching connections
@@ -56,7 +50,7 @@ fn App() -> impl IntoView {
     let (active_tab, set_active_tab) = signal("signals".to_string());
 
     view! {
-        <SyncProvider url=ws_url.to_string() registry=registry auto_connect=true>
+        <SyncProvider url=ws_url.to_string() registry=registry.clone() auto_connect=true>
             <div class="min-h-screen w-screen bg-slate-950 text-slate-50 flex flex-col">
                 <Header />
                 <div class="flex-1 flex overflow-hidden">
@@ -96,7 +90,7 @@ fn App() -> impl IntoView {
                         </div>
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
-                        <DevTools ws_url=devtools_url registry=devtools_registry />
+                        <DevTools ws_url=devtools_url registry=registry />
                     </aside>
                 </div>
             </div>

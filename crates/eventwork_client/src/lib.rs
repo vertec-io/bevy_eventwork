@@ -109,6 +109,7 @@
 //! - ✅ Blur (click away) to revert to server value
 
 // Module declarations
+mod client_type_registry;
 mod components;
 mod context;
 mod error;
@@ -118,6 +119,7 @@ mod registry;
 mod traits;
 
 // Re-exports
+pub use client_type_registry::{ClientTypeRegistry, ClientTypeRegistryBuilder};
 pub use components::SyncFieldInput;
 pub use context::{MutationState, SyncConnection, SyncContext};
 pub use error::SyncError;
