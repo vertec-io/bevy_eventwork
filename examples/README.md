@@ -92,4 +92,4 @@ All shared type crates follow the same pattern:
 - `#[cfg_attr(feature = "server", derive(Component))]` for conditional Bevy integration
 - Feature flag `server` enables Bevy dependency
 
-This allows the same types to be used on both server (with Bevy) and client (WASM, without Bevy).
+This pattern enables type sharing between server (with Bevy) and client (WASM, without Bevy).

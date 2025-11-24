@@ -1,21 +1,21 @@
 # Getting Started with eventwork_sync
 
-**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization.
+eventwork_sync is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization.
 
-**Time**: 30-45 minutes
-**Difficulty**: Intermediate
-**Prerequisites**: Basic Bevy knowledge, eventwork setup
+Time: 30-45 minutes
+Difficulty: Intermediate
+Prerequisites: Basic Bevy knowledge, eventwork setup
 
 ---
 
 ## Overview
 
 eventwork_sync provides:
-- **Automatic component synchronization** - Components are automatically sent to subscribed clients
-- **Bincode serialization** - Fast binary serialization, no reflection required
-- **Opt-in per component** - Only components you register are synchronized
-- **Mutation support** - Clients can request component changes (with authorization)
-- **Configurable** - Control update rates, conflation, and more
+- Automatic component synchronization to subscribed clients
+- Fast binary serialization using bincode
+- Opt-in per component registration
+- Client mutation support with authorization
+- Configurable update rates and conflation
 
 ---
 
@@ -81,11 +81,11 @@ pub struct Velocity {
 }
 ```
 
-**Key Points**:
-- ✅ **NO Reflect trait required** - eventwork_sync uses bincode, not reflection
-- ✅ **Conditional compilation** - `Component` is only derived when `server` feature is enabled
-- ✅ **Client has no Bevy dependency** - Client builds without the `server` feature
-- ✅ **Same types, different traits** - Server gets `Component`, client gets just `Serialize + Deserialize`
+This pattern enables:
+- Bincode serialization without reflection
+- Conditional `Component` derivation with the `server` feature
+- Client builds without Bevy dependency
+- Server gets `Component` trait, client gets `Serialize + Deserialize`
 
 ### Step 2: Set Up the Server
 
@@ -178,7 +178,7 @@ fn setup(mut commands: Commands) {
 }
 ```
 
-That's it! Your server is now synchronizing Position and Velocity components to any connected clients.
+Your server is now synchronizing Position and Velocity components to any connected clients.
 
 ---
 

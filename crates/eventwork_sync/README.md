@@ -10,16 +10,16 @@ Bincode-based ECS component synchronization for Bevy servers.
 
 ## Overview
 
-**eventwork_sync** is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and multiplayer games.
+eventwork_sync is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and multiplayer games.
 
 ### Key Features
 
-- ✅ **Automatic Synchronization** - Components are automatically sent to subscribed clients
-- ✅ **Bincode Serialization** - Fast binary serialization, no reflection required
-- ✅ **Opt-In Per Component** - Only components you register are synchronized
-- ✅ **Mutation Support** - Clients can request component changes (with authorization)
-- ✅ **High Performance** - Message conflation and rate limiting prevent overwhelming clients
-- ✅ **Configurable** - Control update rates, conflation, and authorization policies
+- Automatic synchronization of components to subscribed clients
+- Fast binary serialization using bincode
+- Opt-in per component registration
+- Client mutation support with authorization
+- Message conflation and rate limiting for performance
+- Configurable update rates and authorization policies
 
 ---
 
@@ -73,11 +73,11 @@ pub struct Velocity {
 }
 ```
 
-**Key Points**:
-- ✅ **NO Reflect trait required** - eventwork_sync uses bincode, not reflection
-- ✅ **Conditional compilation** - `Component` only derived with `server` feature
-- ✅ **Client has no Bevy dependency** - Builds without `server` feature for WASM
-- ✅ **Type safety** - Server and client guaranteed to use same types
+This pattern enables:
+- Bincode serialization without reflection
+- Conditional `Component` derivation with the `server` feature
+- WASM-compatible client builds without Bevy dependency
+- Type safety between server and client
 
 ### Basic Usage
 
@@ -136,7 +136,7 @@ fn move_entities(
 }
 ```
 
-That's it! Components are now automatically synchronized to connected clients.
+Components are now automatically synchronized to connected clients.
 
 ---
 

@@ -1,21 +1,21 @@
 # Getting Started with eventwork_client
 
-**eventwork_client** is a reactive Leptos library for building web UIs that synchronize with Bevy ECS servers via eventwork_sync.
+eventwork_client is a reactive Leptos library for building web UIs that synchronize with Bevy ECS servers via eventwork_sync.
 
-**Time**: 30-45 minutes  
-**Difficulty**: Intermediate  
-**Prerequisites**: Basic Leptos knowledge, eventwork_sync server running
+Time: 30-45 minutes
+Difficulty: Intermediate
+Prerequisites: Basic Leptos knowledge, eventwork_sync server running
 
 ---
 
 ## Overview
 
 eventwork_client provides:
-- **Reactive hooks** - Subscribe to components with automatic updates
-- **Type-safe** - Compile-time type checking
-- **Focus retention** - Editable fields that don't lose focus on server updates
-- **DevTools** - Built-in component inspector
-- **Automatic subscription management** - Subscribe on mount, unsubscribe on unmount
+- Reactive hooks for subscribing to components with automatic updates
+- Compile-time type checking
+- Focus retention for editable fields during server updates
+- Built-in component inspector
+- Automatic subscription management (subscribe on mount, unsubscribe on unmount)
 
 ---
 
@@ -56,17 +56,17 @@ serde = { version = "1.0", features = ["derive"] }
 shared_types = { path = "../shared_types" }
 ```
 
-**Key Points**:
-- ✅ **NO "server" feature** - Client builds without Bevy dependency
-- ✅ **Same types as server** - `Position`, `Velocity`, etc. are identical
-- ✅ **WASM-compatible** - No Bevy means it compiles to WASM
-- ✅ **Type safety** - Compile-time guarantees that client and server use same types
+This pattern enables:
+- Client builds without Bevy dependency (no "server" feature)
+- Identical types on server and client (`Position`, `Velocity`, etc.)
+- WASM compilation without Bevy
+- Compile-time type safety guarantees
 
 ### Step 2: Automatic SyncComponent Implementation
 
-**Good news!** The `SyncComponent` trait is **automatically implemented** for all types that are `Serialize + Deserialize + Send + Sync + 'static`.
+The `SyncComponent` trait is automatically implemented for all types that are `Serialize + Deserialize + Send + Sync + 'static`.
 
-No manual implementation needed! Just derive `Serialize` and `Deserialize` on your types:
+Simply derive `Serialize` and `Deserialize` on your types:
 
 ```rust
 use serde::{Serialize, Deserialize};
@@ -76,26 +76,13 @@ pub struct Position {
     pub x: f32,
     pub y: f32,
 }
-
-// That's it! SyncComponent is automatically implemented.
 ```
 
-**How does it work?**
-- eventwork_client provides a blanket implementation of `SyncComponent`
-- Component names are automatically extracted using `std::any::type_name::<T>()`
-- Names are cached for performance (~500ns first call, ~50-100ns subsequent)
-- This matches the server-side behavior in eventwork_sync
-
-**Migration Note:**
-If you have existing code using `impl_sync_component!`, it still works but is now unnecessary:
-
-```rust
-// OLD (still works, but unnecessary):
-impl_sync_component!(Position);
-
-// NEW (automatic):
-// Nothing needed!
-```
+The implementation:
+- Provides a blanket implementation of `SyncComponent`
+- Extracts component names using `std::any::type_name::<T>()`
+- Caches names for performance (approximately 500ns first call, 50-100ns subsequent)
+- Matches the server-side behavior in eventwork_sync
 
 ### Step 3: Set Up the Client Registry
 
@@ -183,7 +170,7 @@ fn GameView() -> impl IntoView {
 trunk serve --port 8080
 ```
 
-Open `http://localhost:8080` in your browser. You should see the synchronized entities!
+Open `http://localhost:8080` in your browser to see the synchronized entities.
 
 ---
 
@@ -225,10 +212,10 @@ fn PositionEditor(entity_id: u64) -> impl IntoView {
 }
 ```
 
-**Features**:
-- ✅ **Focus retention** - Input doesn't lose focus when server updates arrive
-- ✅ **Enter to apply** - Press Enter to send mutation to server
-- ✅ **Blur to revert** - Click away to discard changes and revert to server value
+Features:
+- Input retains focus when server updates arrive
+- Press Enter to send mutation to server
+- Click away to discard changes and revert to server value
 
 ---
 

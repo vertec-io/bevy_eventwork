@@ -10,16 +10,16 @@ Reactive Leptos client library for building web UIs that synchronize with Bevy E
 
 ## Overview
 
-**eventwork_client** is a reactive Leptos library for building web UIs that display and edit ECS components synchronized from Bevy servers via `eventwork_sync`. It's designed for control panels, dashboards, and web-based tools for robotics, industrial automation, and multiplayer games.
+eventwork_client is a reactive Leptos library for building web UIs that display and edit ECS components synchronized from Bevy servers via `eventwork_sync`. It's designed for control panels, dashboards, and web-based tools for robotics, industrial automation, and multiplayer games.
 
 ### Key Features
 
-- ✅ **Reactive Hooks** - Subscribe to components with automatic updates
-- ✅ **Type-Safe** - Compile-time type checking with Rust's type system
-- ✅ **Focus Retention** - Editable fields that don't lose focus on server updates
-- ✅ **DevTools** - Built-in component inspector for debugging
-- ✅ **Automatic Subscription Management** - Subscribe on mount, unsubscribe on unmount
-- ✅ **Bevy-Free** - No Bevy dependency, runs in WASM/browser
+- Reactive hooks for subscribing to components with automatic updates
+- Compile-time type checking with Rust's type system
+- Focus retention for editable fields during server updates
+- Built-in component inspector for debugging
+- Automatic subscription management (subscribe on mount, unsubscribe on unmount)
+- No Bevy dependency, runs in WASM/browser
 
 ---
 
@@ -54,11 +54,11 @@ eventwork_client = "0.1"
 shared_types = { path = "../shared_types" }
 ```
 
-**Key Points**:
-- ✅ **NO "server" feature** - Client builds without Bevy dependency
-- ✅ **Same types as server** - Guaranteed type compatibility
-- ✅ **WASM-compatible** - No Bevy means it compiles to WASM
-- ✅ **Automatic trait implementation** - `SyncComponent` is automatically implemented for all `Serialize + Deserialize` types
+This pattern enables:
+- Client builds without Bevy dependency (no "server" feature)
+- Guaranteed type compatibility with server
+- WASM compilation without Bevy
+- Automatic `SyncComponent` trait implementation for all `Serialize + Deserialize` types
 
 ### Basic Usage
 
@@ -68,8 +68,6 @@ use eventwork_client::{
     SyncProvider, use_sync_component, ClientRegistryBuilder
 };
 use shared_types::Position;
-
-// SyncComponent is automatically implemented - no manual implementation needed!
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -117,24 +115,7 @@ fn GameView() -> impl IntoView {
 }
 ```
 
-### About impl_sync_component!
 
-The `impl_sync_component!` macro is **required** for types to work with eventwork_client hooks:
-
-```rust
-impl_sync_component!(Position);
-```
-
-**What it does**:
-- Implements the `SyncComponent` trait for your type
-- Provides `component_name()` method that returns the short type name
-- Enables `use_sync_component::<T>()` to subscribe to the correct component type
-
-**Why it's needed**:
-- eventwork_sync identifies components by their short type name (e.g., "Position")
-- The macro extracts this name using `std::any::type_name::<T>()`
-- This is different from eventwork core's blanket `EventworkMessage` implementation
-- Both serve different purposes and are both necessary
 
 ### Editable Fields
 
@@ -161,10 +142,10 @@ fn PositionEditor(entity_id: u64) -> impl IntoView {
 }
 ```
 
-**Features**:
-- ✅ **Focus retention** - Input doesn't lose focus when server updates arrive
-- ✅ **Enter to apply** - Press Enter to send mutation to server
-- ✅ **Blur to revert** - Click away to discard changes and revert to server value
+Features:
+- Input retains focus when server updates arrive
+- Press Enter to send mutation to server
+- Click away to discard changes and revert to server value
 
 ### DevTools
 
@@ -202,7 +183,7 @@ Build and serve:
 trunk serve --port 8080
 ```
 
-Open `http://localhost:8080` in your browser!
+Open `http://localhost:8080` in your browser.
 
 ---
 
