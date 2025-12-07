@@ -22,9 +22,9 @@ mod subscription;
 #[cfg(feature = "runtime")]
 mod systems;
 
-// Client-side modules (not behind runtime feature - available for all clients)
-pub mod client_registry;
-pub mod client_sync;
+/// Optional utilities for exclusive control transfer patterns.
+#[cfg(feature = "runtime")]
+pub mod control;
 
 pub use messages::*;
 #[cfg(feature = "runtime")]
@@ -44,6 +44,7 @@ pub use registry::{
     MutationAuthorizer,
     MutationAuthorizerResource,
     ServerOnlyMutationAuthorizer,
+    has_control_hierarchical,
 };
 #[cfg(feature = "runtime")]
 pub use subscription::*;

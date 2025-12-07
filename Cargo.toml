@@ -12,11 +12,13 @@ members = [
     "examples/shared/demo_types",
     "examples/shared/fanuc_types",
     "examples/shared/fanuc_real_types",
+    "examples/shared/control_demo_types",
     "examples/basic/server",
     "examples/basic/client",
     "examples/fanuc/server",
     "examples/fanuc/client",
     "examples/devtools-demo/server",
+    "examples/control-demo/server",
 ]
 
 [workspace.package]
@@ -45,6 +47,7 @@ basic_types = { path = "examples/shared/basic_types" }
 demo_types = { path = "examples/shared/demo_types" }
 fanuc_types = { path = "examples/shared/fanuc_types" }
 fanuc_real_types = { path = "examples/shared/fanuc_real_types" }
+control_demo_types = { path = "examples/shared/control_demo_types" }
 
 # Common dependencies
 bevy = { version = "0.17", default-features = false, features = ["multi_threaded", "bevy_log"] }

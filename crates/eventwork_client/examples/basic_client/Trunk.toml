@@ -1,8 +1,0 @@
-[serve]
-port = 8085
-
-[[hooks]]
-stage = "build"
-command = "sh"
-command_arguments = ["-c", "echo 'Building basic client example...'"]
-

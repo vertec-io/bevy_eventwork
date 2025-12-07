@@ -1,0 +1,17 @@
+[package]
+name = "control_demo_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { workspace = true }
+eventwork = { path = "../../../crates/eventwork" }
+eventwork_sync = { path = "../../../crates/eventwork_sync", features = ["runtime"] }
+eventwork_websockets = { path = "../../../crates/eventwork_websockets" }
+control_demo_types = { path = "../../shared/control_demo_types", features = ["server"] }
+tokio = { version = "1.48", features = ["full"] }
+
+[[bin]]
+name = "control_demo_server"
+path = "src/main.rs"
+

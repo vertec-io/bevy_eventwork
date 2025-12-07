@@ -14,10 +14,12 @@
 //!   trunk serve --open
 
 use eventwork_client::{
-    use_sync_component, use_sync_component_store, use_sync_component_write, use_sync_connection,
-    ClientTypeRegistry, SyncProvider,
-    devtools::DevTools,
+    use_sync_component, use_sync_component_store, use_sync_connection, use_sync_context, use_sync_entity,
+    ClientTypeRegistry, SyncProvider, MutationState,
 };
+
+#[cfg(target_arch = "wasm32")]
+use eventwork_client::devtools::DevTools;
 use leptos::prelude::*;
 use reactive_graph::traits::{Get, Read};
 use reactive_stores::Store;
@@ -90,7 +92,16 @@ fn App() -> impl IntoView {
                         </div>
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
-                        <DevTools ws_url=devtools_url registry=registry />
+                        {
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                view! { <DevTools ws_url=devtools_url registry=registry /> }
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                view! { <div>"DevTools only available on WASM"</div> }
+                            }
+                        }
                     </aside>
                 </div>
             </div>
@@ -340,15 +351,63 @@ fn EntityCardWithStore(
     }
 }
 
-/// Demonstrates the use_sync_component_write hook for editable fields
+/// Demonstrates direct mutations for editable fields
 #[component]
 fn EditablePosition(entity_id: u64) -> impl IntoView {
-    // Use the write hook to get server value, local value, and commit function
-    let (_server_pos, local_pos, commit_pos) = use_sync_component_write::<Position>(entity_id);
+    // Get the sync context for mutations
+    let ctx = use_sync_context();
+
+    // Get the current position using use_sync_entity
+    let position = use_sync_entity::<Position>(entity_id);
+
+    // Local state for editing
+    let (local_x, set_local_x) = signal(String::new());
+    let (local_y, set_local_y) = signal(String::new());
+    let (mutation_status, set_mutation_status) = signal::<Option<MutationState>>(None);
+
+    // Initialize local state from server value
+    Effect::new(move |_| {
+        if let Some(pos) = position.get() {
+            set_local_x.set(pos.x.to_string());
+            set_local_y.set(pos.y.to_string());
+        }
+    });
+
+    // Mutation handler for X
+    let ctx_x = ctx.clone();
+    let mutate_x = move |_| {
+        if let Ok(x) = local_x.get().parse::<f32>() {
+            if let Some(mut pos) = position.get() {
+                pos.x = x;
+                let request_id = ctx_x.mutate(entity_id, pos);
+                set_mutation_status.set(Some(MutationState {
+                    request_id,
+                    status: None,
+                    message: None,
+                }));
+            }
+        }
+    };
+
+    // Mutation handler for Y
+    let ctx_y = ctx.clone();
+    let mutate_y = move |_| {
+        if let Ok(y) = local_y.get().parse::<f32>() {
+            if let Some(mut pos) = position.get() {
+                pos.y = y;
+                let request_id = ctx_y.mutate(entity_id, pos);
+                set_mutation_status.set(Some(MutationState {
+                    request_id,
+                    status: None,
+                    message: None,
+                }));
+            }
+        }
+    };
 
     view! {
         <div class="mt-3 pt-3 border-t border-slate-800">
-            <div class="text-xs text-slate-400 mb-2">"Edit Position (use_sync_component_write):"</div>
+            <div class="text-xs text-slate-400 mb-2">"Edit Position (Direct Mutations):"</div>
             <div class="flex gap-2">
                 <div class="flex-1">
                     <label class="text-[10px] text-slate-500">"X:"</label>
@@ -356,13 +415,9 @@ fn EditablePosition(entity_id: u64) -> impl IntoView {
                         type="number"
                         step="0.1"
                         class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        prop:value=move || local_pos.get().x.to_string()
-                        on:input=move |ev| {
-                            local_pos.update(|pos| {
-                                pos.x = event_target_value(&ev).parse().unwrap_or(pos.x);
-                            });
-                        }
-                        on:blur=move |_| commit_pos.set(())
+                        prop:value=move || local_x.get()
+                        on:input=move |ev| set_local_x.set(event_target_value(&ev))
+                        on:blur=mutate_x
                     />
                 </div>
                 <div class="flex-1">
@@ -371,19 +426,18 @@ fn EditablePosition(entity_id: u64) -> impl IntoView {
                         type="number"
                         step="0.1"
                         class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        prop:value=move || local_pos.get().y.to_string()
-                        on:input=move |ev| {
-                            local_pos.update(|pos| {
-                                pos.y = event_target_value(&ev).parse().unwrap_or(pos.y);
-                            });
-                        }
-                        on:blur=move |_| commit_pos.set(())
+                        prop:value=move || local_y.get()
+                        on:input=move |ev| set_local_y.set(event_target_value(&ev))
+                        on:blur=mutate_y
                     />
                 </div>
             </div>
             <div class="text-[10px] text-slate-500 mt-1 italic">
                 "Changes are sent to server on blur"
             </div>
+            {move || mutation_status.get().and_then(|s| s.message.clone()).map(|msg| view! {
+                <div class="text-[10px] text-red-400 mt-1">{msg}</div>
+            })}
         </div>
     }
 }

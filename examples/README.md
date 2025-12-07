@@ -6,19 +6,22 @@ This directory contains all examples for the `bevy_eventwork` project, organized
 
 ```
 examples/
-├── shared/              # Shared types used by multiple examples
-│   ├── basic_types/     # Types for basic example
-│   ├── demo_types/      # Types for demo
-│   ├── fanuc_types/     # Types for FANUC demo
-│   └── fanuc_real_types/# Real FANUC RMI API types
-├── basic/               # Basic client-server example
-│   ├── server/          # Bevy ECS server
-│   └── client/          # Leptos WASM client
-├── fanuc/               # FANUC robot control example
-│   ├── server/          # Bevy ECS server with FANUC simulation
-│   └── client/          # Leptos WASM client
-└── devtools-demo/       # DevTools demonstration
-    └── server/          # Server for DevTools testing
+├── shared/                # Shared types used by multiple examples
+│   ├── basic_types/       # Types for basic example
+│   ├── demo_types/        # Types for demo
+│   ├── fanuc_types/       # Types for FANUC demo
+│   ├── fanuc_real_types/  # Real FANUC RMI API types
+│   └── control_demo_types/# Types for control demo
+├── basic/                 # Basic client-server example
+│   ├── server/            # Bevy ECS server
+│   └── client/            # Leptos WASM client
+├── fanuc/                 # FANUC robot control example
+│   ├── server/            # Bevy ECS server with FANUC simulation
+│   └── client/            # Leptos WASM client
+├── control-demo/          # Exclusive control demonstration
+│   └── server/            # Server demonstrating ExclusiveControlPlugin
+└── devtools-demo/         # DevTools demonstration
+    └── server/            # Server for DevTools testing
 ```
 
 ## Running Examples
@@ -53,6 +56,15 @@ trunk serve --port 8082
 
 Then open http://127.0.0.1:8082/
 
+### Control Demo
+
+**Server:**
+```bash
+cargo run -p control_demo_server
+```
+
+This example demonstrates the `ExclusiveControlPlugin` for managing exclusive control of entities. See [control-demo/README.md](control-demo/README.md) for details.
+
 ### DevTools Demo
 
 **Server:**
@@ -77,6 +89,14 @@ Shows how to use `eventwork_client` for industrial robot control:
 - Robot position and status monitoring
 - Joint angle visualization
 - Mutation support for robot commands
+
+### Control Demo
+Demonstrates the `ExclusiveControlPlugin` for exclusive control transfer:
+- Exclusive control semantics (only one client can control an entity)
+- Control request/release messages
+- Automatic timeout for inactive clients
+- Hierarchy propagation (control parent = control children)
+- State synchronization (all clients see who has control)
 
 ### DevTools Demo
 Demonstrates the DevTools widget capabilities:

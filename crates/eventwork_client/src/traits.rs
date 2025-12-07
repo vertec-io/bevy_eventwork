@@ -85,37 +85,6 @@ where
     T: Serialize + DeserializeOwned + Send + Sync + 'static
 {}
 
-/// Helper macro to implement SyncComponent (DEPRECATED - no longer needed).
-///
-/// **This macro is now unnecessary** due to the blanket implementation of SyncComponent.
-/// All types that implement `Serialize + DeserializeOwned + Send + Sync + 'static`
-/// automatically get SyncComponent.
-///
-/// This macro is kept for backwards compatibility but is now a no-op.
-/// It will be removed in a future version.
-///
-/// # Migration
-///
-/// Simply remove calls to this macro:
-///
-/// ```rust,ignore
-/// // OLD (still works, but unnecessary):
-/// impl_sync_component!(Position);
-///
-/// // NEW (automatic):
-/// // Nothing needed! SyncComponent is automatically implemented.
-/// ```
-#[deprecated(
-    since = "1.2.0",
-    note = "No longer needed - SyncComponent is now automatically implemented for all Serialize + Deserialize types"
-)]
-#[macro_export]
-macro_rules! impl_sync_component {
-    ($type:ty) => {
-        // No-op: the blanket impl handles everything
-    };
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

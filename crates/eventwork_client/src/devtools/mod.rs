@@ -23,14 +23,16 @@
 //!
 //! ```rust,ignore
 //! use eventwork_client::devtools::DevTools;
-//! use eventwork_sync::client_registry::ComponentTypeRegistry;
+//! use eventwork_client::ClientTypeRegistry;
 //!
-//! let mut registry = ComponentTypeRegistry::new();
-//! registry.register::<Position>();
-//! registry.register::<Velocity>();
+//! let registry = ClientTypeRegistry::builder()
+//!     .register::<Position>()
+//!     .register::<Velocity>()
+//!     .with_devtools_support()
+//!     .build();
 //!
 //! view! {
-//!     <DevTools url="ws://127.0.0.1:3000/sync" registry=registry />
+//!     <DevTools ws_url="ws://127.0.0.1:3000/sync" registry=registry />
 //! }
 //! ```
 
@@ -40,13 +42,10 @@ mod sync;
 mod ui;
 
 // Re-export public API
-pub use sync::{DevtoolsSync, use_sync};
+pub use sync::{DevtoolsSync, use_sync, MutationState};
 
 #[cfg(target_arch = "wasm32")]
 pub use ui::{DevTools, DevToolsMode};
-
-// Re-export MutationState from eventwork_sync for convenience
-pub use eventwork_sync::client_sync::MutationState;
 
 // Re-export core wire-level types so downstream tools can depend on this
 // crate alone for typical sync workflows.

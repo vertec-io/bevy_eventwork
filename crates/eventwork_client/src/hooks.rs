@@ -63,6 +63,138 @@ pub fn use_sync_component<T: SyncComponent + Clone + Default + 'static>() -> Rea
     ctx.subscribe_component::<T>()
 }
 
+/// Hook to subscribe to a component type with client-side filtering.
+///
+/// This returns a signal containing a HashMap of entity_id -> component,
+/// filtered by the provided predicate function. The filter runs on the client
+/// side whenever the component data updates.
+///
+/// This provides an ergonomic API without requiring server-side query parsing
+/// or DSL complexity. The filter is type-safe and can use any Rust expression.
+///
+/// # Performance
+///
+/// The filter runs on every update of the underlying component data. For most
+/// use cases this is very fast (< 1μs per entity). If you have thousands of
+/// entities and performance becomes an issue, consider using server-side
+/// query filtering (future feature).
+///
+/// # Panics
+///
+/// Panics if called outside of a `SyncProvider` context.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::{use_sync_component_where, SyncComponent};
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct Position {
+///     x: f32,
+///     y: f32,
+/// }
+///
+/// #[component]
+/// fn FilteredPositionList() -> impl IntoView {
+///     // Only show positions where x > 100.0
+///     let filtered_positions = use_sync_component_where::<Position, _>(
+///         |pos| pos.x > 100.0
+///     );
+///
+///     view! {
+///         <ul>
+///             <For
+///                 each=move || filtered_positions.get().into_iter()
+///                 key=|(id, _)| *id
+///                 children=|(id, pos)| {
+///                     view! {
+///                         <li>{format!("Entity {}: ({}, {})", id, pos.x, pos.y)}</li>
+///                     }
+///                 }
+///             />
+///         </ul>
+///     }
+/// }
+/// ```
+pub fn use_sync_component_where<T, F>(
+    filter: F,
+) -> Signal<HashMap<u64, T>>
+where
+    T: SyncComponent + Clone + Default + 'static,
+    F: Fn(&T) -> bool + Send + Sync + 'static,
+{
+    let all_components = use_sync_component::<T>();
+
+    Signal::derive(move || {
+        all_components.get()
+            .into_iter()
+            .filter(|(_, component)| filter(component))
+            .collect::<HashMap<u64, T>>()
+    })
+}
+
+/// Hook to subscribe to a single entity's component.
+///
+/// This is a convenience helper that creates a derived signal for accessing
+/// a specific entity's component. It's useful when you know the entity ID
+/// and want to reactively access its component data.
+///
+/// This is equivalent to manually creating a derived signal from
+/// `use_sync_component`, but more ergonomic.
+///
+/// # Panics
+///
+/// Panics if called outside of a `SyncProvider` context.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::{use_sync_entity, use_sync_context, SyncComponent};
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct MicrowaveConfig {
+///     power_enabled: bool,
+///     watts: f32,
+/// }
+///
+/// #[component]
+/// fn MicrowaveControls(entity_id: u64) -> impl IntoView {
+///     let ctx = use_sync_context();
+///     let server_config = use_sync_entity::<MicrowaveConfig>(entity_id);
+///
+///     // Toggle power using direct mutation
+///     let toggle_power = move |_| {
+///         if let Some(config) = server_config.get_untracked() {
+///             ctx.mutate(entity_id, MicrowaveConfig {
+///                 power_enabled: !config.power_enabled,
+///                 ..config
+///             });
+///         }
+///     };
+///
+///     view! {
+///         <button on:click=toggle_power>
+///             {move || if server_config.get().map(|c| c.power_enabled).unwrap_or(false) {
+///                 "Power On"
+///             } else {
+///                 "Power Off"
+///             }}
+///         </button>
+///     }
+/// }
+/// ```
+pub fn use_sync_entity<T: SyncComponent + Clone + Default + 'static>(
+    entity_id: u64,
+) -> Signal<Option<T>> {
+    let all_components = use_sync_component::<T>();
+
+    Signal::derive(move || {
+        all_components.get().get(&entity_id).cloned()
+    })
+}
+
 /// Hook to access the WebSocket connection control interface.
 ///
 /// This allows you to manually control the WebSocket connection (open/close)
@@ -262,197 +394,6 @@ pub fn use_sync_mutations() -> ReadSignal<HashMap<u64, MutationState>> {
     ctx.mutations()
 }
 
-/// Hook for editable component fields with automatic local state management.
-///
-/// This hook simplifies the pattern of creating editable fields that sync with the server.
-/// It manages:
-/// - Local state for immediate UI updates
-/// - Focus tracking to prevent server updates from overwriting user input
-/// - Automatic sync from server to local when not editing
-/// - Commit function to send mutations to server
-///
-/// # Returns
-///
-/// A tuple of:
-/// - `ReadSignal<Option<T>>`: Server value (read-only, from subscription)
-/// - `RwSignal<T>`: Local value (read-write, for immediate UI updates)
-/// - `WriteSignal<()>`: Commit function (call to send mutation to server)
-///
-/// # Panics
-///
-/// Panics if called outside of a `SyncProvider` context.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use eventwork_client::{use_sync_component_write, SyncComponent};
-/// use serde::{Deserialize, Serialize};
-///
-/// #[derive(Clone, Default, Serialize, Deserialize)]
-/// struct Position {
-///     x: f32,
-///     y: f32,
-/// }
-///
-/// // SyncComponent is automatically implemented!
-///
-/// #[component]
-/// fn PositionEditor(entity_id: u64) -> impl IntoView {
-///     let (server_pos, local_pos, commit_pos) =
-///         use_sync_component_write::<Position>(entity_id);
-///
-///     view! {
-///         <div>
-///             <input
-///                 type="number"
-///                 prop:value=move || local_pos.get().x.to_string()
-///                 on:input=move |ev| {
-///                     local_pos.update(|pos| {
-///                         pos.x = event_target_value(&ev).parse().unwrap_or(pos.x);
-///                     });
-///                 }
-///                 on:blur=move |_| commit_pos.set(())
-///             />
-///             <input
-///                 type="number"
-///                 prop:value=move || local_pos.get().y.to_string()
-///                 on:input=move |ev| {
-///                     local_pos.update(|pos| {
-///                         pos.y = event_target_value(&ev).parse().unwrap_or(pos.y);
-///                     });
-///                 }
-///                 on:blur=move |_| commit_pos.set(())
-///             />
-///         </div>
-///     }
-/// }
-/// ```
-pub fn use_sync_component_write<T: SyncComponent + Clone + Default + 'static>(
-    entity_id: u64,
-) -> (
-    Signal<Option<T>>,
-    RwSignal<T>,
-    WriteSignal<()>,
-) {
-    let ctx = expect_context::<SyncContext>();
-
-    // Subscribe to all instances of this component type
-    let all_components = use_sync_component::<T>();
-
-    // Create a derived signal for just this entity's component
-    let server_value = Signal::derive(move || {
-        all_components.get().get(&entity_id).cloned()
-    });
-
-    // Create local editable value (initialized with default)
-    let local_value = RwSignal::new(T::default());
-
-    // Track if currently editing (has focus)
-    let (is_editing, set_is_editing) = signal(false);
-
-    // Sync server -> local when not editing
-    Effect::new(move |_| {
-        if !is_editing.get() {
-            if let Some(value) = server_value.get() {
-                local_value.set(value);
-            }
-        }
-    });
-
-    // Create commit signal
-    let (commit_trigger, set_commit_trigger) = signal(());
-
-    // Track if this is the first run to avoid sending mutation on mount
-    let is_first_run = RwSignal::new(true);
-
-    // Handle commits - use untracked to avoid reactivity to local_value changes
-    Effect::new(move |_| {
-        commit_trigger.track();
-
-        // Skip the first run to avoid sending mutation on mount
-        if is_first_run.get_untracked() {
-            is_first_run.set(false);
-            return;
-        }
-
-        // Read local_value without tracking to avoid infinite loops
-        let value = local_value.get_untracked();
-        ctx.mutate(entity_id, value);
-
-        set_is_editing.set(false);
-    });
-
-    // Return read-only server, read-write local, and commit trigger
-    (server_value, local_value, set_commit_trigger)
-}
-
-/// Hook for creating controlled input fields with focus tracking.
-///
-/// This is a lower-level hook that manages the boilerplate of creating an editable
-/// field that syncs with a server value but doesn't overwrite user input during editing.
-///
-/// Unlike `use_sync_component_write`, this hook works with any value type and doesn't
-/// automatically send mutations - you provide the commit callback.
-///
-/// The key feature is that it returns a **derived signal** that switches between the
-/// local (editing) value and the server value based on focus state. This prevents
-/// the DOM from being updated while the user is editing, which would steal focus.
-///
-/// # Returns
-///
-/// A tuple of:
-/// - `Signal<T>`: Display value (derived signal that switches between local and server)
-/// - `RwSignal<T>`: Local value (write-only, for `on:input` handler)
-/// - `WriteSignal<bool>`: Focus setter (call with `true` on focus, `false` on blur)
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use eventwork_client::use_controlled_input;
-///
-/// #[component]
-/// fn NumberInput(server_value: Signal<String>, on_commit: impl Fn(String) + 'static) -> impl IntoView {
-///     let (display_value, local_value, set_is_focused) = use_controlled_input(server_value);
-///
-///     view! {
-///         <input
-///             prop:value=move || display_value.get()
-///             on:input=move |ev| local_value.set(event_target_value(&ev))
-///             on:focus=move |_| set_is_focused.set(true)
-///             on:blur=move |_| {
-///                 set_is_focused.set(false);
-///                 on_commit(local_value.get_untracked());
-///             }
-///         />
-///     }
-/// }
-/// ```
-pub fn use_controlled_input<T: Clone + Send + Sync + 'static>(
-    server_value: Signal<T>,
-) -> (Signal<T>, RwSignal<T>, WriteSignal<bool>) {
-    // Create local editable value
-    let local_value = RwSignal::new(server_value.get_untracked());
-
-    // Track if currently focused
-    let (is_focused, set_is_focused) = signal(false);
-
-    // Create a derived signal that chooses between local and server value based on focus
-    // This prevents DOM updates while editing
-    let display_value = Signal::derive(move || {
-        if is_focused.get() {
-            // While focused, show local value (user's edits)
-            local_value.get()
-        } else {
-            // When not focused, show server value and sync local
-            let server = server_value.get();
-            local_value.update_untracked(|v| *v = server.clone());
-            server
-        }
-    });
-
-    (display_value, local_value, set_is_focused)
-}
-
 /// Hook for creating editable fields with Enter-to-apply, blur-to-revert UX.
 ///
 /// This hook implements the NodeRef + Effect + focus tracking pattern to achieve:
@@ -635,3 +576,237 @@ where
     )
 }
 
+/// Hook for "untracked" synchronization pattern.
+///
+/// This hook implements the pattern where:
+/// 1. Initial sync: Client receives full state from server
+/// 2. Incremental updates: Client receives individual updates and appends them locally
+///
+/// This is useful for scenarios like logging where:
+/// - Server sends full log history on connection
+/// - Server broadcasts individual log messages thereafter
+/// - Client appends messages to local copy without re-syncing entire log
+///
+/// # Type Parameters
+///
+/// - `TFull`: The full state type (e.g., `ServerLog` containing `VecDeque<ServerLogMessage>`)
+/// - `TIncremental`: The incremental update type (e.g., `ServerLogMessage`)
+///
+/// # Arguments
+///
+/// - `append_fn`: Function to append an incremental update to the full state
+///
+/// # Returns
+///
+/// A tuple of:
+/// - `Signal<TFull>`: The full state (initialized from server, then updated locally)
+/// - `Signal<Option<TIncremental>>`: The latest incremental update (for triggering effects)
+///
+/// # Panics
+///
+/// Panics if called outside of a `SyncProvider` context.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::{use_sync_untracked, SyncComponent};
+/// use serde::{Deserialize, Serialize};
+/// use std::collections::VecDeque;
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct ServerLog {
+///     messages: VecDeque<ServerLogMessage>,
+/// }
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct ServerLogMessage {
+///     timestamp: u64,
+///     level: String,
+///     message: String,
+/// }
+///
+/// #[component]
+/// fn LogViewer() -> impl IntoView {
+///     let (full_log, latest_message) = use_sync_untracked::<ServerLog, ServerLogMessage>(
+///         |log, msg| log.messages.push_back(msg),
+///     );
+///
+///     // Auto-scroll to bottom when new message arrives
+///     Effect::new(move |_| {
+///         if latest_message.get().is_some() {
+///             scroll_to_bottom();
+///         }
+///     });
+///
+///     view! {
+///         <div class="log-viewer">
+///             <For
+///                 each=move || full_log.get().messages.iter().cloned().collect::<Vec<_>>()
+///                 key=|msg| msg.timestamp
+///                 children=|msg| view! {
+///                     <div class=format!("log-{}", msg.level)>
+///                         {format!("[{}] {}", msg.timestamp, msg.message)}
+///                     </div>
+///                 }
+///             />
+///         </div>
+///     }
+/// }
+/// ```
+pub fn use_sync_untracked<TFull, TIncremental, F>(
+    append_fn: F,
+) -> (Signal<TFull>, Signal<Option<TIncremental>>)
+where
+    TFull: SyncComponent + Clone + Default + 'static,
+    TIncremental: SyncComponent + Clone + Default + 'static,
+    F: Fn(&mut TFull, TIncremental) + Send + Sync + Clone + 'static,
+{
+    // Subscribe to full state (HashMap<u64, TFull>)
+    let full_components = use_sync_component::<TFull>();
+
+    // Subscribe to incremental updates (HashMap<u64, TIncremental>)
+    let incremental_components = use_sync_component::<TIncremental>();
+
+    // Create local state for the full data
+    let local_full = RwSignal::new(TFull::default());
+
+    // Track the latest incremental update
+    let (latest_incremental, set_latest_incremental) = signal(None::<TIncremental>);
+
+    // Track if we've received the initial full sync
+    let has_initial_sync = RwSignal::new(false);
+
+    // Effect: Initialize from full state (runs once on initial sync)
+    Effect::new(move |_| {
+        let full_map = full_components.get();
+
+        // If we haven't initialized yet and we have data, initialize
+        if !has_initial_sync.get_untracked() && !full_map.is_empty() {
+            // Take the first (and should be only) full state
+            if let Some((_, full_state)) = full_map.iter().next() {
+                local_full.set(full_state.clone());
+                has_initial_sync.set(true);
+            }
+        }
+    });
+
+    // Effect: Append incremental updates
+    Effect::new(move |_| {
+        let incremental_map = incremental_components.get();
+
+        // Only process incremental updates after initial sync
+        if has_initial_sync.get_untracked() {
+            // Process all incremental updates
+            for (_, incremental) in incremental_map.iter() {
+                local_full.update(|full| {
+                    append_fn(full, incremental.clone());
+                });
+                set_latest_incremental.set(Some(incremental.clone()));
+            }
+        }
+    });
+
+    // Return read-only signal for full state and latest incremental
+    (local_full.into(), latest_incremental.into())
+}
+
+/// Hook to subscribe to arbitrary EventworkMessage broadcasts from the server.
+///
+/// This is for one-way broadcast messages (e.g., notifications, events, video frames)
+/// that are not part of the component sync system. Unlike component subscriptions which
+/// track entity state, message subscriptions receive broadcast messages.
+///
+/// # Type Parameters
+///
+/// - `T`: The message type. Must implement `SyncComponent` (which provides type_name).
+///
+/// # Returns
+///
+/// Returns a `ReadSignal<T>` that updates whenever a message of type `T` is received.
+///
+/// # Panics
+///
+/// Panics if called outside of a `SyncProvider` context.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::use_sync_message;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct Notification {
+///     message: String,
+///     level: String,
+/// }
+///
+/// #[component]
+/// fn NotificationBanner() -> impl IntoView {
+///     let notification = use_sync_message::<Notification>();
+///
+///     view! {
+///         <div class="notification">
+///             {move || notification.get().message}
+///         </div>
+///     }
+/// }
+/// ```
+pub fn use_sync_message<T>() -> ReadSignal<T>
+where
+    T: SyncComponent + Clone + Default + 'static,
+{
+    let ctx = expect_context::<SyncContext>();
+    ctx.subscribe_message::<T>()
+}
+
+/// Hook to subscribe to arbitrary EventworkMessage broadcasts using a Store.
+///
+/// This provides fine-grained reactivity for message fields, similar to
+/// `use_sync_component_store` but for broadcast messages.
+///
+/// # Type Parameters
+///
+/// - `T`: The message type. Must implement `SyncComponent` (which provides type_name).
+///
+/// # Returns
+///
+/// Returns a `Store<T>` that updates whenever a message of type `T` is received.
+///
+/// # Panics
+///
+/// Panics if called outside of a `SyncProvider` context.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_client::use_sync_message_store;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Clone, Default, Serialize, Deserialize)]
+/// struct ServerStats {
+///     cpu_usage: f32,
+///     memory_usage: f32,
+///     active_connections: u32,
+/// }
+///
+/// #[component]
+/// fn StatsDisplay() -> impl IntoView {
+///     let stats = use_sync_message_store::<ServerStats>();
+///
+///     view! {
+///         <div>
+///             <p>"CPU: " {move || stats.cpu_usage().get()}</p>
+///             <p>"Memory: " {move || stats.memory_usage().get()}</p>
+///             <p>"Connections: " {move || stats.active_connections().get()}</p>
+///         </div>
+///     }
+/// }
+/// ```
+#[cfg(feature = "stores")]
+pub fn use_sync_message_store<T>() -> Store<T>
+where
+    T: SyncComponent + Clone + Default + 'static,
+{
+    let ctx = expect_context::<SyncContext>();
+    ctx.subscribe_message_store::<T>()
+}

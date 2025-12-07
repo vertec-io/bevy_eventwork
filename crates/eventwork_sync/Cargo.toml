@@ -28,26 +28,6 @@ thiserror = { version = "1.0", optional = true }
 web-sys = { version = "0.3", features = ["console"] }
 
 [dev-dependencies]
-# For integration-style tests and examples using a miniature Bevy app
+# For integration-style tests using a miniature Bevy app
 bincode = { workspace = true }
 eventwork_websockets = { path = "../eventwork_websockets" }
-demo_shared = { path = "../demo_shared", features = ["server"] }
-fanuc_shared = { path = "../fanuc_shared", features = ["server"] }
-fanuc_real_shared = { path = "../fanuc_real_shared", features = ["server"] }
-fanuc_rmi = { path = "../../../Fanuc_RMI_API/fanuc_rmi", features = ["DTO"] }
-bevy-tokio-tasks = "0.17"
-tokio = { version = "1.48", features = ["full"] }
-
-
-
-[[example]]
-name = "devtools-demo-server"
-path = "examples/devtools-demo-server.rs"
-
-[[example]]
-name = "fanuc_server"
-path = "examples/fanuc_server.rs"
-
-[[example]]
-name = "fanuc_real_server"
-path = "examples/fanuc_real_server.rs"

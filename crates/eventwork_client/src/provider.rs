@@ -142,7 +142,7 @@ pub fn SyncProvider(
                     packet.data.len()
                 );
 
-                // Unwrap NetworkPacket and deserialize to SyncServerMessage
+                // Try to deserialize as SyncServerMessage first
                 match bincode::serde::decode_from_slice::<SyncServerMessage, _>(
                     &packet.data,
                     bincode::config::standard(),
@@ -153,17 +153,15 @@ pub fn SyncProvider(
 
                         handle_server_message(&ctx, server_msg, &last_error);
                     }
-                    Err(e) => {
+                    Err(_) => {
+                        // Not a SyncServerMessage - treat as arbitrary EventworkMessage
                         #[cfg(target_arch = "wasm32")]
-                        leptos::logging::warn!(
-                            "[SyncProvider] Failed to deserialize SyncServerMessage: {:?}",
-                            e
+                        leptos::logging::log!(
+                            "[SyncProvider] Not a SyncServerMessage, routing as EventworkMessage: type_name={}",
+                            packet.type_name
                         );
 
-                        last_error.set(Some(SyncError::DeserializationFailed {
-                            component_name: "SyncServerMessage".to_string(),
-                            error: format!("Failed to deserialize from NetworkPacket: {}", e),
-                        }));
+                        ctx.handle_incoming_message(packet.type_name.clone(), packet.data.clone());
                     }
                 }
             }

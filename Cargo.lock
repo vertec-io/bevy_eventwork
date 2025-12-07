@@ -547,17 +547,6 @@ dependencies = [
 [[package]]
 name = "bevy-tokio-tasks"
 version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "987123d29c3f2d6f1c1a4255adf65394f0ac460b1b6d1753a0a1c56128f71f53"
-dependencies = [
- "bevy_app",
- "bevy_ecs",
- "tokio",
-]
-
-[[package]]
-name = "bevy-tokio-tasks"
-version = "0.17.0"
 source = "git+https://github.com/vertec-io/async_bevy_web.git#a380e9d4633442ca0003b07dfc2873aa71fe4be7"
 dependencies = [
  "bevy",
@@ -2178,6 +2167,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "control_demo_server"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "control_demo_types",
+ "eventwork",
+ "eventwork_sync",
+ "eventwork_websockets",
+ "tokio",
+]
+
+[[package]]
+name = "control_demo_types"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "serde",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2520,14 +2529,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "demo_shared"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "serde",
-]
-
-[[package]]
 name = "demo_types"
 version = "0.1.0"
 dependencies = [
@@ -2812,14 +2813,10 @@ dependencies = [
 name = "eventwork_client"
 version = "0.1.0"
 dependencies = [
- "bevy",
  "bincode",
  "codee",
- "eventwork",
- "eventwork_client_example_shared",
  "eventwork_common",
  "eventwork_sync",
- "eventwork_websockets",
  "leptos",
  "leptos-use",
  "reactive_graph",
@@ -2828,16 +2825,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "wasm-bindgen-test",
-]
-
-[[package]]
-name = "eventwork_client_example_shared"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "eventwork_client",
- "reactive_stores 0.2.5",
- "serde",
 ]
 
 [[package]]
@@ -2883,20 +2870,14 @@ name = "eventwork_sync"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy-tokio-tasks 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode",
- "demo_shared",
  "eventwork",
  "eventwork_common",
  "eventwork_websockets",
- "fanuc_real_shared",
- "fanuc_rmi 0.3.0",
- "fanuc_shared",
  "log",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tokio",
  "web-sys",
 ]
 
@@ -2954,34 +2935,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "fanuc_real_shared"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "fanuc_rmi 0.3.0",
- "serde",
-]
-
-[[package]]
 name = "fanuc_real_types"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "fanuc_rmi 0.3.0 (git+https://github.com/vertec-io/Fanuc_RMI_API.git)",
+ "fanuc_rmi",
  "serde",
-]
-
-[[package]]
-name = "fanuc_rmi"
-version = "0.3.0"
-dependencies = [
- "fanuc_rmi_macros 0.1.0",
- "int-enum",
- "serde",
- "serde_derive",
- "serde_json",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -2989,22 +2948,13 @@ name = "fanuc_rmi"
 version = "0.3.0"
 source = "git+https://github.com/vertec-io/Fanuc_RMI_API.git#020e852a458b50931f02a44eb2b128e4bf5efde8"
 dependencies = [
- "fanuc_rmi_macros 0.1.0 (git+https://github.com/vertec-io/Fanuc_RMI_API.git)",
+ "fanuc_rmi_macros",
  "int-enum",
  "serde",
  "serde_derive",
  "serde_json",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "fanuc_rmi_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -3022,23 +2972,15 @@ name = "fanuc_server"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy-tokio-tasks 0.17.0 (git+https://github.com/vertec-io/async_bevy_web.git)",
+ "bevy-tokio-tasks",
  "bincode",
  "eventwork",
  "eventwork_sync",
  "eventwork_websockets",
  "fanuc_real_types",
- "fanuc_rmi 0.3.0 (git+https://github.com/vertec-io/Fanuc_RMI_API.git)",
+ "fanuc_rmi",
  "sim",
  "tokio",
-]
-
-[[package]]
-name = "fanuc_shared"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "serde",
 ]
 
 [[package]]

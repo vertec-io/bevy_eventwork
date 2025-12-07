@@ -1,6 +1,9 @@
 use eventwork_client::{
-    ClientTypeRegistry, devtools::DevTools, SyncProvider, use_sync_component,
+    ClientTypeRegistry, SyncProvider, use_sync_component,
 };
+
+#[cfg(target_arch = "wasm32")]
+use eventwork_client::devtools::DevTools;
 use fanuc_real_types::{RobotPosition, RobotStatus, JointAngles, RobotInfo};
 use leptos::prelude::*;
 
@@ -44,7 +47,16 @@ fn App() -> impl IntoView {
                         </div>
                     </main>
                     <aside class="w-96 border-l border-slate-800 overflow-hidden">
-                        <DevTools ws_url=devtools_url registry=registry />
+                        {
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                view! { <DevTools ws_url=devtools_url registry=registry /> }
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                view! { <div>"DevTools only available on WASM"</div> }
+                            }
+                        }
                     </aside>
                 </div>
             </div>

@@ -1,0 +1,16 @@
+[package]
+name = "control_demo_types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+
+[features]
+server = ["dep:bevy"]
+
+[dependencies.bevy]
+workspace = true
+optional = true
+default-features = false
+

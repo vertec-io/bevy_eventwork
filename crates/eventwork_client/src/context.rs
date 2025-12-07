@@ -82,6 +82,10 @@ pub struct SyncContext {
     pub(crate) mutations: RwSignal<HashMap<u64, MutationState>>,
     /// Next mutation request ID
     next_request_id: Arc<Mutex<u64>>,
+    /// Incoming message data storage: type_name -> raw bytes
+    /// This stores arbitrary EventworkMessage types (not component sync)
+    /// Effects in subscribe_message watch this and deserialize to typed signals
+    pub(crate) incoming_messages: RwSignal<HashMap<String, RwSignal<Vec<u8>>>>,
 }
 
 impl SyncContext {
@@ -109,6 +113,7 @@ impl SyncContext {
             component_data: RwSignal::new(HashMap::new()),
             mutations: RwSignal::new(HashMap::new()),
             next_request_id: Arc::new(Mutex::new(0)),
+            incoming_messages: RwSignal::new(HashMap::new()),
         }
     }
 
@@ -118,6 +123,32 @@ impl SyncContext {
             ready_state: self.ready_state,
             open: self.open.clone(),
             close: self.close.clone(),
+        }
+    }
+
+    /// Handle an incoming message (non-sync message).
+    ///
+    /// This is called by the provider when it receives a NetworkPacket that is not
+    /// a SyncServerMessage. The message bytes are stored by type_name and routed
+    /// to any active subscriptions.
+    pub(crate) fn handle_incoming_message(&self, type_name: String, data: Vec<u8>) {
+        #[cfg(target_arch = "wasm32")]
+        leptos::logging::log!(
+            "[SyncContext] Routing incoming message: type_name={}, data_len={}",
+            type_name,
+            data.len()
+        );
+
+        // Check if we already have a signal for this type_name
+        if let Some(signal) = self.incoming_messages.get().get(&type_name) {
+            // Update existing signal
+            signal.set(data);
+        } else {
+            // Create new signal and insert into map
+            let new_signal = RwSignal::new(data);
+            self.incoming_messages.update(|map| {
+                map.insert(type_name, new_signal);
+            });
         }
     }
 
@@ -660,6 +691,168 @@ impl SyncContext {
     /// This allows components to reactively watch mutation status.
     pub fn mutations(&self) -> ReadSignal<HashMap<u64, MutationState>> {
         self.mutations.read_only()
+    }
+
+    /// Subscribe to arbitrary EventworkMessage broadcasts from the server.
+    ///
+    /// This is for one-way broadcast messages (e.g., notifications, events, video frames)
+    /// that are not part of the component sync system.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: The message type. Must implement `SyncComponent` (which provides type_name).
+    ///
+    /// # Returns
+    ///
+    /// Returns a `ReadSignal<T>` that updates whenever a message of type `T` is received.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// #[derive(Clone, Default, Serialize, Deserialize)]
+    /// struct Notification {
+    ///     message: String,
+    ///     level: String,
+    /// }
+    ///
+    /// #[component]
+    /// fn NotificationBanner() -> impl IntoView {
+    ///     let ctx = use_sync_context();
+    ///     let notification = ctx.subscribe_message::<Notification>();
+    ///
+    ///     view! {
+    ///         <div>{move || notification.get().message}</div>
+    ///     }
+    /// }
+    /// ```
+    pub fn subscribe_message<T>(&self) -> ReadSignal<T>
+    where
+        T: SyncComponent + Clone + Default + 'static,
+    {
+        let type_name = T::component_name();
+        let (read, write) = signal(T::default());
+
+        // Create a local signal to track the raw bytes
+        let incoming_messages = self.incoming_messages;
+        let serialized_message = RwSignal::new(Vec::new());
+
+        // Effect to update serialized_message when new messages arrive
+        Effect::new(move |_| {
+            if let Some(bytes_signal) = incoming_messages.get().get(type_name) {
+                serialized_message.set(bytes_signal.get());
+            }
+        });
+
+        // Effect to deserialize and update the typed signal
+        Effect::new(move |_| {
+            let bytes = serialized_message.get();
+            if !bytes.is_empty() {
+                match bincode::serde::decode_from_slice::<T, _>(&bytes, bincode::config::standard()) {
+                    Ok((deserialized, _)) => {
+                        #[cfg(target_arch = "wasm32")]
+                        leptos::logging::log!(
+                            "[SyncContext] Deserialized message of type {}",
+                            type_name
+                        );
+                        write.set(deserialized);
+                    }
+                    Err(_e) => {
+                        #[cfg(target_arch = "wasm32")]
+                        leptos::logging::warn!(
+                            "[SyncContext] Failed to deserialize message of type {}: {:?}",
+                            type_name,
+                            _e
+                        );
+                    }
+                }
+            }
+        });
+
+        read
+    }
+
+    /// Subscribe to arbitrary EventworkMessage broadcasts using a Store.
+    ///
+    /// This provides fine-grained reactivity for message fields, similar to
+    /// `subscribe_component_store` but for broadcast messages.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: The message type. Must implement `SyncComponent` (which provides type_name).
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Store<T>` that updates whenever a message of type `T` is received.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// #[derive(Clone, Default, Serialize, Deserialize)]
+    /// struct ServerStats {
+    ///     cpu_usage: f32,
+    ///     memory_usage: f32,
+    ///     active_connections: u32,
+    /// }
+    ///
+    /// #[component]
+    /// fn StatsDisplay() -> impl IntoView {
+    ///     let ctx = use_sync_context();
+    ///     let stats = ctx.subscribe_message_store::<ServerStats>();
+    ///
+    ///     view! {
+    ///         <div>
+    ///             <p>"CPU: " {move || stats.cpu_usage().get()}</p>
+    ///             <p>"Memory: " {move || stats.memory_usage().get()}</p>
+    ///         </div>
+    ///     }
+    /// }
+    /// ```
+    #[cfg(feature = "stores")]
+    pub fn subscribe_message_store<T>(&self) -> Store<T>
+    where
+        T: SyncComponent + Clone + Default + 'static,
+    {
+        let type_name = T::component_name();
+        let store = Store::new(T::default());
+        let store_clone = store.clone();
+
+        // Create a local signal to track the raw bytes
+        let incoming_messages = self.incoming_messages;
+        let serialized_message = RwSignal::new(Vec::new());
+
+        // Effect to update serialized_message when new messages arrive
+        Effect::new(move |_| {
+            if let Some(bytes_signal) = incoming_messages.get().get(type_name) {
+                serialized_message.set(bytes_signal.get());
+            }
+        });
+
+        // Effect to deserialize and update the store
+        Effect::new(move |_| {
+            let bytes = serialized_message.get();
+            if !bytes.is_empty() {
+                match bincode::serde::decode_from_slice::<T, _>(&bytes, bincode::config::standard()) {
+                    Ok((deserialized, _)) => {
+                        #[cfg(target_arch = "wasm32")]
+                        leptos::logging::log!(
+                            "[SyncContext] Deserialized message of type {} for store",
+                            type_name
+                        );
+                        store_clone.update(|value| *value = deserialized);
+                    }
+                    Err(_e) => {
+                        #[cfg(target_arch = "wasm32")]
+                        leptos::logging::warn!(
+                            "[SyncContext] Failed to deserialize message of type {} for store: {:?}",
+                            type_name,
+                            _e
+                        );
+                    }
+                }
+            }
+        });
+
+        store
     }
 }
 

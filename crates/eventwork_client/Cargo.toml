@@ -34,14 +34,6 @@ thiserror = "2.0"
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
-# Example dependencies
-bevy = { workspace = true }
-eventwork = { path = "../eventwork" }
-eventwork_websockets = { path = "../eventwork_websockets" }
-eventwork_client_example_shared = { path = "../eventwork_client_example_shared", features = ["server"] }
-# Override eventwork_sync to enable runtime feature for examples
-eventwork_sync = { path = "../eventwork_sync", features = ["runtime"] }
-
 [features]
 default = []
 stores = ["dep:reactive_stores"]

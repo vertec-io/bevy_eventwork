@@ -347,6 +347,88 @@ impl MutationAuthorizer for ServerOnlyMutationAuthorizer {
     }
 }
 
+/// Helper function for hierarchy-aware authorization.
+///
+/// Traverses the entity hierarchy (using Bevy's `Parent` component) to check if
+/// the given entity or any of its ancestors has a control component matching the
+/// provided predicate.
+///
+/// This is useful for implementing authorization policies where control of a parent
+/// entity grants control over all child entities.
+///
+/// # Type Parameters
+///
+/// - `C`: The control component type (e.g., `NodeControl`, `PlayerControl`)
+/// - `F`: Predicate function that checks if the control component grants access
+///
+/// # Arguments
+///
+/// - `world`: Reference to the Bevy world
+/// - `entity`: The entity to check (will traverse up to ancestors)
+/// - `predicate`: Function that returns `true` if the control component grants access
+///
+/// # Returns
+///
+/// `true` if the entity or any ancestor has a control component matching the predicate,
+/// `false` otherwise.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use eventwork_sync::{has_control_hierarchical, MutationAuthorizerResource};
+/// use bevy::prelude::*;
+///
+/// #[derive(Component)]
+/// struct NodeControl {
+///     client_id: ConnectionId,
+/// }
+///
+/// app.insert_resource(MutationAuthorizerResource::from_fn(
+///     |world, mutation| {
+///         let entity = Entity::from_bits(mutation.entity.0);
+///
+///         if has_control_hierarchical::<NodeControl, _>(
+///             world,
+///             entity,
+///             |control| control.client_id == mutation.connection_id
+///         ) {
+///             MutationStatus::Ok
+///         } else {
+///             MutationStatus::Forbidden
+///         }
+///     }
+/// ));
+/// ```
+pub fn has_control_hierarchical<C, F>(
+    world: &World,
+    entity: Entity,
+    predicate: F,
+) -> bool
+where
+    C: Component,
+    F: Fn(&C) -> bool,
+{
+    let mut current = Some(entity);
+
+    while let Some(e) = current {
+        if let Ok(entity_ref) = world.get_entity(e) {
+            // Check if this entity has the control component
+            if let Some(control) = entity_ref.get::<C>() {
+                if predicate(control) {
+                    return true;
+                }
+            }
+
+            // Traverse to parent using Bevy's built-in ChildOf component
+            current = entity_ref.get::<ChildOf>().map(|child_of| child_of.parent());
+        } else {
+            break;
+        }
+    }
+
+    false
+}
+
 /// Minimal representation of a component change event emitted by typed systems.
 #[derive(Debug, Clone, Message)]
 pub struct ComponentChangeEvent {

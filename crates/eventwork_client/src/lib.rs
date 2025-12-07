@@ -20,11 +20,11 @@
 //!
 //! ```rust,ignore
 //! use leptos::prelude::*;
-//! use eventwork_client::{SyncProvider, use_sync_component, ClientRegistryBuilder};
+//! use eventwork_client::{SyncProvider, use_sync_component, ClientTypeRegistry};
 //!
 //! #[component]
 //! fn App() -> impl IntoView {
-//!     let registry = ClientRegistryBuilder::new()
+//!     let registry = ClientTypeRegistry::builder()
 //!         .register::<Position>()
 //!         .register::<Velocity>()
 //!         .build();
@@ -115,7 +115,6 @@ mod context;
 mod error;
 mod hooks;
 mod provider;
-mod registry;
 mod traits;
 
 // Re-exports
@@ -124,11 +123,14 @@ pub use components::SyncFieldInput;
 pub use context::{MutationState, SyncConnection, SyncContext};
 pub use error::SyncError;
 pub use hooks::{
-    use_controlled_input, use_sync_component, use_sync_component_write, use_sync_connection,
-    use_sync_context, use_sync_field_editor, use_sync_mutations,
+    use_sync_component, use_sync_component_where, use_sync_connection, use_sync_context,
+    use_sync_entity, use_sync_field_editor, use_sync_message, use_sync_mutations,
+    use_sync_untracked,
 };
+
+#[cfg(feature = "stores")]
+pub use hooks::use_sync_message_store;
 pub use provider::SyncProvider;
-pub use registry::{ClientRegistry, ClientRegistryBuilder};
 pub use traits::SyncComponent;
 
 // Re-export mutation types from eventwork_sync for convenience
@@ -143,4 +145,14 @@ pub mod devtools;
 
 #[cfg(all(feature = "devtools", target_arch = "wasm32"))]
 pub use devtools::{DevTools, DevToolsMode};
+
+// Deprecated native client module
+#[deprecated(
+    since = "0.1.0",
+    note = "Use base `eventwork` for Bevy-to-Bevy networking or `eventwork_client::SyncProvider` for WASM/Leptos clients"
+)]
+pub mod native_client;
+
+#[allow(deprecated)]
+pub use native_client::{NativeMutationState, NativeSyncClient};
 
