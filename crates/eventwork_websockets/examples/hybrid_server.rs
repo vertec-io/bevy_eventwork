@@ -6,14 +6,14 @@
 //! The example showcases two different architectural patterns controlled by feature flags:
 //!
 //! ## Immediate Pattern (feature = "immediate")
-//! - Game logic directly uses Network<T> resources to send messages
+//! - Application logic directly uses Network<T> resources to send messages
 //! - Simple and direct, provides maximum control
-//! - Couples game logic to network infrastructure
+//! - Couples application logic to network infrastructure
 //!
 //! ## Scheduled Pattern (feature = "scheduled", default)
-//! - Game logic writes OutboundMessage<T> events
+//! - Application logic writes OutboundMessage<T> events
 //! - Relay system broadcasts messages in a deterministic system set
-//! - Complete decoupling of game logic from network infrastructure
+//! - Complete decoupling of application logic from network infrastructure
 //! - Deterministic message timing
 //!
 //! Run with:

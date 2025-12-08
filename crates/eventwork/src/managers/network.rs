@@ -222,7 +222,7 @@ impl<NP: NetworkProvider> Network<NP> {
     /// ## Example
     ///
     /// ```rust,ignore
-    /// net.broadcast(GameStateUpdate { ... });
+    /// net.broadcast(StateUpdate { ... });
     /// ```
     pub fn broadcast<T: EventworkMessage + Clone>(&self, message: T) {
         let serialized_message = bincode::serde::encode_to_vec(&message, bincode::config::standard())
@@ -465,7 +465,7 @@ fn register_auto_if_needed<T: EventworkMessage, NP: NetworkProvider>(app: &mut A
     true
 }
 
-/// A utility trait on [`App`] to easily register [`NetworkMessage`]s
+/// A utility trait on [`App`] to easily register network messages
 pub trait AppNetworkMessage {
     /// Register a network message type using automatic type name generation
     ///
@@ -527,9 +527,9 @@ pub trait AppNetworkMessage {
     /// ```rust,ignore
     /// // With auto-generated names (no trait implementations needed!)
     /// #[derive(SubscribeById, Serialize, Deserialize)]
-    /// struct GameUpdate { game_id: String }
+    /// struct SessionUpdate { session_id: String }
     ///
-    /// app.register_subscription::<GameUpdate, WebSocketProvider>();
+    /// app.register_subscription::<SessionUpdate, WebSocketProvider>();
     /// ```
     fn register_subscription<T: SubscriptionMessage, NP: NetworkProvider>(&mut self) -> &mut Self
     where
@@ -625,10 +625,10 @@ impl AppNetworkMessage for App {
     /// ```rust,ignore
     /// // With auto-generated names (no explicit NetworkMessage impl needed for base type)
     /// #[derive(SubscribeById, Serialize, Deserialize)]
-    /// struct GameUpdate { game_id: String }
+    /// struct SessionUpdate { session_id: String }
     ///
-    /// // No need to implement NetworkMessage for GameUpdate!
-    /// app.register_subscription::<GameUpdate, WebSocketProvider>();
+    /// // No need to implement NetworkMessage for SessionUpdate!
+    /// app.register_subscription::<SessionUpdate, WebSocketProvider>();
     /// ```
     fn register_subscription<T: SubscriptionMessage, NP: NetworkProvider>(
         &mut self,

@@ -47,7 +47,7 @@ fn main() {
     // Register messages
     app.register_network_message::<MoveCommand, WebSocketProvider>();
 
-    // Add game systems
+    // Add application systems
     app.add_systems(Startup, spawn_robots);
     app.add_systems(Update, (handle_move_commands, update_robot_status));
 

@@ -10,7 +10,7 @@ Bincode-based ECS component synchronization for Bevy servers.
 
 ## Overview
 
-eventwork_sync is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and multiplayer games.
+eventwork_sync is a server-side Bevy plugin that automatically synchronizes ECS components to connected clients using bincode serialization. It's designed for high-performance, high-throughput applications like robotics control, industrial automation, and networked applications.
 
 ### Key Features
 

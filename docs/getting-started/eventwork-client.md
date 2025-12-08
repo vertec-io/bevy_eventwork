@@ -105,7 +105,7 @@ pub fn App() -> impl IntoView {
             url="ws://localhost:8082"
             registry=registry
         >
-            <GameView/>
+            <AppView/>
         </SyncProvider>
     }
 }
@@ -119,12 +119,12 @@ Use the `use_sync_component` hook to subscribe and display data:
 use eventwork_client::use_sync_component;
 
 #[component]
-fn GameView() -> impl IntoView {
+fn AppView() -> impl IntoView {
     // Automatically subscribes to Position components
     let positions = use_sync_component::<Position>();
-    
+
     view! {
-        <div class="game-view">
+        <div class="app-view">
             <h1>"Entities"</h1>
             <For
                 each=move || {
@@ -158,7 +158,7 @@ fn GameView() -> impl IntoView {
 <html>
 <head>
     <meta charset="utf-8"/>
-    <title>My Game Client</title>
+    <title>My Web Client</title>
 </head>
 <body></body>
 </html>
@@ -234,7 +234,7 @@ fn App() -> impl IntoView {
     
     view! {
         <SyncProvider url="ws://localhost:8082" registry=registry>
-            <GameView/>
+            <AppView/>
             <DevTools/>  // Add DevTools
         </SyncProvider>
     }

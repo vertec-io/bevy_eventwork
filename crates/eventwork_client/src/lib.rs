@@ -31,13 +31,13 @@
 //!
 //!     view! {
 //!         <SyncProvider url="ws://localhost:8080" registry=registry>
-//!             <GameView/>
+//!             <AppView/>
 //!         </SyncProvider>
 //!     }
 //! }
 //!
 //! #[component]
-//! fn GameView() -> impl IntoView {
+//! fn AppView() -> impl IntoView {
 //!     // Automatically subscribes, updates, and unsubscribes
 //!     let positions = use_sync_component::<Position>();
 //!

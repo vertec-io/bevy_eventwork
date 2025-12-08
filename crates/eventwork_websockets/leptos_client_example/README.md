@@ -130,7 +130,7 @@ leptos_client_example/
 
 | Aspect | Bevy Client | Leptos Client |
 |--------|-------------|---------------|
-| **Framework** | Bevy game engine | Leptos web framework |
+| **Framework** | Bevy application engine | Leptos web framework |
 | **UI** | Bevy UI components | HTML/CSS |
 | **WebSocket** | eventwork Network resource | leptos_use::use_websocket |
 | **Codec** | EventworkBincodeCodec | Same! |

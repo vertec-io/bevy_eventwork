@@ -16,8 +16,8 @@ A simple networking plugin for Bevy designed to work with Bevy's event architect
 Using this plugin is meant to be straightforward and highly configurable.
 You simply add the `EventworkPlugin` to the respective bevy app with the runtime you wish to use
 and the networking provider you wish to use. Next add your runtime to the app as the [`EventworkRuntime`] Resource.
-Then, register which kind of messages can be received through [`managers::network::AppNetworkMessage::listen_for_message`],
-as well as which provider you wantto handle these messages and you
+Then, register which kind of messages can be received through [`managers::network::AppNetworkMessage::register_network_message`],
+as well as which provider you want to handle these messages and you
 can start receiving packets as events of [`NetworkData<T>`].
 
 This plugin also supports Request/Response style messages, see that modules documentation for further info: **[Request Documentation](https://docs.rs/eventwork/latest/eventwork/managers/network_request/index.html)**
@@ -129,7 +129,7 @@ fn handle_connection_events(
 }
 
 ```
-As you can see, they are both quite similar, and provide everything a basic networked game needs.
+As you can see, they are both quite similar, and provide everything a basic networked application needs.
 
 Currently, Bevy's [TaskPool](bevy::tasks::TaskPool) is the default runtime used by Eventwork.
 */
@@ -196,7 +196,7 @@ pub struct NetworkData<T> {
     source: ConnectionId,
     inner: T,
     /// The name of the provider that received this message (e.g., "TcpProvider", "WebSocketProvider")
-    /// This allows game logic to determine which protocol the message came from without
+    /// This allows application logic to determine which protocol the message came from without
     /// needing direct access to Network resources
     provider_name: &'static str,
 }

@@ -290,36 +290,36 @@ impl<T: EventworkMessage> PreviousMessage<T> {
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Serialize, Deserialize, Debug)]
-/// struct GameUpdate {
-///     game_id: String,
+/// struct SessionUpdate {
+///     session_id: String,
 ///     state: Vec<u8>,
 /// }
 ///
 /// #[derive(Serialize, Deserialize, Debug)]
-/// struct SubscribeToGame {
-///     game_id: String,
+/// struct SubscribeToSession {
+///     session_id: String,
 /// }
 ///
 /// #[derive(Serialize, Deserialize, Debug)]
-/// struct UnsubscribeFromGame {
-///     game_id: String,
+/// struct UnsubscribeFromSession {
+///     session_id: String,
 /// }
 ///
-/// impl SubscriptionMessage for GameUpdate {
-///     type SubscribeRequest = SubscribeToGame;
-///     type UnsubscribeRequest = UnsubscribeFromGame;
+/// impl SubscriptionMessage for SessionUpdate {
+///     type SubscribeRequest = SubscribeToSession;
+///     type UnsubscribeRequest = UnsubscribeFromSession;
 ///     type SubscriptionParams = String;
 ///
 ///     fn get_subscription_params(&self) -> Self::SubscriptionParams {
-///         self.game_id.clone()
+///         self.session_id.clone()
 ///     }
 ///
 ///     fn create_subscription_request(params: Self::SubscriptionParams) -> Self::SubscribeRequest {
-///         SubscribeToGame { game_id: params }
+///         SubscribeToSession { session_id: params }
 ///     }
 ///
 ///     fn create_unsubscribe_request(params: Self::SubscriptionParams) -> Self::UnsubscribeRequest {
-///         UnsubscribeFromGame { game_id: params }
+///         UnsubscribeFromSession { session_id: params }
 ///     }
 /// }
 /// ```

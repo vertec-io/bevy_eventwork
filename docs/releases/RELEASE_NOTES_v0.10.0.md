@@ -23,7 +23,7 @@ struct PlayerPosition {
 
 // Had to implement this for every type
 impl NetworkMessage for PlayerPosition {
-    const NAME: &'static str = "game:PlayerPosition";
+    const NAME: &'static str = "app:PlayerPosition";
 }
 
 app.listen_for_message::<PlayerPosition, TcpProvider>();
@@ -70,7 +70,7 @@ net.send(connection_id, ChatMessage { ... })?;
 #### `broadcast<T>()`
 Updated broadcast method (same signature, now works with automatic messages):
 ```rust
-net.broadcast(GameStateUpdate { ... });
+net.broadcast(StateUpdate { ... });
 ```
 
 ## Migration Guide

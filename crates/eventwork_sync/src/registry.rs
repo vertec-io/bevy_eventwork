@@ -156,7 +156,7 @@ pub struct ComponentRegistration {
     pub type_name: String,
     pub config: ComponentSyncConfig,
     /// Type-specific function that knows how to deserialize and apply a
-    /// [`QueuedMutation`] for this component.
+    /// queued mutation for this component.
     pub apply_mutation: fn(&mut World, &QueuedMutation) -> MutationStatus,
     /// Type-specific function that can produce a full snapshot of all
     /// `(Entity, Component)` pairs for this component type, encoded as bincode
@@ -238,7 +238,7 @@ pub struct SnapshotQueue {
 /// Queue of pending component mutations requested by clients.
 #[derive(Resource, Default)]
 pub struct MutationQueue {
-    /// Pending mutations received from clients via [`SyncClientMessage::Mutate`].
+    /// Pending mutations received from clients via `SyncClientMessage::Mutate`.
     ///
     /// These are processed by an internal system which will consult any
     /// configured [`MutationAuthorizer`] and, if authorized, deserialize and
@@ -276,7 +276,7 @@ pub trait MutationAuthorizer: Send + Sync + 'static {
     ///
     /// Returning any status other than [`MutationStatus::Ok`] will prevent the
     /// mutation from being applied and will be propagated back to the client via
-    /// [`MutationResponse`].
+    /// [`crate::messages::MutationResponse`].
     fn authorize(&self, ctx: &MutationAuthContext, mutation: &QueuedMutation) -> MutationStatus;
 }
 

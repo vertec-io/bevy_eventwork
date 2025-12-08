@@ -6,10 +6,10 @@ Welcome to the comprehensive documentation for the bevy_eventwork ecosystem!
 
 **New to bevy_eventwork?** Start here:
 
-1. **[Server-Side Sync](getting-started/eventwork-sync.md)** - Synchronize ECS components to clients
-2. **[Client-Side Reactive UI](getting-started/eventwork-client.md)** - Build reactive web UIs with Leptos
-3. **Core Networking** - TCP-based networking with Bevy (coming soon)
-4. **Full Stack Example** - Complete client-server application (coming soon)
+1. **[Installation](getting-started/installation.md)** - Add bevy_eventwork to your project
+2. **[Server-Side Sync](getting-started/eventwork-sync.md)** - Synchronize ECS components to clients
+3. **[Client-Side Reactive UI](getting-started/eventwork-client.md)** - Build reactive web UIs with Leptos
+4. **[Core Networking](getting-started/eventwork.md)** - TCP-based networking with Bevy
 
 ---
 
@@ -24,7 +24,17 @@ Step-by-step guides to get you up and running quickly.
 Deep dives into system architecture and design.
 
 ### guides/
-How-to guides for specific tasks and features.
+How-to guides for specific tasks and features:
+- [Server Setup](guides/server-setup.md) - Configure EventworkSyncPlugin
+- [Hooks](guides/hooks.md) - All 9 Leptos hooks for reactive sync
+- [Subscriptions](guides/subscriptions.md) - Component subscription lifecycle
+- [Mutations](guides/mutations.md) - Client-driven component mutations
+- [Type Registry](guides/type-registry.md) - ClientTypeRegistry configuration
+- [Connection Management](guides/connection-management.md) - Connection lifecycle
+- [Shared Types](guides/shared-types.md) - Sharing types between server/client
+- [WebSocket Patterns](guides/websocket-patterns.md) - Production WebSocket patterns
+- [DevTools](guides/devtools.md) - DevTools setup and usage
+- [Sending Messages](guides/sending-messages.md) - Direct vs scheduled messaging
 
 ### api/
 API reference and quick reference guides.
@@ -45,6 +55,21 @@ Reference materials, glossary, troubleshooting, and FAQ.
 ### The bevy_eventwork Ecosystem
 
 **bevy_eventwork** is a modular networking ecosystem for Bevy applications:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Your Application                          │
+├─────────────────────────────────────────────────────────────────┤
+│  eventwork_client    │  eventwork_sync    │  eventwork          │
+│  (Leptos Web UI)     │  (Server Sync)     │  (Core Networking)  │
+├─────────────────────────────────────────────────────────────────┤
+│                    eventwork_websockets                          │
+│                    (Transport Provider)                          │
+├─────────────────────────────────────────────────────────────────┤
+│                    eventwork_common                              │
+│                    (Shared Types)                                │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 - **eventwork** - Core networking library (TCP, WebSocket, custom transports)
 - **eventwork_sync** - Server-side ECS component synchronization
@@ -75,8 +100,14 @@ Reference materials, glossary, troubleshooting, and FAQ.
 
 ## 📖 Documentation Status
 
-This documentation is currently being built. Check back soon for comprehensive guides!
+| Section | Status |
+|---------|--------|
+| Getting Started | ✅ Complete |
+| Guides | ✅ Complete (10 guides) |
+| API Reference | 🔧 In Progress |
+| Examples | 🔧 In Progress |
+| Contributing | ✅ Complete |
 
-**Last Updated**: 2025-11-22  
-**bevy_eventwork Version**: 1.1.1  
+**Last Updated**: 2025-12-07
+**bevy_eventwork Version**: 1.1.1
 **Bevy Version**: 0.17.2

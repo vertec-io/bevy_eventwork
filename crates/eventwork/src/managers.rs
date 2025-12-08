@@ -22,7 +22,7 @@ pub mod network_request;
 ///
 /// - Listen for new client connections using [`Network::listen`]
 /// - Connect to a server using [`Network::connect`]
-/// - Send new messages using [`Network::send_message`]
+/// - Send new messages using [`Network::send`]
 /// - Send broadcasts to all connected clients using [`Network::broadcast`]
 #[derive(Resource)]
 pub struct Network<NP: NetworkProvider> {

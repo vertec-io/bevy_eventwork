@@ -46,8 +46,8 @@ Learn how to build reactive web UIs that display and edit synchronized data.
 - Using DevTools
 
 ### 4. Full Stack Application
-**Time**: 45-60 minutes  
-**Guide**: [Full Stack Example](./full-stack-example.md)
+**Time**: 45-60 minutes
+**Guide**: [Control Demo Example](../examples/control-demo.md)
 
 Put it all together by building a complete client-server application.
 
@@ -74,19 +74,15 @@ You only need the core `eventwork` crate. Skip the sync and client guides.
 1. [eventwork Getting Started](./eventwork.md)
 2. [eventwork_sync Getting Started](./eventwork-sync.md)
 3. [eventwork_client Getting Started](./eventwork-client.md)
-4. [Full Stack Example](./full-stack-example.md)
+4. [Control Demo Example](../examples/control-demo.md)
 
-### "I want to build a multiplayer game"
+### "I want to build a distributed application"
 
 → Start with [eventwork Getting Started](./eventwork.md), then:
-- Read the [Performance Tuning Guide](../guides/performance-tuning.md)
-- Check out the [Multiplayer Game Example](../examples/multiplayer-game.md)
+- Read the [Sending Messages Guide](../guides/sending-messages.md)
+- Check out the [Examples](../examples/README.md)
 
-You may not need eventwork_sync/eventwork_client for a game - consider using eventwork directly for more control.
-
-### "I'm migrating from Meteorite"
-
-→ Read the [Meteorite Migration Guide](../migration/meteorite-to-eventwork.md) first, then follow the full learning path.
+You may not need eventwork_sync/eventwork_client for some applications - consider using eventwork directly for more control.
 
 ---
 
@@ -171,23 +167,23 @@ view! {
 
 Choose your starting point:
 
+- **[Installation](./installation.md)** - Add dependencies
 - **[eventwork Getting Started](./eventwork.md)** - Core networking
 - **[eventwork_sync Getting Started](./eventwork-sync.md)** - Server-side sync
 - **[eventwork_client Getting Started](./eventwork-client.md)** - Client-side UI
-- **[Full Stack Example](./full-stack-example.md)** - Complete application
 
 ---
 
 ## 📚 Additional Resources
 
-- **[Architecture Overview](../architecture/system-overview.md)** - Understand how it all works
+- **[Architecture Overview](../architecture/README.md)** - Understand how it all works
 - **[User Guides](../guides/README.md)** - Task-specific how-to guides
 - **[API Reference](https://docs.rs/eventwork)** - Detailed API documentation
 - **[Examples](../examples/README.md)** - Real-world example applications
 
 ---
 
-**Last Updated**: 2025-11-22  
-**Difficulty**: Beginner to Intermediate  
+**Last Updated**: 2025-12-07
+**Difficulty**: Beginner to Intermediate
 **Estimated Time**: 2-3 hours for full learning path
 

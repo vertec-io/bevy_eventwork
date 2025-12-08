@@ -1,14 +1,14 @@
 //! Scheduled message handling plugin for the hybrid server.
 //!
 //! This module demonstrates the "scheduled" or "decoupled" approach to handling messages
-//! in a multi-protocol server. Game logic writes OutboundMessage<T> events, and the built-in
+//! in a multi-protocol server. Application logic writes OutboundMessage<T> events, and the built-in
 //! relay system handles the actual network broadcasting in a deterministic system set.
 //!
 //! **Trade-offs:**
-//! - ✅ Complete decoupling - game logic has no Network dependencies
+//! - ✅ Complete decoupling - application logic has no Network dependencies
 //! - ✅ Deterministic - all messages sent at the same point in the frame
-//! - ✅ Easy to test - game logic can be tested without network infrastructure
-//! - ✅ Flexible - easy to add new protocols without changing game logic
+//! - ✅ Easy to test - application logic can be tested without network infrastructure
+//! - ✅ Flexible - easy to add new protocols without changing application logic
 //! - ❌ Slightly more complex - requires understanding of system sets and OutboundMessage
 
 use bevy::prelude::*;
@@ -28,8 +28,8 @@ impl Plugin for ScheduledMsgPlugin {
     fn build(&self, app: &mut App) {
         // Define system sets for deterministic message handling
         app.configure_sets(Update, (
-            GameLogic,
-            NetworkRelay.after(GameLogic),
+            AppLogic,
+            NetworkRelay.after(AppLogic),
         ));
 
         // Register outbound messages for BOTH providers
@@ -40,14 +40,14 @@ impl Plugin for ScheduledMsgPlugin {
         // Add connection event handler (not part of the message flow)
         app.add_systems(Update, handle_connection_events);
 
-        // Add game logic system (reads messages, writes OutboundMessage)
-        app.add_systems(Update, handle_messages.in_set(GameLogic));
+        // Add application logic system (reads messages, writes OutboundMessage)
+        app.add_systems(Update, handle_messages.in_set(AppLogic));
     }
 }
 
-/// System set for game logic that processes incoming messages
+/// System set for application logic that processes incoming messages
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-struct GameLogic;
+struct AppLogic;
 
 /// System set for network relay that broadcasts outbound messages
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -90,9 +90,9 @@ fn handle_connection_events(
     }
 }
 
-/// Game logic that processes incoming messages and writes OutboundMessage events.
+/// Application logic that processes incoming messages and writes OutboundMessage events.
 ///
-/// This demonstrates the scheduled pattern: game logic has ZERO dependencies on Network resources!
+/// This demonstrates the scheduled pattern: application logic has ZERO dependencies on Network resources!
 /// It simply reads incoming messages and writes outbound messages. The relay system handles the rest.
 fn handle_messages(
     mut new_messages: MessageReader<NetworkData<shared_types::UserChatMessage>>,
@@ -114,7 +114,7 @@ fn handle_messages(
         };
 
         // Scheduled pattern: Write OutboundMessage - the built-in relay system handles broadcasting!
-        // This completely decouples game logic from network infrastructure
+        // This completely decouples application logic from network infrastructure
         // The relay_outbound system (registered via register_outbound_message) will automatically
         // broadcast this message to all clients on both TCP and WebSocket providers
         outbound.write(OutboundMessage {

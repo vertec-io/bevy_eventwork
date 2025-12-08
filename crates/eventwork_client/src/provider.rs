@@ -32,7 +32,7 @@ use eventwork_sync::{SyncClientMessage, SyncServerMessage};
 ///             url="ws://localhost:3000/sync"
 ///             registry=registry
 ///         >
-///             <MyGameUI />
+///             <MyAppUI />
 ///         </SyncProvider>
 ///     }
 /// }

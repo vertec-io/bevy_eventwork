@@ -1,13 +1,13 @@
 //! Immediate message handling plugin for the hybrid server.
 //!
 //! This module demonstrates the "immediate" or "raw" approach to handling messages
-//! in a multi-protocol server. Game logic systems directly use Network<T> resources
+//! in a multi-protocol server. Application logic systems directly use Network<T> resources
 //! to send messages, providing maximum control and simplicity.
 //!
 //! **Trade-offs:**
 //! - ✅ Simple and direct - no extra abstractions
 //! - ✅ Full control over when messages are sent
-//! - ❌ Game logic is coupled to Network resources
+//! - ❌ Application logic is coupled to Network resources
 //! - ❌ Harder to test without network infrastructure
 //! - ❌ Less deterministic - messages sent whenever systems run
 
@@ -75,8 +75,8 @@ fn handle_connection_events(
 
 /// Message handler that directly broadcasts using Network resources.
 ///
-/// This demonstrates the immediate pattern: game logic directly uses Network<T> resources
-/// to send messages. This provides maximum control but couples game logic to network infrastructure.
+/// This demonstrates the immediate pattern: application logic directly uses Network<T> resources
+/// to send messages. This provides maximum control but couples application logic to network infrastructure.
 fn handle_messages(
     mut new_messages: MessageReader<NetworkData<shared_types::UserChatMessage>>,
     tcp_net: Res<Network<TcpProvider>>,
@@ -98,7 +98,7 @@ fn handle_messages(
         };
 
         // Immediate pattern: Directly broadcast to both networks
-        // This is simple and direct, but couples game logic to Network resources
+        // This is simple and direct, but couples application logic to Network resources
         tcp_net.broadcast(broadcast_message.clone());
         ws_net.broadcast(broadcast_message);
     }

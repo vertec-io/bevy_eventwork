@@ -98,7 +98,7 @@ fn send_messages(
 - You want to batch network operations in specific system sets
 - You're implementing custom network flow control
 - You want to separate message creation from message sending
-- You need to coordinate network sends with other game systems
+- You need to coordinate network sends with other application systems
 
 ### How It Works
 
@@ -123,7 +123,7 @@ fn setup(app: &mut App) {
     // All outbound messages will be sent during NetworkSync
     app.register_outbound_message::<PlayerPosition, TcpProvider, _>(NetworkSync);
     app.register_outbound_message::<PlayerAction, TcpProvider, _>(NetworkSync);
-    app.register_outbound_message::<GameState, TcpProvider, _>(NetworkSync);
+    app.register_outbound_message::<AppState, TcpProvider, _>(NetworkSync);
 }
 
 // Now all these messages will be batched and sent together
@@ -171,7 +171,7 @@ fn handle_action(mut outbound: MessageWriter<OutboundMessage<PlayerAction>>) {
 ### For Advanced Applications
 
 **Use Outbound Messages** (`MessageWriter<OutboundMessage<T>>`) for:
-- Multiplayer games with complex state synchronization
+- Networked applications with complex state synchronization
 - Applications that need deterministic network timing
 - Systems that batch multiple message types together
 - Applications with custom network scheduling requirements
@@ -180,7 +180,7 @@ fn handle_action(mut outbound: MessageWriter<OutboundMessage<PlayerAction>>) {
 
 You can use both approaches in the same application! For example:
 - Use **Direct Sending** for urgent, one-off messages (chat, commands)
-- Use **Outbound Messages** for regular state updates (positions, game state)
+- Use **Outbound Messages** for regular state updates (positions, application state)
 
 ```rust
 fn handle_chat(

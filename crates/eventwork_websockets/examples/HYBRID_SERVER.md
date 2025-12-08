@@ -19,12 +19,12 @@ Both networks are registered with the same message types, and the message handli
 
 ## Pattern 1: Scheduled (Default) - Decoupled Architecture
 
-The **scheduled pattern** uses the built-in `register_outbound_message` method to create a two-stage relay system that completely decouples game logic from network infrastructure.
+The **scheduled pattern** uses the built-in `register_outbound_message` method to create a two-stage relay system that completely decouples application logic from network infrastructure.
 
 ### How It Works
 
-**Stage 1: Game Logic (GameLogic SystemSet)**
-Game logic reads incoming messages and writes `OutboundMessage<T>` events. It has **zero dependencies** on `Network` resources.
+**Stage 1: Application Logic (AppLogic SystemSet)**
+Application logic reads incoming messages and writes `OutboundMessage<T>` events. It has **zero dependencies** on `Network` resources.
 
 ```rust
 fn handle_messages(
@@ -67,31 +67,31 @@ Each relay system reads `OutboundMessage<T>` events and broadcasts them via its 
 
 ```rust
 app.configure_sets(Update, (
-    GameLogic,
-    NetworkRelay.after(GameLogic),
+    AppLogic,
+    NetworkRelay.after(AppLogic),
 ));
 ```
 
 This ensures:
-- ✅ All game logic completes before messages are sent
+- ✅ All application logic completes before messages are sent
 - ✅ Messages are sent at a deterministic point in the frame
 - ✅ Can use `.apply_deferred()` before NetworkRelay to sync world state
 
 ### Benefits
 
-✅ **Complete Decoupling**: Game logic has zero dependencies on `Network` resources
+✅ **Complete Decoupling**: Application logic has zero dependencies on `Network` resources
 ✅ **Determinism**: All messages sent at the same point in the frame
-✅ **Testability**: Game logic can be tested without network infrastructure
-✅ **Flexibility**: Easy to add new protocols without changing game logic
+✅ **Testability**: Application logic can be tested without network infrastructure
+✅ **Flexibility**: Easy to add new protocols without changing application logic
 ✅ **Uses Framework Correctly**: Leverages built-in `register_outbound_message` method
 
 ## Pattern 2: Immediate - Direct Control
 
-The **immediate pattern** gives you direct control by having game logic directly broadcast to both network providers.
+The **immediate pattern** gives you direct control by having application logic directly broadcast to both network providers.
 
 ### How It Works
 
-Game logic directly uses `Network<TcpProvider>` and `Network<WebSocketProvider>` resources:
+Application logic directly uses `Network<TcpProvider>` and `Network<WebSocketProvider>` resources:
 
 ```rust
 fn handle_messages(
@@ -147,7 +147,7 @@ Both patterns use the `provider_name` field in `NetworkData<T>` to identify whic
 let provider = message.provider_name();  // "TCP" or "WebSocket"
 ```
 
-This allows game logic to determine the protocol **without** needing access to `Network` resources, achieving complete decoupling (especially important in the scheduled pattern).
+This allows application logic to determine the protocol **without** needing access to `Network` resources, achieving complete decoupling (especially important in the scheduled pattern).
 
 ## Running the Example
 
@@ -192,13 +192,13 @@ trunk serve --port 8082
 ### Scheduled Pattern
 1. Message received by appropriate `Network<T>` resource
 2. Message written to Bevy's global `MessageWriter<NetworkData<UserChatMessage>>` with provider name
-3. Game logic reads message and writes `OutboundMessage<NewChatMessage>` (GameLogic set)
+3. Application logic reads message and writes `OutboundMessage<NewChatMessage>` (AppLogic set)
 4. Built-in relay systems (one per provider) read outbound messages and broadcast (NetworkRelay set)
 
 ### Immediate Pattern
 1. Message received by appropriate `Network<T>` resource
 2. Message written to Bevy's global `MessageWriter<NetworkData<UserChatMessage>>` with provider name
-3. Game logic reads message and directly broadcasts to both `Network<TcpProvider>` and `Network<WebSocketProvider>`
+3. Application logic reads message and directly broadcasts to both `Network<TcpProvider>` and `Network<WebSocketProvider>`
 
 Both patterns create a unified chat room where TCP and WebSocket clients can communicate seamlessly!
 
@@ -214,20 +214,20 @@ The example is split into three files:
 ### `scheduled_messages.rs` (Scheduled Pattern Plugin)
 - `ScheduledMsgPlugin` - Sets up system sets and registers outbound messages
 - `handle_connection_events()` - Unified connection handler
-- `handle_messages()` - Game logic that writes `OutboundMessage<T>` events
+- `handle_messages()` - Application logic that writes `OutboundMessage<T>` events
 - Uses built-in `relay_outbound` systems (registered via `register_outbound_message`)
 
 ### `immediate_messages.rs` (Immediate Pattern Plugin)
 - `ImmediateMsgPlugin` - Sets up systems
 - `handle_connection_events()` - Unified connection handler
-- `handle_messages()` - Game logic that directly broadcasts to both networks
+- `handle_messages()` - Application logic that directly broadcasts to both networks
 
 ## Which Pattern Should You Use?
 
 ### Use **Scheduled Pattern** if you want:
-- ✅ Complete decoupling of game logic from network infrastructure
+- ✅ Complete decoupling of application logic from network infrastructure
 - ✅ Deterministic message timing (all messages sent at same point in frame)
-- ✅ Easy testing (game logic has no network dependencies)
+- ✅ Easy testing (application logic has no network dependencies)
 - ✅ Production-ready architecture
 - ✅ Ability to use `.apply_deferred()` before sending messages
 
@@ -288,9 +288,9 @@ The hybrid server demonstrates that **bevy_eventwork's architecture is flexible 
 The example showcases **two different architectural approaches**:
 
 ### Scheduled Pattern (Recommended for Production)
-- **Clean separation** between game logic and network infrastructure
+- **Clean separation** between application logic and network infrastructure
 - **Deterministic behavior** with predictable message timing
-- **Easy testing** since game logic has no network dependencies
+- **Easy testing** since application logic has no network dependencies
 - **Uses framework correctly** by leveraging built-in `register_outbound_message`
 - **Scalability** to add new protocols without changing existing code
 

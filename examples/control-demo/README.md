@@ -133,7 +133,7 @@ control.last_activity = time.elapsed_secs();
 │  └──────────────────────────────────────────────────────┘  │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │  Game Logic                                          │  │
+│  │  Application Logic                                   │  │
 │  │  - handle_move_commands (validate control)           │  │
 │  │  - update_robot_status                               │  │
 │  └──────────────────────────────────────────────────────┘  │

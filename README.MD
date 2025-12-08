@@ -1,6 +1,6 @@
 # bevy_eventwork
 
-> A modular, event-driven networking solution for [Bevy](https://bevyengine.org/) games. Connect multiple Bevy instances with ease using a flexible, transport-agnostic architecture.
+> A modular, event-driven networking solution for [Bevy](https://bevyengine.org/) applications. Connect multiple Bevy instances with ease using a flexible, transport-agnostic architecture.
 
 Forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bevy_spicy_networking), with significant improvements for modularity, performance, and ease of use.
 
@@ -13,7 +13,7 @@ Forked from the excellent [`bevy_spicy_networking`](https://crates.io/crates/bev
 - [Features](#features)
 - [Documentation](#documentation)
   - [Quickstart](#quickstart)
-  - [Sending Messages Guide](./SENDING_MESSAGES.md) 📖
+  - [Sending Messages Guide](./docs/guides/sending-messages.md) 📖
 - [Examples](#examples)
 - [Bevy Version Compatibility](#bevy-version-compatibility)
 - [Supported Platforms](#supported-platforms)
@@ -42,7 +42,7 @@ Version 0.10 introduces **automatic message registration** - a major ergonomic i
 ```rust
 // Had to implement NetworkMessage for every type
 impl NetworkMessage for PlayerPosition {
-    const NAME: &'static str = "game:PlayerPosition";
+    const NAME: &'static str = "app:PlayerPosition";
 }
 app.listen_for_message::<PlayerPosition, TcpProvider>();
 net.send_message(conn_id, msg)?;
@@ -200,7 +200,7 @@ fn send_chat_message(
 }
 ```
 
-> 📚 **Advanced:** Eventwork also supports `OutboundMessage` with `MessageWriter` for precise control over network scheduling. See **[SENDING_MESSAGES.md](./SENDING_MESSAGES.md)** for the complete guide on both approaches.
+> 📚 **Advanced:** Eventwork also supports `OutboundMessage` with `MessageWriter` for precise control over network scheduling. See **[Sending Messages Guide](./docs/guides/sending-messages.md)** for the complete guide on both approaches.
 
 ## Examples
 
@@ -301,13 +301,20 @@ This repository is organized as a Cargo workspace with multiple crates:
 - **[`eventwork_websockets`](./crates/eventwork_websockets)** - WebSocket transport (WASM + Native)
 - **[`eventwork_memory`](./crates/eventwork_memory)** - In-memory transport for testing
 
+### Sync & Client Crates
+
+- **[`eventwork_sync`](./crates/eventwork_sync)** - Server-side ECS component synchronization
+- **[`eventwork_client`](./crates/eventwork_client)** - Leptos-based reactive web client for eventwork_sync
+
 ## Roadmap
 
 ### Current Focus
-- ✅ Bevy 0.16 support
+- ✅ Bevy 0.17 support
 - ✅ Rust 2024 edition
 - ✅ Improved documentation
 - ✅ WebSocket transport provider
+- ✅ ECS component synchronization (eventwork_sync)
+- ✅ Reactive web client (eventwork_client)
 
 ### Future Plans
 - 🔄 Message type ID optimization (reduce bandwidth by using numeric IDs instead of strings)

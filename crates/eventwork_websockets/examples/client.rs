@@ -63,7 +63,7 @@ struct NetworkTaskPool(TaskPool);
 ///////////////////////////////////////////////////////////////
 
 fn handle_incoming_messages(
-    mut messages: Query<&mut GameChatMessages>,
+    mut messages: Query<&mut AppChatMessages>,
     mut new_messages: MessageReader<NetworkData<shared::NewChatMessage>>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
@@ -79,7 +79,7 @@ fn handle_network_events(
     mut new_network_events: MessageReader<NetworkEvent>,
     connect_query: Query<&Children, With<ConnectButton>>,
     mut text_query: Query<&mut Text>,
-    mut messages: Query<&mut GameChatMessages>,
+    mut messages: Query<&mut AppChatMessages>,
 ) {
     let Ok(connect_children) = connect_query.single() else {
         return;
@@ -207,7 +207,7 @@ impl<T> ChatMessages<T> {
     }
 }
 
-type GameChatMessages = ChatMessages<ChatMessage>;
+type AppChatMessages = ChatMessages<ChatMessage>;
 
 ///////////////////////////////////////////////////////////////
 ////////////// UI Definitions/Handlers ////////////////////////
@@ -224,7 +224,7 @@ fn handle_connect_button(
         (Changed<Interaction>, With<ConnectButton>),
     >,
     mut text_query: Query<&mut Text>,
-    mut messages: Query<&mut GameChatMessages>,
+    mut messages: Query<&mut AppChatMessages>,
     task_pool: Res<EventworkRuntime<TaskPool>>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
@@ -257,7 +257,7 @@ struct MessageButton;
 fn handle_message_button(
     net: Res<Network<WebSocketProvider>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MessageButton>)>,
-    mut messages: Query<&mut GameChatMessages>,
+    mut messages: Query<&mut AppChatMessages>,
 ) {
     let Ok(mut messages) = messages.single_mut() else {
         return;
@@ -286,7 +286,7 @@ struct ChatArea;
 
 fn handle_chat_area(
     chat_settings: Res<GlobalChatSettings>,
-    messages: Query<&GameChatMessages, Changed<GameChatMessages>>,
+    messages: Query<&AppChatMessages, Changed<AppChatMessages>>,
     mut chat_text_query: Query<(Entity, &mut Text), With<ChatArea>>,
     mut read_messages_index: Local<usize>,
     mut commands: Commands,
@@ -319,7 +319,7 @@ fn handle_chat_area(
 fn setup_ui(mut commands: Commands) {
     commands.spawn(Camera2d::default());
 
-    commands.spawn((GameChatMessages::new(),));
+    commands.spawn((AppChatMessages::new(),));
 
     commands
         .spawn((

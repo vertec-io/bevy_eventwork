@@ -330,7 +330,7 @@ impl SyncContext {
     /// use reactive_stores::Store;
     ///
     /// #[component]
-    /// fn GameView() -> impl IntoView {
+    /// fn AppView() -> impl IntoView {
     ///     let positions = use_sync_component_store::<Position>();
     ///
     ///     // Access individual entity fields reactively

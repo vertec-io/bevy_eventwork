@@ -66,7 +66,7 @@ fn main() {
             TaskPoolBuilder::new().num_threads(2).build()
         ))
         // Register your messages
-        .listen_for_message::<YourMessage, WebSocketProvider>()
+        .register_network_message::<YourMessage, WebSocketProvider>()
         .run();
 }
 ```
@@ -117,13 +117,6 @@ cargo build --target wasm32-unknown-unknown --example client -p eventwork_websoc
 ```
 
 No special features or configuration needed - it just works! ✨
-
-## Version Compatibility
-
-| eventwork_websockets | eventwork | Bevy |
-| :------------------: | :-------: | :--: |
-|         0.2          |    0.9    | 0.16 |
-|         0.1          |    0.8    | 0.13 |
 
 ## License
 

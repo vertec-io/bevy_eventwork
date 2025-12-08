@@ -10,7 +10,7 @@ Reactive Leptos client library for building web UIs that synchronize with Bevy E
 
 ## Overview
 
-eventwork_client is a reactive Leptos library for building web UIs that display and edit ECS components synchronized from Bevy servers via `eventwork_sync`. It's designed for control panels, dashboards, and web-based tools for robotics, industrial automation, and multiplayer games.
+eventwork_client is a reactive Leptos library for building web UIs that display and edit ECS components synchronized from Bevy servers via `eventwork_sync`. It's designed for control panels, dashboards, and web-based tools for robotics, industrial automation, and networked applications.
 
 ### Key Features
 
@@ -77,18 +77,18 @@ pub fn App() -> impl IntoView {
 
     view! {
         <SyncProvider url="ws://localhost:8082" registry=registry>
-            <GameView/>
+            <AppView/>
         </SyncProvider>
     }
 }
 
 #[component]
-fn GameView() -> impl IntoView {
+fn AppView() -> impl IntoView {
     // Automatically subscribes to Position components
     let positions = use_sync_component::<Position>();
 
     view! {
-        <div class="game-view">
+        <div class="app-view">
             <h1>"Entities"</h1>
             <For
                 each=move || {
@@ -154,7 +154,7 @@ use eventwork_client::DevTools;
 
 view! {
     <SyncProvider url="ws://localhost:8082" registry=registry>
-        <GameView/>
+        <AppView/>
         <DevTools/>  // Add DevTools
     </SyncProvider>
 }
