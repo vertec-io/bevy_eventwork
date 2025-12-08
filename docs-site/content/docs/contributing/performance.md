@@ -1,3 +1,6 @@
+---
+title: Performance Reference
+---
 # Performance Reference
 
 Performance characteristics and optimization strategies for bevy_eventwork contributors.

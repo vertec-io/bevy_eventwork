@@ -1,3 +1,6 @@
+---
+title: Architecture Reference
+---
 # Architecture Reference
 
 This document provides architectural reference for bevy_eventwork contributors.

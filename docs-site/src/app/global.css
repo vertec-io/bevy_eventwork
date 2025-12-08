@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Custom Gold/Amber accent color override */
+:root {
+    --fd-primary: 38 92% 50%;
+    --fd-primary-foreground: 60 9.1% 97.8%;
+}
+
+.dark {
+    --fd-primary: 38 92% 50%;
+    --fd-primary-foreground: 60 9.1% 97.8%;
+}

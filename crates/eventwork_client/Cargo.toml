@@ -1,6 +1,6 @@
 [package]
 name = "eventwork_client"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Vertec.io"]
 description = "High-level reactive client library for eventwork_sync with Leptos integration"

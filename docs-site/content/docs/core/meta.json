@@ -1,0 +1,17 @@
+{
+  "title": "Core",
+  "pages": [
+    "index",
+    "what-is-eventwork",
+    "comparisons",
+    "getting-started",
+    "installation",
+    "guides",
+    "examples",
+    "architecture",
+    "api",
+    "reference",
+    "releases",
+    "migration"
+  ]
+}
