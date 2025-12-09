@@ -22,11 +22,10 @@ use basic_types::{EntityName, Position, Velocity};
 fn main() {
     let mut app = App::new();
 
-    // Configure MinimalPlugins with a schedule runner that runs at 0.25 Hz (once every 4 seconds)
-    // This is slowed down for debugging the DevTools focus issue
+    // Configure MinimalPlugins with a schedule runner that runs at 60 FPS. To slow it down, use 4.0
     app.add_plugins(
         MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
-            4.0, // 0.25 Hz
+            1.0/60.0, // 0.25 Hz
         ))),
     );
     app.add_plugins(bevy::log::LogPlugin::default());

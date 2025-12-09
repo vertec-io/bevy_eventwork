@@ -1,6 +1,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 
+use bevy::app::ScheduleRunnerPlugin;
 use bevy::prelude::*;
 use bevy::tasks::{TaskPool, TaskPoolBuilder};
 use bevy_tokio_tasks::{TokioTasksPlugin, TokioTasksRuntime};
@@ -28,8 +30,12 @@ use tokio::sync::broadcast;
 fn main() {
     let mut app = App::new();
 
+    // Configure MinimalPlugins with a schedule runner that runs at 60 FPS
     app.add_plugins((
-        MinimalPlugins,
+        MinimalPlugins
+        .set(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
+            1.0 / 60.0,
+        ))),
         bevy::log::LogPlugin::default(),
         TokioTasksPlugin::default(),
     ));

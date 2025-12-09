@@ -168,10 +168,11 @@ fn EntityList() -> impl IntoView {
             }}
                 <For
                     each=move || {
-                        let entity_ids = positions.get()
+                        let mut entity_ids: Vec<_> = positions.get()
                             .keys()
                             .copied()
-                            .collect::<Vec<_>>();
+                            .collect();
+                        entity_ids.sort(); // Sort for stable ordering
                         leptos::logging::log!("[EntityList] For loop: {} entity IDs", entity_ids.len());
                         entity_ids
                     }
@@ -271,10 +272,12 @@ fn EntityListWithStores() -> impl IntoView {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <For
                     each=move || {
-                        positions.read()
+                        let mut entity_ids: Vec<_> = positions.read()
                             .keys()
                             .copied()
-                            .collect::<Vec<_>>()
+                            .collect();
+                        entity_ids.sort(); // Sort for stable ordering
+                        entity_ids
                     }
                     key=|entity_id| *entity_id
                     children=move |entity_id| {
